@@ -1,0 +1,47 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+    id 'java'
+}
+
+group = artifact_group
+version = "${artifact_version}.${build_number}"
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+    implementation gradleApi()
+    testImplementation(platform("org.junit:junit-bom:5.9.1"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+}
+
+test {
+    useJUnitPlatform()
+}
+
+test {
+    // Always run the tests
+    outputs.upToDateWhen { false }
+
+    // Turn on some console logging
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        stackTraceFilters "entryPoint"
+    }
+}
+
+// Write the plugin's classpath to a file to share with the tests
+task createClasspathManifest {
+    def outputDir = file("$buildDir/$name")
+
+    inputs.files sourceSets.main.runtimeClasspath
+    outputs.dir outputDir
+
+    doLast {
+        outputDir.mkdirs()
+        file("$outputDir/plugin-classpath.txt").text = sourceSets.main.runtimeClasspath.join("\n")
+    }
+}
