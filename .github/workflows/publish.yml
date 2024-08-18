@@ -22,10 +22,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run build with Gradle Wrapper
-        run: ./gradlew build -Partifact_version=${{ github.ref_name }
+        run: ./gradlew build -Partifact_version=${{ github.ref_name }}
 
       - name: Run publish
-        run: ./gradlew publishPlugins -Pgradle.publish.key=${{ secrets.KEY }} -Pgradle.publish.secret=${{ secrets.SECRET }} -Partifact_version=${{ github.ref_name }
+        run: ./gradlew publishPlugins -Pgradle.publish.key=${{ secrets.KEY }} -Pgradle.publish.secret=${{ secrets.SECRET }} -Partifact_version=${{ github.ref_name }}
 
       - name: Debug Releases
         run: gh release list
