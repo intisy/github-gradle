@@ -1,0 +1,36 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project sources
+        uses: actions/checkout@v4
+
+      - name: Setup Git
+        run: echo "${{ secrets.PAT }}" | gh auth login --with-token
+        
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+        
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run build with Gradle Wrapper
+        run: ./gradlew build
+
+      - name: Run publish
+        run: ./gradlew publishPlugins -Pgradle.publish.key=${{ secrets.KEY }} -Pgradle.publish.secret=${{ secrets.SECRET }}
+
+      - name: Debug Releases
+        run: gh release list
+
+      - name: Create Release and Upload Jar
+        run: |
+            gh release create ${{ github.ref_name }} -t "Release v${{ github.ref_name }}"
+            gh release upload ${{ github.ref_name }} build/libs/SimpleVariables.jar

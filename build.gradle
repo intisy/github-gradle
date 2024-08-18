@@ -2,19 +2,58 @@ plugins {
     id 'java-gradle-plugin'
     id 'maven-publish'
     id 'java'
+    id 'com.gradle.plugin-publish' version "1.2.1"
 }
 
 group = artifact_group
-version = "${artifact_version}.${build_number}"
+version = artifact_version
+
+gradlePlugin {
+    website.set("https://github.com/intisy/github-gradle")
+    vcsUrl.set("https://github.com/intisy/github-gradle")
+    plugins {
+        create(artifact_name) {
+            id = "$group.$artifact_name"
+            implementationClass = group + ".Plugin"
+            displayName = display_name
+            description = "Implements an way to get dependencies from an online file in the github assets"
+            tags = ["github", "dependency", "jar"]
+        }
+    }
+}
 
 repositories {
 	mavenCentral()
 }
 
+tasks.withType(Javadoc) {
+    failOnError false
+    title = "Github Gradle API Documentation"
+    classpath = sourceSets.main.runtimeClasspath
+    destinationDir = file("$buildDir/docs/javadoc")
+    options {
+        encoding = 'UTF-8'
+        author = true
+        version = true
+        links("https://docs.oracle.com/en/java/javase/11/docs/api/") // Link to external Javadocs
+    }
+}
+
 dependencies {
     implementation gradleApi()
+    implementation ('org.kohsuke:github-api:1.321')
+    implementation ('com.squareup.okhttp3:okhttp:4.12.0')
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+}
+
+task javadocJar(type: Jar) {
+    archiveClassifier = 'javadoc'
+    from tasks.javadoc
+}
+
+artifacts {
+    archives javadocJar
 }
 
 test {
@@ -22,10 +61,7 @@ test {
 }
 
 test {
-    // Always run the tests
     outputs.upToDateWhen { false }
-
-    // Turn on some console logging
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
@@ -33,13 +69,10 @@ test {
     }
 }
 
-// Write the plugin's classpath to a file to share with the tests
 task createClasspathManifest {
     def outputDir = file("$buildDir/$name")
-
     inputs.files sourceSets.main.runtimeClasspath
     outputs.dir outputDir
-
     doLast {
         outputDir.mkdirs()
         file("$outputDir/plugin-classpath.txt").text = sourceSets.main.runtimeClasspath.join("\n")
