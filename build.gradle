@@ -3,10 +3,26 @@ plugins {
     id 'maven-publish'
     id 'java'
     id 'com.gradle.plugin-publish' version "1.2.1"
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 version = project.hasProperty('artifact_version') ? project.property('artifact_version') : '1.0'
 group = artifact_group
+def main = group + ".Plugin"
+
+shadowJar {
+    archiveBaseName.set(artifact_name)
+    archiveClassifier.set('')
+    manifest {
+        attributes 'Main-Class':main
+    }
+    mergeServiceFiles()
+    minimize()
+}
+
+tasks.build {
+    dependsOn shadowJar
+}
 
 gradlePlugin {
     website.set("https://github.com/intisy/github-gradle")
@@ -14,7 +30,7 @@ gradlePlugin {
     plugins {
         create(artifact_name) {
             id = "$group.$artifact_name"
-            implementationClass = group + ".Plugin"
+            implementationClass = main
             displayName = display_name
             description = "Implements an way to get dependencies from an online file in the github assets"
             tags = ["github", "dependency", "jar"]
