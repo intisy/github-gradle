@@ -5,8 +5,8 @@ plugins {
     id 'com.gradle.plugin-publish' version "1.2.1"
 }
 
+version = project.hasProperty('artifact_version') ? project.property('artifact_version') : '1.0'
 group = artifact_group
-version = artifact_version
 
 gradlePlugin {
     website.set("https://github.com/intisy/github-gradle")
