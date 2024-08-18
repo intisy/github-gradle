@@ -12,7 +12,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Handles all the GitHub API related stuff.
+ */
 public class GitHub {
+    /**
+     * gets the asset from the repository
+     */
     public static File getAsset(String repoName, String repoOwner, String version) {
         File direction = new File(new File(GradleUtils.getGradleHome().toFile(), repoOwner), repoName);
         direction.mkdirs();
@@ -48,6 +54,9 @@ public class GitHub {
         } else
             return jar;
     }
+    /**
+     * downloads the asset
+     */
     public static void download(File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
         System.out.println("Downloading dependency from " + repoOwner + "/" + repoName);
         String downloadUrl = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/assets/" + asset.getId();
