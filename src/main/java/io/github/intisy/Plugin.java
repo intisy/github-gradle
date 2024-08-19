@@ -28,7 +28,7 @@ class Plugin implements org.gradle.api.Plugin<Project> {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
-					System.out.println("Dependency: " + group + ":" + name + ":" + version);
+					System.out.println("Github Dependency named " + name + " version " + version + " from user" + group);
 				}
 			});
 		});
