@@ -4,12 +4,61 @@
 
 Github Gradle makes it easier for the average person to make personal dependencies without spending money on websites like jitpack, because it allows you to make dependencies out of you GitHub projects assets just like JitPack 
 
-## Why did i make Github Gradle?
+## Usage
 
-Because my JitPack trial endet
+You can add the plugin like this and add as many codeartifact repositories, as you want:
 
-## How do you use GitHub Gradle?
+```groovy
+plugins {
+    id 'io.github.intisy.github-gradle'
+}
 
-```java
-// Soon
+repositories {
+    codeartifact {
+        region '<region>'
+        domain '<domain>'
+        domainOwner '<domainOwner>'
+        repository '<repository>'
+    }
+}
 ```
+
+Or to add repositories to the Publishing plugin:
+
+```groovy
+plugins {
+    id 'maven-publish'
+    id 'io.github.intisy.github-gradle'
+}
+
+publishing {
+    repositories {
+        codeartifact {
+            region '<region>'
+            domain '<domain>'
+            domainOwner '<domainOwner>'
+            repository '<repository>'
+        }
+    }
+}
+```
+
+Once you have the plugin installed you can use it like so:
+
+```groovy
+dependencies {
+    githubImplementation "USERNAME:REPOSITORY:TAG"
+}
+```
+
+Which in my case would be:
+
+```groovy
+dependencies {
+    githubImplementation "intisy:SimpleLogger:1.12.7"
+}
+```
+
+## License
+
+[![Apache License 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
