@@ -17,7 +17,7 @@ class Plugin implements org.gradle.api.Plugin<Project> {
     public void apply(Project project) {
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-			File jar = GitHub.getAsset(dependency.getGroup(), dependency.getName(), dependency.getVersion());
+			File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion());
 			project.getDependencies().add("implementation", project.files(jar));
         }));
 		project.getTasks().register("printGithubDependencies", task -> {
