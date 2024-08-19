@@ -32,7 +32,7 @@ gradlePlugin {
             id = "$group.$artifact_name"
             implementationClass = main
             displayName = display_name
-            description = "github-gradle implements an way to get dependencies from an the github assets, so you don't need services like jitpack anymore"
+            description = "github-gradle implements an way to get dependencies from an github asset, so you don't need services like jitpack anymore"
             tags = ["github", "dependency", "jar", "jitpack"]
         }
     }
