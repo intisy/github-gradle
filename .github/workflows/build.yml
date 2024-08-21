@@ -5,7 +5,7 @@ on:
       - "*"
 jobs:
   call-reusable-workflow:
-    uses: intisy/workflows/.github/workflows/gradle/build.yml@main
+    uses: intisy/workflows/.github/workflows/build.yml@main
     with:
       ref_name: ${{ github.ref_name }}
     secrets:
