@@ -10,37 +10,25 @@ You can add the plugin like this and add as many codeartifact repositories, as y
 
 ```groovy
 plugins {
-    id 'io.github.intisy.github-gradle'
-}
-
-repositories {
-    codeartifact {
-        region '<region>'
-        domain '<domain>'
-        domainOwner '<domainOwner>'
-        repository '<repository>'
-    }
+  id "io.github.intisy.github-gradle" version "1.1"
 }
 ```
 
 Or to add repositories to the Publishing plugin:
 
 ```groovy
-plugins {
-    id 'maven-publish'
-    id 'io.github.intisy.github-gradle'
+buildscript {
+  repositories {
+    maven {
+      url "https://plugins.gradle.org/m2/"
+    }
+  }
+  dependencies {
+    classpath "io.github.intisy:github-gradle:1.1"
+  }
 }
 
-publishing {
-    repositories {
-        codeartifact {
-            region '<region>'
-            domain '<domain>'
-            domainOwner '<domainOwner>'
-            repository '<repository>'
-        }
-    }
-}
+apply plugin: "io.github.intisy.github-gradle"
 ```
 
 Once you have the plugin installed you can use it like so:
