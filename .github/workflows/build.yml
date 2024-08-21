@@ -1,0 +1,12 @@
+name: Build And Upload
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  call-reusable-workflow:
+    uses: intisy/workflows/gradle/build.yml@main
+    with:
+      ref_name: ${{ github.ref_name }}
+    secrets:
+      PAT: ${{ secrets.PAT }}

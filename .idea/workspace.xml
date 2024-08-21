@@ -5,26 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7512c12f-94e9-4e35-bee8-48ecf5856290" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/github/WildePizza/MyTestableTask.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/java/com/github/WildePizza/GithubGradlePluginTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/java/com/github/WildePizza/TestMyPlugin.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/java/com/github/WildePizza/TestRealBuild.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.jar" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.jar" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradlew" beforeDir="false" afterPath="$PROJECT_DIR$/gradlew" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradlew.bat" beforeDir="false" afterPath="$PROJECT_DIR$/gradlew.bat" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/groovy/com/jhood/MyPlugin.groovy" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/github/WildePizza/MyPlugin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/groovy/com/jhood/MyPluginExtension.groovy" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/github/WildePizza/MyPluginExtension.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/groovy/com/jhood/MyTask.groovy" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/github/WildePizza/MyTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/groovy/com/jhood/MyTestableTask.groovy" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/groovy/com/jhood/impl/FileCreator.groovy" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/github/WildePizza/impl/FileCreator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/groovy/TestMyPlugin.groovy" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/groovy/TestRealBuild.groovy" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/groovy/impl/TestFileCreator.groovy" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/github/WildePizza/impl/TestFileCreator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/testProjects/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/testProjects/configuredProject/build.gradle" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/testProjects/simpleProject/build.gradle" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/.github/workflows/build.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/publish.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/test.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/test.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,18 +31,35 @@
             <expand>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="myplugin" type="f1a62948:ProjectNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="myplugin" type="f1a62948:ProjectNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="myplugin" type="f1a62948:ProjectNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="documentation" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="plugin portal" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="github-gradle" type="f1a62948:ProjectNode" />
+                <item name="Run Configurations" type="7b0102dc:RunConfigurationsNode" />
               </path>
             </expand>
             <select />
@@ -66,6 +67,13 @@
         </projects_view>
       </state>
     </system>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -87,23 +95,33 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;Gradle.Upgrade Gradle wrapper.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.gradle-plugin-example [build].executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/wilde/Documents/Github/gradle-plugin-example/src/test&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_ADD_EXTERNAL_FILES": "true",
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Gradle.GHGradle [javadoc].executor": "Run",
+    "Gradle.GHGradle [publishPlugins].executor": "Run",
+    "Gradle.GHGradle [testClasses].executor": "Run",
+    "Gradle.TestGitHub.testGithub.executor": "Run",
+    "Gradle.TestPlugin.testGithubImplementation.executor": "Run",
+    "Gradle.TestPlugin.testImplementation.executor": "Run",
+    "Gradle.TestPlugin.testPrintGithubDependenciesTask.executor": "Run",
+    "Gradle.Upgrade Gradle wrapper.executor": "Run",
+    "Gradle.gradle-plugin-example [build].executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "com.google.cloudcode.ide_session_index": "20240820_0003",
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "F:/Github/GHGradle/.github/workflows",
+    "settings.editor.selected.configurable": "settings.sync"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="F:\Github\GHGradle\.github\workflows" />
+      <recent name="F:\Github\GHGradle" />
       <recent name="C:\Users\wilde\Documents\Github\gradle-plugin-example\src\test" />
       <recent name="C:\Users\wilde\Documents\Github\gradle-plugin-example" />
       <recent name="C:\Users\wilde\Documents\Github\gradle-plugin-example\src\main\java\com\github\WildePizza" />
@@ -113,7 +131,101 @@
       <recent name="C:\Users\wilde\Documents\Github\gradle-plugin-example\src\test" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Gradle.gradle-plugin-example [build]">
+    <configuration name="GHGradle [testClasses]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="testClasses" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="TestGitHub.testGithub" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" value="" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":test" />
+            <option value="--tests" />
+            <option value="&quot;io.github.intisy.impl.TestGitHub.testGithub&quot;" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>true</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="TestPlugin.testGithubImplementation" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" value="" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":test" />
+            <option value="--tests" />
+            <option value="&quot;io.github.intisy.TestPlugin.testGithubImplementation&quot;" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>true</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="TestPlugin.testPrintGithubDependenciesTask" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" value="" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":test" />
+            <option value="--tests" />
+            <option value="&quot;io.github.intisy.TestPlugin.testPrintGithubDependenciesTask&quot;" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>true</RunAsTest>
+      <method v="2" />
+    </configuration>
     <configuration name="gradle-plugin-example [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -152,6 +264,10 @@
     <recent_temporary>
       <list>
         <item itemvalue="Gradle.gradle-plugin-example [build]" />
+        <item itemvalue="Gradle.GHGradle [testClasses]" />
+        <item itemvalue="Gradle.TestPlugin.testGithubImplementation" />
+        <item itemvalue="Gradle.TestPlugin.testPrintGithubDependenciesTask" />
+        <item itemvalue="Gradle.TestGitHub.testGithub" />
       </list>
     </recent_temporary>
   </component>
