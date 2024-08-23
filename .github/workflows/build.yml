@@ -9,4 +9,4 @@ jobs:
     with:
       ref_name: ${{ github.ref_name }}
     secrets:
-      PAT: ${{ secrets.PAT }}
+      envPAT: ${{ secrets.PAT }}
