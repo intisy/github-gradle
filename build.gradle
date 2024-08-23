@@ -7,9 +7,9 @@ plugins {
 }
 
 version = project.hasProperty('artifact_version') ? project.property('artifact_version') : '1.0'
-group = "${artifact_group}.${artifact_id}"
+group = artifact_group
 description = artifact_description
-def main = "${group}.Main"
+def main = "${group}.${artifact_id}.Main"
 
 shadowJar {
     archiveClassifier = ''
