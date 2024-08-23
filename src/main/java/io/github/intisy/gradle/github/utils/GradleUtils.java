@@ -1,4 +1,4 @@
-package io.github.intisy.utils;
+package io.github.intisy.gradle.github.utils;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

@@ -1,6 +1,6 @@
-package io.github.intisy;
+package io.github.intisy.gradle.github;
 
-import io.github.intisy.impl.GitHub;
+import io.github.intisy.gradle.github.impl.GitHub;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;

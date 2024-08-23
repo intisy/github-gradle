@@ -1,6 +1,6 @@
-package io.github.intisy.impl;
+package io.github.intisy.gradle.github.impl;
 
-import io.github.intisy.utils.GradleUtils;
+import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;

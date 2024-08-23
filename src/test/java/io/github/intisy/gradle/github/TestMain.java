@@ -1,4 +1,4 @@
-package io.github.intisy;
+package io.github.intisy.gradle.github;
 
 import org.gradle.api.Action;
 import org.gradle.api.Project;

@@ -1,4 +1,4 @@
-package io.github.intisy;
+package io.github.intisy.gradle.github;
 
 import org.gradle.api.Project;
 import org.gradle.testfixtures.ProjectBuilder;
