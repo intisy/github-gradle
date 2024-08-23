@@ -7,14 +7,15 @@ plugins {
 }
 
 version = project.hasProperty('artifact_version') ? project.property('artifact_version') : '1.0'
-group = artifact_group
-def main = group + ".Plugin"
+group = "${artifact_group}.${artifact_id}"
+description = artifact_description
+def main = "${group}.Main"
 
 shadowJar {
-    archiveBaseName.set(artifact_name)
-    archiveClassifier.set('')
+    archiveClassifier = ''
+    archiveFileName = "${artifact_name}-standalone.jar"
     manifest {
-        attributes 'Main-Class':main
+        attributes 'Main-Class': main
     }
     mergeServiceFiles()
     minimize()
@@ -25,14 +26,14 @@ tasks.build {
 }
 
 gradlePlugin {
-    website.set("https://github.com/intisy/github-gradle")
-    vcsUrl.set("https://github.com/intisy/github-gradle")
+    website.set("https://github.com/intisy/$artifact_name")
+    vcsUrl.set("https://github.com/intisy/$artifact_name")
     plugins {
         create(artifact_name) {
             id = "$group.$artifact_name"
             implementationClass = main
             displayName = display_name
-            description = "github-gradle implements an way to get dependencies from an github asset, so you don't need services like jitpack anymore"
+            description = this.description
             tags = ["github", "dependency", "jar", "jitpack"]
         }
     }
@@ -44,14 +45,14 @@ repositories {
 
 tasks.withType(Javadoc) {
     failOnError false
-    title = "Github Gradle API Documentation"
+    title = "$display_name API Documentation"
     classpath = sourceSets.main.runtimeClasspath
     destinationDir = file("$buildDir/docs/javadoc")
     options {
         encoding = 'UTF-8'
         author = true
         version = true
-        links("https://docs.oracle.com/en/java/javase/11/docs/api/") // Link to external Javadocs
+        links("https://docs.oracle.com/en/java/javase/11/docs/api/")
     }
 }
 
@@ -74,9 +75,6 @@ artifacts {
 
 test {
     useJUnitPlatform()
-}
-
-test {
     outputs.upToDateWhen { false }
     testLogging {
         events "passed", "skipped", "failed"
