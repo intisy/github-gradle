@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class TestPlugin {
+public class TestMain {
     @Test
     public void testGithubImplementation() {
         Project project = Commons.applyPlugin();

@@ -10,7 +10,7 @@ import java.io.File;
 /**
  * Main class.
  */
-class Plugin implements org.gradle.api.Plugin<Project> {
+class Main implements org.gradle.api.Plugin<Project> {
 	/**
 	 * Applies all the project stuff.
 	 */
