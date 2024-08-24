@@ -1,0 +1,13 @@
+name: Update Plugin README
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  call-reusable-workflow:
+    uses: intisy/workflows/.github/workflows/readme-plugin.yml@main
+    with:
+      repository: ${{ github.repository }}
+    secrets:
+      envPAT: ${{ secrets.PAT }}
