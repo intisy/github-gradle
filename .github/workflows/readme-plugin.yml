@@ -9,5 +9,6 @@ jobs:
     uses: intisy/workflows/.github/workflows/readme-plugin.yml@main
     with:
       repository: ${{ github.repository }}
+      actor: ${{ github.actor }}
     secrets:
       envPAT: ${{ secrets.PAT }}
