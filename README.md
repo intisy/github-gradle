@@ -1,34 +1,36 @@
 # Github Gradle
 
-## What is Github Gradle?
+Archives containing JAR files are available as [releases](https://github.com/intisy/intisy/github-gradle/releases).
 
-Github Gradle makes it easier for the average person to make personal dependencies without spending money on websites like jitpack, because it allows you to make dependencies out of you GitHub projects assets just like JitPack 
+## What is Online Gradle?
+
+Online Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
 
 ## Usage
 
-You can add the plugin like this and add as many codeartifact repositories, as you want:
+Using the plugins DSL:
 
 ```groovy
 plugins {
-  id "io.github.intisy.github-gradle" version "1.1"
+    id "io.github.intisy.intisy/github-gradle" version "1.3"
 }
 ```
 
-Or to add repositories to the Publishing plugin:
+Using legacy plugin application:
 
 ```groovy
 buildscript {
-  repositories {
-    maven {
-      url "https://plugins.gradle.org/m2/"
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
     }
-  }
-  dependencies {
-    classpath "io.github.intisy:github-gradle:1.1"
-  }
+    dependencies {
+        classpath "io.github.intisy:intisy/github-gradle:1.3"
+    }
 }
 
-apply plugin: "io.github.intisy.github-gradle"
+apply plugin: "io.github.intisy.intisy/github-gradle"
 ```
 
 Once you have the plugin installed you can use it like so:
@@ -36,14 +38,6 @@ Once you have the plugin installed you can use it like so:
 ```groovy
 dependencies {
     githubImplementation "USERNAME:REPOSITORY:TAG"
-}
-```
-
-Which in my case would be:
-
-```groovy
-dependencies {
-    githubImplementation "intisy:SimpleLogger:1.12.7"
 }
 ```
 
