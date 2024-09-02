@@ -17,7 +17,21 @@ import java.util.List;
  */
 public class GitHub {
     /**
-     * gets the asset from the repository
+     * Retrieves the asset (JAR file) from the specified GitHub repository.
+     *
+     * @param repoName The name of the GitHub repository.
+     * @param repoOwner The owner of the GitHub repository.
+     * @param version The version of the asset to retrieve.
+     * @throws RuntimeException If the asset cannot be found or downloaded.
+     * @return The local file representing the downloaded asset.
+     * <p>
+     * This function first checks if the asset already exists locally.
+     * If not, it connects to the GitHub API,
+     * retrieves the specified release, and then downloads the asset.
+     * The downloaded asset is saved in a local
+     * directory based on the repository owner and name.
+     *
+     * If the asset cannot be found or downloaded, a RuntimeException is thrown.
      */
     public static File getAsset(String repoName, String repoOwner, String version) {
         File direction = new File(new File(GradleUtils.getGradleHome().toFile(), repoOwner), repoName);
@@ -55,7 +69,13 @@ public class GitHub {
             return jar;
     }
     /**
-     * downloads the asset
+     * Downloads the asset.
+     *
+     * @param direction The local file representing the downloaded asset.
+     * @param asset The GitHub asset to download.
+     * @param repoName The name of the GitHub repository.
+     * @param repoOwner The owner of the GitHub repository.
+     * @throws IOException If an error occurs while downloading the asset.
      */
     public static void download(File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
         System.out.println("Downloading dependency from " + repoOwner + "/" + repoName);
