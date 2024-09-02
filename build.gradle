@@ -25,6 +25,11 @@ tasks.build {
     dependsOn shadowJar
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 gradlePlugin {
     website.set("https://github.com/intisy/$artifact_name")
     vcsUrl.set("https://github.com/intisy/$artifact_name")
