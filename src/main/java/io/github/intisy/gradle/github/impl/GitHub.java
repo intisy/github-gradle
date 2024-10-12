@@ -56,15 +56,15 @@ public class GitHub {
                             }
                         }
                     } else {
-                        throw new RuntimeException("No assets found for the release");
+                        throw new RuntimeException("No assets found for the release for " + repoName + ":" + repoName);
                     }
                 } else {
-                    throw new RuntimeException("Release not found");
+                    throw new RuntimeException("Release not found for " + repoName + ":" + repoName);
                 }
             } catch (IOException e) {
                 throw new RuntimeException("Github exception while pulling asset: " + e.getMessage() + " (retrying in 5 seconds...)");
             }
-            throw new RuntimeException("Could not find an valid asset");
+            throw new RuntimeException("Could not find an valid asset for " + repoName + ":" + repoName);
         } else
             return jar;
     }
