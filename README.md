@@ -1,6 +1,6 @@
 # Github Gradle
 
-Archives containing JAR files are available as [releases](https://github.com/intisy/intisy/github-gradle/releases).
+Archives containing JAR files are available as [releases](https://github.com/intisy/github-gradle/releases).
 
 ## What is Online Gradle?
 
@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.intisy/github-gradle" version "1.3"
+    id "io.github.intisy.github-gradle" version "1.3.1"
 }
 ```
 
@@ -26,11 +26,11 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy:intisy/github-gradle:1.3"
+        classpath "io.github.intisy.github-gradle:1.3.1"
     }
 }
 
-apply plugin: "io.github.intisy.intisy/github-gradle"
+apply plugin: "io.github.intisy.github-gradle"
 ```
 
 Once you have the plugin installed you can use it like so:
