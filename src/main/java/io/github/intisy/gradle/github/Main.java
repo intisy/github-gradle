@@ -25,7 +25,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 					github = org.kohsuke.github.GitHub.connectAnonymously();
 					System.out.println("Pulling from github anonymously");
 				} else {
-					org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
+					github = org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
 					System.out.println("Pulling from github using OAuth");
 				}
 				githubImplementation.getDependencies().all(dependency -> {
