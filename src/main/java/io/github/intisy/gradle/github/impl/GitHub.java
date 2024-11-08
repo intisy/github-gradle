@@ -33,7 +33,7 @@ public class GitHub {
      *
      * If the asset cannot be found or downloaded, a RuntimeException is thrown.
      */
-    public static File getAsset(String repoName, String repoOwner, String version, org.kohsuke.github.GitHub gitHub) {
+    public static File getAsset(String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
         File direction = new File(new File(GradleUtils.getGradleHome().toFile(), repoOwner), repoName);
         direction.mkdirs();
         File jar = new File(direction, version + ".jar");
