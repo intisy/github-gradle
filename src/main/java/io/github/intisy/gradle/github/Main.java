@@ -18,15 +18,24 @@ class Main implements org.gradle.api.Plugin<Project> {
     public void apply(Project project) {
 		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
-		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-            try {
-				org.kohsuke.github.GitHub github = extension.getAccessToken() == null ? org.kohsuke.github.GitHub.connectAnonymously() : org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
-				File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
-				project.getDependencies().add("implementation", project.files(jar));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }));
+		project.afterEvaluate(proj -> {
+			try {
+				org.kohsuke.github.GitHub github;
+				if (extension.getAccessToken() == null) {
+					github = org.kohsuke.github.GitHub.connectAnonymously();
+					System.out.println("Pulling from github anonymously");
+				} else {
+					org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
+					System.out.println("Pulling from github using OAuth");
+				}
+				githubImplementation.getDependencies().all(dependency -> {
+					File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
+					project.getDependencies().add("implementation", project.files(jar));
+				});
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		});
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
 			task.setDescription("Implement an github dependency");
