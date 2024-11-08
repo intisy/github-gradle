@@ -6,6 +6,7 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Main class.
@@ -15,10 +16,16 @@ class Main implements org.gradle.api.Plugin<Project> {
 	 * Applies all the project stuff.
 	 */
     public void apply(Project project) {
+		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-			File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion());
-			project.getDependencies().add("implementation", project.files(jar));
+            try {
+				org.kohsuke.github.GitHub github = extension.getAccessToken() == null ? org.kohsuke.github.GitHub.connectAnonymously() : org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken();
+				File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
+				project.getDependencies().add("implementation", project.files(jar));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }));
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
