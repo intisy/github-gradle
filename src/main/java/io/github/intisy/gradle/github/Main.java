@@ -20,7 +20,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
             try {
-				org.kohsuke.github.GitHub github = extension.getAccessToken() == null ? org.kohsuke.github.GitHub.connectAnonymously() : org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken();
+				org.kohsuke.github.GitHub github = extension.getAccessToken() == null ? org.kohsuke.github.GitHub.connectAnonymously() : org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
 				File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
 				project.getDependencies().add("implementation", project.files(jar));
             } catch (IOException e) {
