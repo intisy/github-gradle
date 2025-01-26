@@ -62,6 +62,8 @@ class Main implements org.gradle.api.Plugin<Project> {
 						logger.log("Updating dependency " + group + "/" + name + " to version " + newVersion);
 						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 						refresh = true;
+					} else {
+						logger.log("Dependency " + group + "/" + name + " is already up to date");
 					}
 				}
 				if (refresh)
