@@ -105,6 +105,7 @@ public class GitHub {
     }
     public static GHRelease getLatestRelease(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
         try {
+            logger.debug("Fetching releases from GitHub" + repoOwner + "/" + repoName);
             List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
             logger.debug("Found releases for " + repoName + ": " + releases);
             if (!releases.isEmpty()) {
