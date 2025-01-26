@@ -1,6 +1,7 @@
 package io.github.intisy.gradle.github.impl;
 
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,15 +24,30 @@ public class Gradle {
         }
     }
 
-    public static void softRefreshGradle(Project project) {
-        project.getLogger().lifecycle("Attempting Gradle configuration refresh...");
-        project.getRepositories().clear();
-        project.getRepositories().addAll(project.getRepositories());
+    public static void safeSoftRefreshGradle(Project project) {
+        project.getLogger().lifecycle("Attempting safe configuration refresh...");
         project.getConfigurations().forEach(config -> {
-            config.resolve();
+            if (config.isCanBeResolved()) { // Only touch resolvable configs
+                config.setTransitive(false);
+                config.setTransitive(true); // Toggle to invalidate cache
+            }
         });
+        resolveIfPossible(project, "compileClasspath");
+        resolveIfPossible(project, "runtimeClasspath");
+        resolveIfPossible(project, "testRuntimeClasspath");
         project.getLogger().lifecycle(
-                "For complete refresh, run: gradlew --refresh-dependencies --recompile-scripts"
+                "For full refresh, run with: --refresh-dependencies --recompile-scripts"
         );
+    }
+
+    private static void resolveIfPossible(Project project, String configName) {
+        try {
+            project.getConfigurations()
+                    .getByName(configName)
+                    .getResolvedConfiguration()
+                    .getResolvedArtifacts();
+        } catch (Exception e) {
+            project.getLogger().debug("Couldn't resolve {}: {}", configName, e.getMessage());
+        }
     }
 }
