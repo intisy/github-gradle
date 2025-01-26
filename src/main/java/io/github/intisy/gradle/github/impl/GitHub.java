@@ -34,9 +34,9 @@ public class GitHub {
      * If the asset cannot be found or downloaded, a RuntimeException is thrown.
      */
     public static File getAsset(String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
-        File direction = new File(new File(GradleUtils.getGradleHome().toFile(), repoOwner), repoName);
+        File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
         direction.mkdirs();
-        File jar = new File(direction, version + ".jar");
+        File jar = new File(direction, repoName + "-" + version + ".jar");
         if (!jar.exists()) {
             try {
                 List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
