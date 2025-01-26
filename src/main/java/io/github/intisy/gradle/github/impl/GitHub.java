@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -33,10 +34,11 @@ public class GitHub {
      *
      * If the asset cannot be found or downloaded, a RuntimeException is thrown.
      */
-    public static File getAsset(String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
+    public static File getAsset(Logger logger, String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
         File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
         direction.mkdirs();
         File jar = new File(direction, repoName + "-" + version + ".jar");
+        logger.debug("Implementing jar: " + jar.getName());
         if (!jar.exists()) {
             try {
                 List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
@@ -50,7 +52,7 @@ public class GitHub {
                     if (!assets.isEmpty()) {
                         for (GHAsset asset : assets) {
                             if (asset.getName().equals(repoName + ".jar")) {
-                                download(jar, asset, repoName, repoOwner);
+                                download(logger, jar, asset, repoName, repoOwner);
                                 return jar;
                             }
                         }
@@ -76,8 +78,8 @@ public class GitHub {
      * @param repoOwner The owner of the GitHub repository.
      * @throws IOException If an error occurs while downloading the asset.
      */
-    public static void download(File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
-        System.out.println("Downloading dependency from " + repoOwner + "/" + repoName);
+    public static void download(Logger logger, File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
+        logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
         String downloadUrl = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/assets/" + asset.getId();
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
@@ -96,6 +98,6 @@ public class GitHub {
                 e.printStackTrace();
             }
         }
-        System.out.println("Download completed for dependency " + repoOwner + "/" + repoName);
+        logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
     }
 }

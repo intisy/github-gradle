@@ -17,19 +17,20 @@ class Main implements org.gradle.api.Plugin<Project> {
 	 */
     public void apply(Project project) {
 		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
+		Logger logger = new Logger(extension);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.afterEvaluate(proj -> {
 			try {
 				org.kohsuke.github.GitHub github;
 				if (extension.getAccessToken() == null) {
 					github = org.kohsuke.github.GitHub.connectAnonymously();
-					System.out.println("Pulling from github anonymously");
+					logger.debug("Pulling from github anonymously");
 				} else {
 					github = org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
-					System.out.println("Pulling from github using OAuth");
+					logger.debug("Pulling from github using OAuth");
 				}
 				githubImplementation.getDependencies().all(dependency -> {
-					File jar = GitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
+					File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
 					project.getDependencies().add("implementation", project.files(jar));
 				});
 			} catch (IOException e) {
@@ -44,7 +45,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
-					System.out.println("Github Dependency named " + name + " version " + version + " from user" + group);
+					logger.log("Github Dependency named " + name + " version " + version + " from user" + group);
 				}
 			});
 		});
