@@ -1,4 +1,4 @@
-name: Update Plugin README
+name: Update Dependency README
 on:
   release:
     types: [published]
@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   call-reusable-workflow:
-    uses: intisy/workflows/.github/workflows/readme-plugin.yml@main
+    uses: intisy/workflows/.github/workflows/readme-dependency.yml@main
     with:
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
