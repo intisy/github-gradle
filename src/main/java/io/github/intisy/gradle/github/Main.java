@@ -20,20 +20,8 @@ class Main implements org.gradle.api.Plugin<Project> {
 		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
 		Logger logger = new Logger(extension);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
-		org.kohsuke.github.GitHub github;
-		try {
-			if (extension.getAccessToken() == null) {
-				github = org.kohsuke.github.GitHub.connectAnonymously();
-				logger.debug("Pulling from github anonymously");
-			} else {
-				github = org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
-				logger.debug("Pulling from github using OAuth");
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-            File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), github);
+            File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), getGitHub(logger, extension));
             project.getDependencies().add("implementation", project.files(jar));
         }));
 		project.getTasks().register("printGithubDependencies", task -> {
@@ -59,7 +47,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 					String name = dependency.getName();
 					String version = dependency.getVersion();
 					logger.debug("Updating GitHub dependency: " + name);
-					String newVersion = GitHub.getLatestVersion(logger, group, name, github);
+					String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, extension));
 					if (version != null && !version.equals(newVersion)) {
 						logger.log("Updating GitHub dependency " + group + "/" + name + " to version " + newVersion);
 						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
@@ -73,4 +61,20 @@ class Main implements org.gradle.api.Plugin<Project> {
 			});
 		});
     }
+
+	public static org.kohsuke.github.GitHub getGitHub(Logger logger, GithubExtension extension) {
+		org.kohsuke.github.GitHub github;
+		try {
+			if (extension.getAccessToken() == null) {
+				github = org.kohsuke.github.GitHub.connectAnonymously();
+				logger.debug("Pulling from github anonymously");
+			} else {
+				github = org.kohsuke.github.GitHub.connectUsingOAuth(extension.getAccessToken());
+				logger.debug("Pulling from github using OAuth");
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		return github;
+	}
 }
