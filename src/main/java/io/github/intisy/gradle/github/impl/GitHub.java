@@ -105,11 +105,11 @@ public class GitHub {
     }
     public static GHRelease getLatestRelease(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
         try {
-            GHRepository repo = github.getRepository(repoOwner + "/" + repoName);
-            Optional<GHRelease> release = repo.listReleases().toList().stream().findFirst();
-            if (release.isPresent()) {
-                logger.debug("Latest release found for " + repoName + ": " + release.get().getTagName());
-                return release.get();
+            List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
+            logger.debug("Found releases for " + repoName + ": " + releases);
+            if (!releases.isEmpty()) {
+                logger.debug("Latest release found for " + repoName + ": " + releases.get(0).getTagName());
+                return releases.get(0);
             } else
                 throw new RuntimeException("No releases found for " + repoName);
         } catch (IOException e) {
