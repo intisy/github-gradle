@@ -7,14 +7,11 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.kohsuke.github.GHAsset;
 import org.kohsuke.github.GHRelease;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHubBuilder;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handles all the GitHub API related stuff.
