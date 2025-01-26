@@ -18,7 +18,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 	 */
     public void apply(Project project) {
 		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
-		Logger logger = new Logger(extension);
+		Logger logger = new Logger(project);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
             File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), getGitHub(logger, extension));
