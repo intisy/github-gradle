@@ -7,11 +7,14 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.kohsuke.github.GHAsset;
 import org.kohsuke.github.GHRelease;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHubBuilder;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Handles all the GitHub API related stuff.
@@ -99,5 +102,23 @@ public class GitHub {
             }
         }
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
+    }
+    public static GHRelease getLatestRelease(String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
+        try {
+            GHRepository repo = github.getRepository(repoOwner + "/" + repoName);
+            Optional<GHRelease> release = repo.listReleases().toList().stream().findFirst();
+            if (release.isPresent())
+                return release.get();
+            else
+                throw new RuntimeException("No releases found for " + repoName);
+        } catch (IOException e) {
+            System.err.println("Error fetching releases: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String getLatestVersion(String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
+        GHRelease latestRelease = getLatestRelease(repoOwner, repoName, github);
+        return latestRelease.getTagName();
     }
 }
