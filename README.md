@@ -1,44 +1,60 @@
-# Github Gradle
+# 
 
 Archives containing JAR files are available as [releases](https://github.com/intisy/github-gradle/releases).
 
-## What is Online Gradle?
+## Usage in private repos (faster)
 
-Online Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
-
-## Usage
-
-Using the plugins DSL:
-
-```groovy
-plugins {
-    id "io.github.intisy.github-gradle" version "1.3.8"
-}
+ * Maven (inside the  file)
+```xml
+  <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/intisy/github-gradle</url>
+      <snapshots><enabled>true</enabled></snapshots>
+  </repository>
+  <dependency>
+      <groupId>io.github.intisy</groupId>
+      <artifactId>github-gradle</artifactId>
+      <version>1.3.9</version>
+  </dependency>
 ```
 
-Using legacy plugin application:
-
-```groovy
-buildscript {
-    repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-    }
-    dependencies {
-        classpath "io.github.intisy.github-gradle:1.3.8"
-    }
-}
-
-apply plugin: "io.github.intisy.github-gradle"
+ * Maven (inside the  file)
+```xml
+  <servers>
+      <server>
+          <id>github</id>
+          <username>your-username</username>
+          <password>your-access-token</password>
+      </server>
+  </servers>
 ```
 
-Once you have the plugin installed you can use it like so:
-
+ * Gradle (inside the  or  file)
 ```groovy
-dependencies {
-    githubImplementation "USERNAME:REPOSITORY:TAG"
-}
+  repositories {
+      maven {
+          url "https://maven.pkg.github.com/intisy/github-gradle"
+          credentials {
+              username = "<your-username>"
+              password = "<your-access-token>"
+          }
+      }
+  }
+  dependencies {
+      implementation 'io.github.intisy:github-gradle:1.3.9'
+  }
+```
+
+## Usage in public repos (slower and only works in gradle but safer)
+
+ * Gradle (inside the  or  file)
+```groovy
+  plugins {
+      id "io.github.intisy.github-gradle" version "1.3.7"
+  }
+  dependencies {
+      githubImplementation "intisy:github-gradle:1.3.9"
+  }
 ```
 
 ## License
