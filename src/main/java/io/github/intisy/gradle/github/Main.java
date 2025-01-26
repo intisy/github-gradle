@@ -39,36 +39,37 @@ class Main implements org.gradle.api.Plugin<Project> {
 				}
 			});
 		});
-		project.getRootProject().getTasks().register("updateGithubDependencies", task -> {
-			task.setGroup("github");
-			task.setDescription("Updates all GitHub dependencies");
-			task.doLast(t -> {
-				logger.debug("Updating all GitHub dependencies");
-				boolean refresh = false;
-				Set<Dependency> dependencyList = new HashSet<>();
-				project.getAllprojects().forEach(p -> {
-					if (!p.equals(project.getRootProject())) {
-						collectDeclaredDependencies(p, dependencyList);
-					}
-				});
+		if (project == project.getRootProject())
+			project.getRootProject().getTasks().register("updateGithubDependencies", task -> {
+				task.setGroup("github");
+				task.setDescription("Updates all GitHub dependencies");
+				task.doLast(t -> {
+					logger.debug("Updating all GitHub dependencies");
+					boolean refresh = false;
+					Set<Dependency> dependencyList = new HashSet<>();
+					project.getAllprojects().forEach(p -> {
+						if (!p.equals(project.getRootProject())) {
+							collectDeclaredDependencies(p, dependencyList);
+						}
+					});
 
-				for (Dependency dependency : dependencyList) {
-					String group = dependency.getGroup();
-					String name = dependency.getName();
-					String version = dependency.getVersion();
-					logger.debug("Updating GitHub dependency: " + name);
-					String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, extension));
-					if (version != null && !version.equals(newVersion)) {
-						logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
-						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
-						refresh = true;
-					} else {
-						logger.log("Dependency " + group + "/" + name + " is already up to date (" + version + " -> " + newVersion + ")");
+					for (Dependency dependency : dependencyList) {
+						String group = dependency.getGroup();
+						String name = dependency.getName();
+						String version = dependency.getVersion();
+						logger.debug("Updating GitHub dependency: " + name);
+						String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, extension));
+						if (version != null && !version.equals(newVersion)) {
+							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
+							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
+							refresh = true;
+						} else {
+							logger.log("Dependency " + group + "/" + name + " is already up to date (" + version + " -> " + newVersion + ")");
+						}
 					}
-				}
-				if (refresh)
-					Gradle.safeSoftRefreshGradle(project);
-			});
+					if (refresh)
+						Gradle.safeSoftRefreshGradle(project);
+				});
 		});
     }
 
