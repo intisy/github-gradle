@@ -10,7 +10,7 @@ public class Logger {
         this.extension = project.getExtensions().getByType(GithubExtension.class);
     }
     public void log(String message) {
-        project.getLogger().info(message);
+        project.getLogger().lifecycle(message);
     }
 
     public void error(String message) {
@@ -23,7 +23,7 @@ public class Logger {
 
     public void debug(String message) {
         if (extension.isDebug()) {
-            project.getLogger().info(message);
+            project.getLogger().lifecycle(message);
         }
     }
 
