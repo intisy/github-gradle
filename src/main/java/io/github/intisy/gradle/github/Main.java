@@ -49,7 +49,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 					logger.debug("Updating GitHub dependency: " + name);
 					String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, extension));
 					if (version != null && !version.equals(newVersion)) {
-						logger.log("Updating GitHub dependency " + group + "/" + name + " to version " + newVersion);
+						logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 						refresh = true;
 					} else {
@@ -57,7 +57,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 					}
 				}
 				if (refresh)
-					Gradle.softRefreshGradle(project);
+					Gradle.safeSoftRefreshGradle(project);
 			});
 		});
     }
