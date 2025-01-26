@@ -58,12 +58,12 @@ class Main implements org.gradle.api.Plugin<Project> {
 					String name = dependency.getName();
 					String version = dependency.getVersion();
 					String newVersion = GitHub.getLatestVersion(group, name, github);
-					if (version != null && version.equals(newVersion)) {
+					if (version != null && !version.equals(newVersion)) {
 						logger.log("Updating dependency " + group + "/" + name + " to version " + newVersion);
 						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 						refresh = true;
 					} else {
-						logger.log("Dependency " + group + "/" + name + " is already up to date");
+						logger.log("Dependency " + group + "/" + name + " is already up to date (" + version + " -> " + newVersion + ")");
 					}
 				}
 				if (refresh)
