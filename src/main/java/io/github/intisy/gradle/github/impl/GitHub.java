@@ -103,13 +103,14 @@ public class GitHub {
         }
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
     }
-    public static GHRelease getLatestRelease(String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
+    public static GHRelease getLatestRelease(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
         try {
             GHRepository repo = github.getRepository(repoOwner + "/" + repoName);
             Optional<GHRelease> release = repo.listReleases().toList().stream().findFirst();
-            if (release.isPresent())
+            if (release.isPresent()) {
+                logger.debug("Latest release found for " + repoName + ": " + release.get().getTagName());
                 return release.get();
-            else
+            } else
                 throw new RuntimeException("No releases found for " + repoName);
         } catch (IOException e) {
             System.err.println("Error fetching releases: " + e.getMessage());
@@ -117,8 +118,8 @@ public class GitHub {
         }
     }
 
-    public static String getLatestVersion(String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
-        GHRelease latestRelease = getLatestRelease(repoOwner, repoName, github);
+    public static String getLatestVersion(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
+        GHRelease latestRelease = getLatestRelease(logger, repoOwner, repoName, github);
         return latestRelease.getTagName();
     }
 }

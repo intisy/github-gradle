@@ -52,14 +52,16 @@ class Main implements org.gradle.api.Plugin<Project> {
 			task.setGroup("github");
 			task.setDescription("Updates all GitHub dependencies");
 			task.doLast(t -> {
+				logger.debug("Updating all GitHub dependencies");
 				boolean refresh = false;
 				for (Dependency dependency : githubImplementation.getAllDependencies()) {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
-					String newVersion = GitHub.getLatestVersion(group, name, github);
+					logger.debug("Updating GitHub dependency: " + name);
+					String newVersion = GitHub.getLatestVersion(logger, group, name, github);
 					if (version != null && !version.equals(newVersion)) {
-						logger.log("Updating dependency " + group + "/" + name + " to version " + newVersion);
+						logger.log("Updating GitHub dependency " + group + "/" + name + " to version " + newVersion);
 						Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 						refresh = true;
 					} else {
