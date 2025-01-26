@@ -23,7 +23,7 @@ public class Logger {
 
     public void debug(String message) {
         if (extension.isDebug()) {
-            project.getLogger().debug(message);
+            project.getLogger().info(message);
         }
     }
 
