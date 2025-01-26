@@ -1,14 +1,12 @@
-name: Package
+name: Publish Dependency
 on:
   push:
     tags:
       - "*"
 jobs:
   call-reusable-workflow:
-    uses: intisy/workflows/.github/workflows/publish-plugin.yml@main
+    uses: intisy/workflows/.github/workflows/publish-dependency.yml@main
     with:
       repository: ${{ github.repository }}
     secrets:
-      envSECRET: ${{ secrets.SECRET }}
-      envKEY: ${{ secrets.KEY }}
       envPAT: ${{ secrets.PAT }}
