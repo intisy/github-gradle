@@ -5,9 +5,12 @@ import io.github.intisy.gradle.github.impl.Gradle;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.ModuleDependency;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Main class.
@@ -36,13 +39,20 @@ class Main implements org.gradle.api.Plugin<Project> {
 				}
 			});
 		});
-		project.getTasks().register("updateGithubDependencies", task -> {
+		project.getRootProject().getTasks().register("updateGithubDependencies", task -> {
 			task.setGroup("github");
 			task.setDescription("Updates all GitHub dependencies");
 			task.doLast(t -> {
 				logger.debug("Updating all GitHub dependencies");
 				boolean refresh = false;
-				for (Dependency dependency : githubImplementation.getAllDependencies()) {
+				Set<Dependency> dependencyList = new HashSet<>();
+				project.getAllprojects().forEach(p -> {
+					if (!p.equals(project.getRootProject())) {
+						collectDeclaredDependencies(p, dependencyList);
+					}
+				});
+
+				for (Dependency dependency : dependencyList) {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
@@ -61,6 +71,43 @@ class Main implements org.gradle.api.Plugin<Project> {
 			});
 		});
     }
+
+	private void collectDeclaredDependencies(Project project, Set<Dependency> collector) {
+		project.getConfigurations().forEach(config -> {
+			if (config.isCanBeConsumed() || config.isCanBeResolved()) {
+				config.getDependencies().forEach(dependency -> {
+					if (isNewDependency(collector, dependency)) {
+						collector.add(dependency);
+					}
+				});
+			}
+		});
+	}
+
+	private boolean isNewDependency(Set<Dependency> existing, Dependency newDep) {
+		return existing.stream().noneMatch(d -> areDependenciesEqual(d, newDep));
+	}
+
+	private boolean areDependenciesEqual(Dependency d1, Dependency d2) {
+		if (d1 instanceof ModuleDependency && d2 instanceof ModuleDependency) {
+			ModuleDependency m1 = (ModuleDependency) d1;
+			ModuleDependency m2 = (ModuleDependency) d2;
+
+			return m1.getGroup().equals(m2.getGroup()) &&
+					m1.getName().equals(m2.getName()) &&
+					m1.getVersion().equals(m2.getVersion());
+		}
+		return d1.equals(d2);
+	}
+
+	private String dependencyToString(Dependency dependency) {
+		if (dependency instanceof ModuleDependency) {
+			ModuleDependency md = (ModuleDependency) dependency;
+			return String.format("%s:%s:%s",
+					md.getGroup(), md.getName(), md.getVersion());
+		}
+		return dependency.toString();
+	}
 
 	public static org.kohsuke.github.GitHub getGitHub(Logger logger, GithubExtension extension) {
 		org.kohsuke.github.GitHub github;

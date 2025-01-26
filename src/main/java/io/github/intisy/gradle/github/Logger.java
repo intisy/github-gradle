@@ -17,10 +17,6 @@ public class Logger {
         project.getLogger().error(message);
     }
 
-    public void info(String message) {
-        log(message);
-    }
-
     public void debug(String message) {
         if (extension.isDebug()) {
             project.getLogger().lifecycle(message);
