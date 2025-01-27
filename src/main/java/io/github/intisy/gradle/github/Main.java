@@ -43,7 +43,6 @@ class Main implements org.gradle.api.Plugin<Project> {
 				task.setGroup("github");
 				task.setDescription("Updates all GitHub dependencies");
 				task.doLast(t -> {
-					logger.debug("Updating all GitHub dependencies");
 					boolean refresh = false;
 					Set<Dependency> dependencyList = new HashSet<>();
 					project.getAllprojects().forEach(p -> {
@@ -51,7 +50,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 							dependencyList.addAll(p.getConfigurations().getByName("githubImplementation").getAllDependencies());
 						}
 					});
-
+					logger.debug("Updating GitHub dependencies: " + dependencyList);
 					for (Dependency dependency : dependencyList) {
 						String group = dependency.getGroup();
 						String name = dependency.getName();
@@ -63,7 +62,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 							refresh = true;
 						} else {
-							logger.log("Dependency " + group + "/" + name + " is already up to date (" + version + " -> " + newVersion + ")");
+							logger.log("Dependency " + group + "/" + name + " is already up to date");
 						}
 					}
 					if (refresh)

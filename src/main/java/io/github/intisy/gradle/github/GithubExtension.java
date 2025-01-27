@@ -1,7 +1,6 @@
 package io.github.intisy.gradle.github;
 
-import java.util.List;
-
+@SuppressWarnings("unused")
 public class GithubExtension {
     private String accessToken;
     private boolean debug;

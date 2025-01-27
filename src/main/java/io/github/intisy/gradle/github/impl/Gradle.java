@@ -31,17 +31,15 @@ public class Gradle {
         Logger logger = new Logger(project);
         logger.log("Attempting safe configuration refresh...");
         project.getConfigurations().forEach(config -> {
-            if (config.isCanBeResolved()) { // Only touch resolvable configs
+            if (config.isCanBeResolved()) {
                 config.setTransitive(false);
-                config.setTransitive(true); // Toggle to invalidate cache
+                config.setTransitive(true);
             }
         });
         resolveIfPossible(project, "compileClasspath");
         resolveIfPossible(project, "runtimeClasspath");
         resolveIfPossible(project, "testRuntimeClasspath");
-        project.getLogger().lifecycle(
-                "For full refresh, run with: --refresh-dependencies --recompile-scripts"
-        );
+        logger.log("For full refresh, run with: --refresh-dependencies --recompile-scripts");
     }
 
     private static void resolveIfPossible(Project project, String configName) {
