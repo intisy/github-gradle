@@ -36,7 +36,7 @@ public class GitHub {
      */
     public static File getAsset(Logger logger, String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
         File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
-        if (!direction.mkdirs())
+        if (!direction.exists() && !direction.mkdirs())
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
         File jar = new File(direction, repoName + "-" + version + ".jar");
         logger.debug("Starting the process to implement jar: " + jar.getName());
