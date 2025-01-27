@@ -38,7 +38,7 @@ public class GitHub {
         File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
         direction.mkdirs();
         File jar = new File(direction, repoName + "-" + version + ".jar");
-        logger.debug("Implementing jar: " + jar.getName());
+        logger.debug("Starting the process to implement jar: " + jar.getName());
         if (!jar.exists()) {
             try {
                 List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
