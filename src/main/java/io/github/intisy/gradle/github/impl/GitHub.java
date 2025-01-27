@@ -36,7 +36,8 @@ public class GitHub {
      */
     public static File getAsset(Logger logger, String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
         File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
-        direction.mkdirs();
+        if (!direction.mkdirs())
+            throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
         File jar = new File(direction, repoName + "-" + version + ".jar");
         logger.debug("Starting the process to implement jar: " + jar.getName());
         if (!jar.exists()) {
@@ -48,7 +49,7 @@ public class GitHub {
                         targetRelease = release;
                 }
                 if (targetRelease != null) {
-                    List<GHAsset> assets = targetRelease.getAssets();
+                    List<GHAsset> assets = targetRelease.listAssets().toList();
                     if (!assets.isEmpty()) {
                         for (GHAsset asset : assets) {
                             if (asset.getName().equals(repoName + ".jar")) {
@@ -66,8 +67,10 @@ public class GitHub {
                 throw new RuntimeException("Github exception while pulling asset: " + e.getMessage() + " (retrying in 5 seconds...)");
             }
             throw new RuntimeException("Could not find an valid asset for " + repoOwner + ":" + repoName);
-        } else
+        } else {
+            logger.debug("Jar already exists: " + jar.getName());
             return jar;
+        }
     }
     /**
      * Downloads the asset.
@@ -90,12 +93,12 @@ public class GitHub {
         if (!response.isSuccessful()) {
             response.close();
             throw new IOException("Failed to download asset: " + response);
-        } else {
+        } else if (response.body() != null) {
             byte[] bytes = response.body().bytes();
             try (FileOutputStream fos = new FileOutputStream(direction)) {
                 fos.write(bytes);
             } catch (IOException e) {
-                e.printStackTrace();
+                throw new RuntimeException(e);
             }
         }
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
@@ -111,7 +114,7 @@ public class GitHub {
             } else
                 throw new RuntimeException("No releases found for " + repoName);
         } catch (IOException e) {
-            System.err.println("Error fetching releases: " + e.getMessage());
+            logger.error("Error fetching releases: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
