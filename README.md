@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.4.3.2"
+    id "io.github.intisy.github-gradle" version "1.4.3.3"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.4.3.2"
+        classpath "io.github.intisy.github-gradle:1.4.3.3"
     }
 }
 
