@@ -30,7 +30,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 			task.setGroup("github");
 			task.setDescription("Implement an github dependency");
 			task.doLast(t -> {
-				for (Dependency dependency : githubImplementation.getAllDependencies()) {
+				for (Dependency dependency : getDependencies(project)) {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
@@ -44,12 +44,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 				task.setDescription("Updates all GitHub dependencies");
 				task.doLast(t -> {
 					boolean refresh = false;
-					Set<Dependency> dependencyList = new HashSet<>();
-					project.getAllprojects().forEach(p -> {
-						if (!p.equals(project.getRootProject())) {
-							dependencyList.addAll(p.getConfigurations().getByName("githubImplementation").getAllDependencies());
-						}
-					});
+					Set<Dependency> dependencyList = getDependencies(project);
 					logger.debug("Updating GitHub dependencies: " + dependencyList);
 					for (Dependency dependency : dependencyList) {
 						String group = dependency.getGroup();
@@ -70,6 +65,17 @@ class Main implements org.gradle.api.Plugin<Project> {
 				});
 		});
     }
+
+	public Set<Dependency> getDependencies(Project project) {
+		Set<Dependency> dependencyList = new HashSet<>();
+		project.getAllprojects().forEach(p -> {
+			if (!p.equals(project.getRootProject())) {
+				dependencyList.addAll(p.getConfigurations().getByName("githubImplementation").getAllDependencies());
+			}
+		});
+		dependencyList.addAll(project.getConfigurations().getByName("githubImplementation").getAllDependencies());
+		return dependencyList;
+	}
 
 	public static org.kohsuke.github.GitHub getGitHub(Logger logger, GithubExtension extension) {
 		org.kohsuke.github.GitHub github;
