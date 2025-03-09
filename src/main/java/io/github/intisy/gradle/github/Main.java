@@ -47,7 +47,11 @@ class Main implements org.gradle.api.Plugin<Project> {
 						try {
 							File path = GradleUtils.getGradleHome().resolve("resources").resolve(repoParts[3] + "-" + repoParts[4]).toFile();
 							GitHub.cloneOrPullRepository(logger, path, repoParts[3], repoParts[4], githubExtension.getAccessToken());
+							if (resourcesExtension.isBuildOnly()) {
+								dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+							}
 							FileUtils.deleteDirectory(dir);
+							logger.debug("Copying resources to: " + dir);
 							if (dir.mkdirs())
 								FileUtils.copyDirectory(path, dir);
 						} catch (GitAPIException | IOException e) {
