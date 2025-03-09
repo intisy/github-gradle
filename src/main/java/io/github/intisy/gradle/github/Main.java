@@ -2,9 +2,15 @@ package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
+import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.tasks.Copy;
+import org.gradle.api.tasks.SourceSet;
+import org.gradle.internal.impldep.org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,11 +25,33 @@ class Main implements org.gradle.api.Plugin<Project> {
 	 * Applies all the project stuff.
 	 */
     public void apply(Project project) {
-		GithubExtension extension = project.getExtensions().create("github", GithubExtension.class);
+		ResourcesExtension resourcesExtension = project.getExtensions().create("github", ResourcesExtension.class);
+		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
 		Logger logger = new Logger(project);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
+		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> {
+			project.getTasks().named("processResources", Copy.class, processResources -> {
+				processResources.doFirst(task -> {
+					if (resourcesExtension.getRepo() != null) {
+						JavaPluginConvention javaConvention = project.getConvention()
+								.getPlugin(JavaPluginConvention.class);
+						SourceSet main = javaConvention.getSourceSets()
+								.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+						Set<File> resourceDirs = main.getResources().getSrcDirs();
+						for (File dir : resourceDirs) {
+							String[] repoParts = resourcesExtension.getRepo().split("/");
+							try {
+								GitHub.cloneOrPullRepository(logger, dir, repoParts[3], repoParts[4], githubExtension.getAccessToken());
+							} catch (GitAPIException | IOException e) {
+								throw new RuntimeException(e);
+							}
+						}
+					}
+				});
+			});
+		});
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-            File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), getGitHub(logger, extension));
+            File jar = GitHub.getAsset(logger, dependency.getName(), dependency.getGroup(), dependency.getVersion(), getGitHub(logger, githubExtension));
             project.getDependencies().add("implementation", project.files(jar));
         }));
 		project.getTasks().register("printGithubDependencies", task -> {
@@ -39,7 +67,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 			});
 		});
 		if (project == project.getRootProject())
-			project.getRootProject().getTasks().register("updateGithubDependencies", task -> {
+			project.getTasks().register("updateGithubDependencies", task -> {
 				task.setGroup("github");
 				task.setDescription("Updates all GitHub dependencies");
 				task.doLast(t -> {
@@ -51,7 +79,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 						String name = dependency.getName();
 						String version = dependency.getVersion();
 						logger.debug("Updating GitHub dependency: " + name);
-						String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, extension));
+						String newVersion = GitHub.getLatestVersion(logger, group, name, getGitHub(logger, githubExtension));
 						if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
