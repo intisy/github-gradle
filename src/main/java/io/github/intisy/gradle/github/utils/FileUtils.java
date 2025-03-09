@@ -47,18 +47,16 @@ public class FileUtils {
      * @throws IOException if an I/O error occurs
      */
     public static void deleteDirectory(Path dir) throws IOException {
-        if (!Files.exists(dir) || !Files.isDirectory(dir)) {
-            throw new IllegalArgumentException("Directory does not exist or is not a directory.");
+        if (Files.exists(dir) && Files.isDirectory(dir)) {
+            Files.walk(dir)
+                .sorted((path1, path2) -> path2.compareTo(path1)) // Sort in reverse order to delete files before directories
+                .forEach(path -> {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException e) {
+                        throw new RuntimeException("Error deleting directory", e);
+                    }
+                });
         }
-
-        Files.walk(dir)
-            .sorted((path1, path2) -> path2.compareTo(path1)) // Sort in reverse order to delete files before directories
-            .forEach(path -> {
-                try {
-                    Files.delete(path);
-                } catch (IOException e) {
-                    throw new RuntimeException("Error deleting directory", e);
-                }
-            });
     }
 }
