@@ -4,7 +4,7 @@ Archives containing JAR files are available as [releases](https://github.com/int
 
 ## What is Online Gradle?
 
-Online Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
+GitHub Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
 
 ## Usage
 
@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.4.4"
+    id "io.github.intisy.github-gradle" version "1.5.1"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.4.4"
+        classpath "io.github.intisy.github-gradle:1.5.1"
     }
 }
 
