@@ -5,6 +5,16 @@ import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.gradle.internal.impldep.org.eclipse.jgit.api.Git;
+import org.gradle.internal.impldep.org.eclipse.jgit.api.PullCommand;
+import org.gradle.internal.impldep.org.eclipse.jgit.api.PullResult;
+import org.gradle.internal.impldep.org.eclipse.jgit.api.errors.GitAPIException;
+import org.gradle.internal.impldep.org.eclipse.jgit.lib.ObjectId;
+import org.gradle.internal.impldep.org.eclipse.jgit.lib.Ref;
+import org.gradle.internal.impldep.org.eclipse.jgit.lib.Repository;
+import org.gradle.internal.impldep.org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.gradle.internal.impldep.org.eclipse.jgit.transport.CredentialsProvider;
+import org.gradle.internal.impldep.org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.kohsuke.github.GHAsset;
 import org.kohsuke.github.GHRelease;
 
@@ -17,6 +27,90 @@ import java.util.List;
  * Handles all the GitHub API related stuff.
  */
 public class GitHub {
+    public static void cloneRepository(Logger logger, File path, String repoOwner, String repoName, String apiKey) throws GitAPIException {
+        String repositoryURL = "https://github.com/" + repoOwner + "/" + repoName;
+        logger.log("Cloning repository... (" + repositoryURL + ")");
+        CredentialsProvider credentialsProvider = apiKey != null ? new UsernamePasswordCredentialsProvider(repoOwner, apiKey) : null;
+        try (Git git = Git.cloneRepository()
+                .setURI(repositoryURL)
+                .setCredentialsProvider(credentialsProvider)
+                .setDirectory(path)
+                .call()) {
+            logger.log("Repository cloned successfully.");
+        }
+    }
+
+    public static boolean doesRepoExist(File path) {
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+        try (Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
+                .readEnvironment()
+                .findGitDir()
+                .build()) {
+            return repository.getObjectDatabase().exists();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static boolean isRepoUpToDate(Logger logger, File path) {
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+        try (
+             Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
+                .readEnvironment()
+                .findGitDir()
+                .build();
+             Git git = new Git(repository)
+        ) {
+            git.fetch().call();
+            String branch = repository.getBranch();
+            ObjectId localCommit = repository.resolve("refs/heads/" + branch);
+            ObjectId remoteCommit = repository.resolve("refs/remotes/origin/" + branch);
+            if (localCommit != null && remoteCommit != null) {
+                return localCommit.equals(remoteCommit);
+            } else {
+                return false;
+            }
+        } catch (IOException | GitAPIException exception) {
+            return false;
+        }
+    }
+
+    public static void pullRepository(Logger logger, File path, String repoOwner, String apiKey) throws GitAPIException, IOException {
+        CredentialsProvider credentialsProvider = apiKey != null ? new UsernamePasswordCredentialsProvider(repoOwner, apiKey) : null;
+        try (Git repo = Git.open(path)) {
+            Repository repository = repo.getRepository();
+            Git git = new Git(repository);
+            git.fetch().setCredentialsProvider(credentialsProvider).call();
+            List<Ref> branches = git.branchList().call();
+            if (branches.size() > 1) {
+                logger.warn("Repository has multiple branches, might pull wrong branch...");
+                for (Ref branch : branches) {
+                    logger.warn("Branch: " + branch.getName());
+                }
+            }
+            PullCommand pullCmd = git.pull()
+                    .setCredentialsProvider(credentialsProvider)
+                    .setRemoteBranchName(branches.get(0).getName());
+            logger.log("Pulling Repository branch" + branches.get(0).getName());
+            PullResult result = pullCmd.call();
+            if (!result.isSuccessful()) {
+                logger.error("Pull failed: " + branches.get(0).getName());
+            } else {
+                logger.log("Successfully pulled repository.");
+            }
+        }
+    }
+    public static void cloneOrPullRepository(Logger logger, File path, String repoOwner, String repoName, String apiKey) throws GitAPIException, IOException {
+        if (doesRepoExist(path)) {
+            if (!isRepoUpToDate(logger, path))
+                pullRepository(logger, path, repoOwner, apiKey);
+            else {
+                logger.log("Repository is up to date.");
+            }
+        } else {
+            cloneRepository(logger, path, repoOwner, repoName, apiKey);
+        }
+    }
     /**
      * Retrieves the asset (JAR file) from the specified GitHub repository.
      *
@@ -53,7 +147,7 @@ public class GitHub {
                     if (!assets.isEmpty()) {
                         for (GHAsset asset : assets) {
                             if (asset.getName().equals(repoName + ".jar")) {
-                                download(logger, jar, asset, repoName, repoOwner);
+                                downloadAsset(logger, jar, asset, repoName, repoOwner);
                                 return jar;
                             }
                         }
@@ -81,7 +175,7 @@ public class GitHub {
      * @param repoOwner The owner of the GitHub repository.
      * @throws IOException If an error occurs while downloading the asset.
      */
-    public static void download(Logger logger, File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
+    public static void downloadAsset(Logger logger, File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
         logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
         String downloadUrl = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/assets/" + asset.getId();
         OkHttpClient client = new OkHttpClient();
