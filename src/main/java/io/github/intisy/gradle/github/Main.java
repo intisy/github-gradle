@@ -33,18 +33,11 @@ class Main implements org.gradle.api.Plugin<Project> {
 			project.getTasks().named("processResources", Copy.class, processResources -> {
 				processResources.doFirst(task -> {
 					if (resourcesExtension.getRepo() != null) {
-						JavaPluginConvention javaConvention = project.getConvention()
-								.getPlugin(JavaPluginConvention.class);
-						SourceSet main = javaConvention.getSourceSets()
-								.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-						Set<File> resourceDirs = main.getResources().getSrcDirs();
-						for (File dir : resourceDirs) {
-							String[] repoParts = resourcesExtension.getRepo().split("/");
-							try {
-								GitHub.cloneOrPullRepository(logger, dir, repoParts[3], repoParts[4], githubExtension.getAccessToken());
-							} catch (GitAPIException | IOException e) {
-								throw new RuntimeException(e);
-							}
+						String[] repoParts = resourcesExtension.getRepo().split("/");
+						try {
+							GitHub.cloneOrPullRepository(logger, project.getBuildDir().toPath().resolve("resources").toFile(), repoParts[3], repoParts[4], githubExtension.getAccessToken());
+						} catch (GitAPIException | IOException e) {
+							throw new RuntimeException(e);
 						}
 					}
 				});
