@@ -51,9 +51,12 @@ class Main implements org.gradle.api.Plugin<Project> {
 								dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
 							}
 							FileUtils.deleteDirectory(dir);
-							logger.debug("Copying resources to: " + dir);
-							if (dir.mkdirs())
+							if (dir.mkdirs()) {
+								logger.debug("Copying resources from " + path + " to: " + dir);
 								FileUtils.copyDirectory(path, dir);
+							} else {
+								logger.error("Failed to create directory: " + dir);
+							}
 						} catch (GitAPIException | IOException e) {
 							throw new RuntimeException(e);
 						}
