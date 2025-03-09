@@ -16,6 +16,6 @@ public class GradleUtils {
      */
     public static Path getGradleHome() {
         String userHome = System.getProperty("user.home");
-        return Paths.get(userHome, ".gradle", "caches", "github");
+        return Paths.get(userHome, ".gradle", "caches");
     }
 }

@@ -129,7 +129,7 @@ public class GitHub {
      * If the asset cannot be found or downloaded, a RuntimeException is thrown.
      */
     public static File getAsset(Logger logger, String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
-        File direction = new File(GradleUtils.getGradleHome().toFile(), repoOwner);
+        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         if (!direction.exists() && !direction.mkdirs())
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
         File jar = new File(direction, repoName + "-" + version + ".jar");
