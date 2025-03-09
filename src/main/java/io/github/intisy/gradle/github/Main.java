@@ -2,13 +2,17 @@ package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
+import io.github.intisy.gradle.github.utils.GradleUtils;
+import org.apache.commons.io.FileUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.Copy;
+import org.gradle.api.tasks.SourceSet;
 import org.gradle.internal.impldep.org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.File;
@@ -33,11 +37,22 @@ class Main implements org.gradle.api.Plugin<Project> {
 				logger.debug("Process resource event called on " + project.getName());
 				if (resourcesExtension.getRepo() != null) {
 					logger.debug("Found an repository in the resource extension");
+					JavaPluginConvention javaConvention = project.getConvention()
+							.getPlugin(JavaPluginConvention.class);
+					SourceSet main = javaConvention.getSourceSets()
+							.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+					Set<File> resourceDirs = main.getResources().getSrcDirs();
 					String[] repoParts = resourcesExtension.getRepo().split("/");
-					try {
-						GitHub.cloneOrPullRepository(logger, project.getBuildDir().toPath().resolve("resources").toFile(), repoParts[3], repoParts[4], githubExtension.getAccessToken());
-					} catch (GitAPIException | IOException e) {
-						throw new RuntimeException(e);
+					for (File dir : resourceDirs) {
+						try {
+							File path = GradleUtils.getGradleHome().resolve("resources").resolve(repoParts[3] + "-" + repoParts[4]).toFile();
+							GitHub.cloneOrPullRepository(logger, path, repoParts[3], repoParts[4], githubExtension.getAccessToken());
+							FileUtils.deleteDirectory(dir);
+							if (dir.mkdirs())
+								FileUtils.copyDirectory(path, dir);
+						} catch (GitAPIException | IOException e) {
+							throw new RuntimeException(e);
+						}
 					}
 				}
 			});
