@@ -4,12 +4,11 @@ import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.Copy;
-import org.gradle.api.tasks.SourceSet;
 import org.gradle.internal.impldep.org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.File;
@@ -29,22 +28,24 @@ class Main implements org.gradle.api.Plugin<Project> {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
 		Logger logger = new Logger(project);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
+		Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> {
+			task.doLast(t -> {
+				logger.debug("Process resource event called on " + project.getName());
+				if (resourcesExtension.getRepo() != null) {
+					logger.debug("Found an repository in the resource extension");
+					String[] repoParts = resourcesExtension.getRepo().split("/");
+					try {
+						GitHub.cloneOrPullRepository(logger, project.getBuildDir().toPath().resolve("resources").toFile(), repoParts[3], repoParts[4], githubExtension.getAccessToken());
+					} catch (GitAPIException | IOException e) {
+						throw new RuntimeException(e);
+					}
+				}
+			});
+		});
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> {
 			project.getTasks().named("processResources", Copy.class, processResources -> {
 				logger.debug("Process resource event found on " + project.getName());
-				processResources.getOutputs().upToDateWhen(task -> false);
-				processResources.doFirst(task -> {
-					logger.debug("Process resource event called on " + project.getName());
-					if (resourcesExtension.getRepo() != null) {
-						logger.debug("Found an repository in the resource extension");
-						String[] repoParts = resourcesExtension.getRepo().split("/");
-						try {
-							GitHub.cloneOrPullRepository(logger, project.getBuildDir().toPath().resolve("resources").toFile(), repoParts[3], repoParts[4], githubExtension.getAccessToken());
-						} catch (GitAPIException | IOException e) {
-							throw new RuntimeException(e);
-						}
-					}
-				});
+				processResources.dependsOn(processGitHubResources);
 			});
 		});
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
