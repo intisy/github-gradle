@@ -31,9 +31,10 @@ class Main implements org.gradle.api.Plugin<Project> {
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> {
 			project.getTasks().named("processResources", Copy.class, processResources -> {
-				logger.debug("Process resource event found");
+				logger.debug("Process resource event found on " + project.getName());
+				processResources.getOutputs().upToDateWhen(task -> false);
 				processResources.doFirst(task -> {
-					logger.debug("Process resource event called");
+					logger.debug("Process resource event called on " + project.getName());
 					if (resourcesExtension.getRepo() != null) {
 						logger.debug("Found an repository in the resource extension");
 						String[] repoParts = resourcesExtension.getRepo().split("/");
