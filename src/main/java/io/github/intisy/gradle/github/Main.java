@@ -25,7 +25,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 	 * Applies all the project stuff.
 	 */
     public void apply(Project project) {
-		ResourcesExtension resourcesExtension = project.getExtensions().create("github", ResourcesExtension.class);
+		ResourcesExtension resourcesExtension = project.getExtensions().create("resources", ResourcesExtension.class);
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
 		Logger logger = new Logger(project);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
