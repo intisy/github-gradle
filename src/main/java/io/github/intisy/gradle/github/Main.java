@@ -2,8 +2,8 @@ package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
+import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
-import org.apache.commons.io.FileUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -50,10 +50,10 @@ class Main implements org.gradle.api.Plugin<Project> {
 							if (resourcesExtension.isBuildOnly()) {
 								dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
 							}
-							FileUtils.deleteDirectory(dir);
+							FileUtils.deleteDirectory(dir.toPath());
 							if (dir.mkdirs()) {
 								logger.debug("Copying resources from " + path + " to: " + dir);
-								FileUtils.copyDirectory(path, dir);
+								FileUtils.copyDirectory(path.toPath(), dir.toPath());
 							} else {
 								logger.error("Failed to create directory: " + dir);
 							}
