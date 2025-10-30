@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
@@ -27,7 +28,12 @@ import java.util.List;
  * Handles all the GitHub API related stuff.
  */
 public class GitHub {
-    public static void cloneRepository(Logger logger, File path, String repoOwner, String repoName, String apiKey) throws GitAPIException {
+    private final Logger logger;
+    public GitHub(Logger logger) {
+        this.logger = logger;
+    }
+
+    public void cloneRepository(File path, String repoOwner, String repoName, String apiKey) throws GitAPIException {
         String repositoryURL = "https://github.com/" + repoOwner + "/" + repoName;
         logger.log("Cloning repository... (" + repositoryURL + ")");
         CredentialsProvider credentialsProvider = apiKey != null ? new UsernamePasswordCredentialsProvider(repoOwner, apiKey) : null;
@@ -40,7 +46,7 @@ public class GitHub {
         }
     }
 
-    public static boolean doesRepoExist(File path) {
+    public boolean doesRepoExist(File path) {
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         try (Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
                 .readEnvironment()
@@ -52,7 +58,7 @@ public class GitHub {
         }
     }
 
-    public static boolean isRepoUpToDate(Logger logger, File path) {
+    public boolean isRepoUpToDate(File path) {
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         try (
              Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
@@ -75,64 +81,64 @@ public class GitHub {
         }
     }
 
-    public static void pullRepository(Logger logger, File path, String repoOwner, String apiKey) throws GitAPIException, IOException {
+    public void pullRepository(File path, String repoOwner, String apiKey) throws GitAPIException, IOException {
+        pullRepository(path, repoOwner, apiKey, null);
+    }
+
+    public void pullRepository(File path, String repoOwner, String apiKey, String branch) throws GitAPIException, IOException {
         CredentialsProvider credentialsProvider = apiKey != null ? new UsernamePasswordCredentialsProvider(repoOwner, apiKey) : null;
         try (Git repo = Git.open(path)) {
             Repository repository = repo.getRepository();
             Git git = new Git(repository);
             git.fetch().setCredentialsProvider(credentialsProvider).call();
-            List<Ref> branches = git.branchList().call();
-            if (branches.size() > 1) {
-                logger.warn("Repository has multiple branches, might pull wrong branch...");
-                for (Ref branch : branches) {
-                    logger.warn("Branch: " + branch.getName());
+            if (branch == null) {
+                List<Ref> branches = git.branchList().call();
+                if (branches.size() > 1) {
+                    logger.warn("Repository has multiple branches, might pull wrong branch...");
+                    for (Ref branch2 : branches) {
+                        logger.warn("Branch: " + branch2.getName());
+                    }
                 }
+                branch = branches.get(0).getName();
             }
             PullCommand pullCmd = git.pull()
                     .setCredentialsProvider(credentialsProvider)
-                    .setRemoteBranchName(branches.get(0).getName());
-            logger.log("Pulling Repository branch" + branches.get(0).getName());
+                    .setRemoteBranchName(branch);
+            logger.log("Pulling Repository branch" + branch);
             PullResult result = pullCmd.call();
             if (!result.isSuccessful()) {
-                logger.error("Pull failed: " + branches.get(0).getName());
+                logger.error("Pull failed: " + branch);
             } else {
                 logger.log("Successfully pulled repository.");
             }
         }
     }
-    public static void cloneOrPullRepository(Logger logger, File path, String repoOwner, String repoName, String apiKey) throws GitAPIException, IOException {
+
+    public void cloneOrPullRepository(File path, String repoOwner, String repoName, String apiKey) throws GitAPIException, IOException {
+        cloneOrPullRepository(path, repoOwner, repoName, apiKey, null);
+    }
+
+    public void cloneOrPullRepository(File path, String repoOwner, String repoName, String apiKey, String branch) throws GitAPIException, IOException {
         if (doesRepoExist(path)) {
-            if (!isRepoUpToDate(logger, path))
-                pullRepository(logger, path, repoOwner, apiKey);
+            if (!isRepoUpToDate(path))
+                pullRepository(path, repoOwner, apiKey, branch);
             else {
                 logger.log("Repository is up to date.");
             }
         } else {
-            cloneRepository(logger, path, repoOwner, repoName, apiKey);
+            cloneRepository(path, repoOwner, repoName, apiKey);
         }
     }
-    /**
-     * Retrieves the asset (JAR file) from the specified GitHub repository.
-     *
-     * @param repoName The name of the GitHub repository.
-     * @param repoOwner The owner of the GitHub repository.
-     * @param version The version of the asset to retrieve.
-     * @throws RuntimeException If the asset cannot be found or downloaded.
-     * @return The local file representing the downloaded asset.
-     * <p>
-     * This function first checks if the asset already exists locally.
-     * If not, it connects to the GitHub API,
-     * retrieves the specified release, and then downloads the asset.
-     * The downloaded asset is saved in a local
-     * directory based on the repository owner and name.
-     *
-     * If the asset cannot be found or downloaded, a RuntimeException is thrown.
-     */
-    public static File getAsset(Logger logger, String repoName, String repoOwner, String version, org.kohsuke.github.GitHub github) {
+
+    public File getAsset(String repoName, String repoOwner, String version, String accessToken) {
+        org.kohsuke.github.GitHub github = getGitHub(accessToken);
         File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+
         if (!direction.exists() && !direction.mkdirs())
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
+
         File jar = new File(direction, repoName + "-" + version + ".jar");
+
         logger.debug("Starting the process to implement jar: " + jar.getName());
         if (!jar.exists()) {
             try {
@@ -147,7 +153,7 @@ public class GitHub {
                     if (!assets.isEmpty()) {
                         for (GHAsset asset : assets) {
                             if (asset.getName().equals(repoName + ".jar")) {
-                                downloadAsset(logger, jar, asset, repoName, repoOwner);
+                                downloadAsset(jar, asset, repoName, repoOwner);
                                 return jar;
                             }
                         }
@@ -166,16 +172,8 @@ public class GitHub {
             return jar;
         }
     }
-    /**
-     * Downloads the asset.
-     *
-     * @param direction The local file representing the downloaded asset.
-     * @param asset The GitHub asset to download.
-     * @param repoName The name of the GitHub repository.
-     * @param repoOwner The owner of the GitHub repository.
-     * @throws IOException If an error occurs while downloading the asset.
-     */
-    public static void downloadAsset(Logger logger, File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
+
+    public void downloadAsset(File direction, GHAsset asset, String repoName, String repoOwner) throws IOException {
         logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
         String downloadUrl = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/assets/" + asset.getId();
         OkHttpClient client = new OkHttpClient();
@@ -197,7 +195,13 @@ public class GitHub {
         }
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
     }
-    public static GHRelease getLatestRelease(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
+
+    public GHRelease getLatestRelease(String repoOwner, String repoName) {
+        return getLatestRelease(repoOwner, repoName, null);
+    }
+
+    public GHRelease getLatestRelease(String repoOwner, String repoName, String accessToken) {
+        org.kohsuke.github.GitHub github = getGitHub(accessToken);
         try {
             logger.debug("Fetching releases from GitHub " + repoOwner + "/" + repoName);
             List<GHRelease> releases = github.getRepository(repoOwner + "/" + repoName).listReleases().toList();
@@ -213,8 +217,28 @@ public class GitHub {
         }
     }
 
-    public static String getLatestVersion(Logger logger, String repoOwner, String repoName, org.kohsuke.github.GitHub github) {
-        GHRelease latestRelease = getLatestRelease(logger, repoOwner, repoName, github);
+    public String getLatestVersion(String repoOwner, String repoName) {
+        return getLatestVersion(repoOwner, repoName, null);
+    }
+
+    public String getLatestVersion(String repoOwner, String repoName, String accessToken) {
+        GHRelease latestRelease = getLatestRelease(repoOwner, repoName, accessToken);
         return latestRelease.getTagName();
+    }
+
+    public org.kohsuke.github.GitHub getGitHub(String accessToken) {
+        org.kohsuke.github.GitHub github;
+        try {
+            if (accessToken == null) {
+                github = org.kohsuke.github.GitHub.connectAnonymously();
+                logger.debug("Pulling from github anonymously");
+            } else {
+                github = org.kohsuke.github.GitHub.connectUsingOAuth(accessToken);
+                logger.debug("Pulling from github using OAuth");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return github;
     }
 }
