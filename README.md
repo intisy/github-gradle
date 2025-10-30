@@ -2,7 +2,7 @@
 
 Archives containing JAR files are available as [releases](https://github.com/intisy/github-gradle/releases).
 
-## What is Online Gradle?
+## What is github-gradle?
 
 GitHub Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
 
@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.5.3.4"
+    id "io.github.intisy.github-gradle" version "1.6.0.1"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.5.3.4"
+        classpath "io.github.intisy.github-gradle:1.6.0.1"
     }
 }
 
