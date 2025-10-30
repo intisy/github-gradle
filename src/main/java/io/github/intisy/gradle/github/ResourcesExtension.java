@@ -2,7 +2,9 @@ package io.github.intisy.gradle.github;
 
 @SuppressWarnings("unused")
 public class ResourcesExtension {
-    private String repo;
+    private String branch = "main";
+    private String path = "/";
+    private String repoUrl;
     private boolean buildOnly;
 
     public boolean isBuildOnly() {
@@ -13,11 +15,32 @@ public class ResourcesExtension {
         this.buildOnly = buildOnly;
     }
 
-    public void setRepo(String repo) {
-        this.repo = repo;
+    @Deprecated
+    public void setRepo(String repoUrl) {
+        setRepoUrl(repoUrl);
     }
 
-    public String getRepo() {
-        return repo;
+    public void setRepoUrl(String repoUrl) {
+        this.repoUrl = repoUrl;
+    }
+
+    public String getRepoUrl() {
+        return repoUrl;
+    }
+
+    public String getBranch() {
+        return branch;
+    }
+
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 }
