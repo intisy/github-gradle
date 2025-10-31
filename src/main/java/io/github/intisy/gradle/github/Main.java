@@ -6,6 +6,7 @@ import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Action;
+import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
@@ -23,7 +24,7 @@ import java.util.Set;
 /**
  * Main class.
  */
-class Main implements org.gradle.api.Plugin<Project> {
+class Main implements Plugin<Project> {
 	/**
 	 * Applies all the project stuff.
 	 */
@@ -48,7 +49,7 @@ class Main implements org.gradle.api.Plugin<Project> {
             if (resourcesExtension.getRepoUrl() != null) {
                 logger.debug("Found an repository in the resource extension");
 
-                File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getRepoOwner() + "-" + gitHub.getRepoName()).toFile();
+                File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
 
                 for (File dir : resourceDirs) {
                     try {
@@ -79,7 +80,7 @@ class Main implements org.gradle.api.Plugin<Project> {
         }));
 
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-            File jar = gitHub.getAsset(dependency.getVersion());
+			File jar = gitHub.getAsset(dependency.getGroup(), dependency.getName(), dependency.getVersion());
 
             project.getDependencies().add("implementation", project.files(jar));
         }));
@@ -111,7 +112,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 						String version = dependency.getVersion();
 
 						logger.debug("Updating GitHub dependency: " + name);
-						String newVersion = gitHub.getLatestVersion();
+						String newVersion = gitHub.getLatestVersion(group, name);
 						if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
