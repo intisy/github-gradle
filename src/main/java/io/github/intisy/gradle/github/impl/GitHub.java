@@ -32,6 +32,7 @@ import org.kohsuke.github.GHRelease;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 
 /**
@@ -42,15 +43,37 @@ public class GitHub {
     private final Logger logger;
     private final ResourcesExtension resourcesExtension;
     private final GithubExtension githubExtension;
+    private String resolvedApiKey;
 
     public GitHub(Logger logger, ResourcesExtension resourcesExtension, GithubExtension githubExtension) {
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
+        this.resolvedApiKey = null;
+    }
+
+    private String resolveApiKey(String keyOrPath) {
+        File keyFile = new File(keyOrPath);
+        if (keyFile.exists() && keyFile.isFile()) {
+            try {
+                logger.debug("API key appears to be a file path, reading content from: " + keyFile.getAbsolutePath());
+                return new String(Files.readAllBytes(keyFile.toPath()));
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to read API key from file: " + keyOrPath, e);
+            }
+        }
+        return keyOrPath;
     }
 
     public String getApiKey() {
-        return githubExtension.getAccessToken();
+        if (this.resolvedApiKey == null) {
+            String keyOrPath = githubExtension.getAccessToken();
+            if (keyOrPath == null) {
+                return null;
+            }
+            this.resolvedApiKey = resolveApiKey(keyOrPath);
+        }
+        return this.resolvedApiKey;
     }
 
     public String getRepoName() {
@@ -281,6 +304,8 @@ public class GitHub {
         GHRelease latestRelease = getLatestRelease();
         return latestRelease.getTagName();
     }
+
+
 
     public org.kohsuke.github.GitHub getGitHub() {
         org.kohsuke.github.GitHub github;
