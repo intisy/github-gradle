@@ -10,6 +10,7 @@ import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.PullResult;
@@ -32,6 +33,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.security.Security;
 
 /**
  * GitHub helper class for managing GitHub repositories, releases, and assets.
@@ -52,6 +54,8 @@ public class GitHub {
      * @param githubExtension the github extension containing access token configuration
      */
     public GitHub(Logger logger, ResourcesExtension resourcesExtension, GithubExtension githubExtension) {
+        Security.addProvider(new BouncyCastleProvider());
+
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
