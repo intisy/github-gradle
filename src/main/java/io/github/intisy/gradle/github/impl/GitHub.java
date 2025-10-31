@@ -16,7 +16,6 @@ import org.eclipse.jgit.api.PullResult;
 import org.eclipse.jgit.api.TransportConfigCallback;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
@@ -33,11 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.List;
 
-/**
- * Handles all the GitHub API related stuff.
- */
 @SuppressWarnings("unused")
 public class GitHub {
     private final Logger logger;
@@ -53,6 +48,7 @@ public class GitHub {
     }
 
     private String resolveApiKey(String keyOrPath) {
+        if (keyOrPath == null) return null;
         File keyFile = new File(keyOrPath);
         if (keyFile.exists() && keyFile.isFile()) {
             try {
@@ -68,41 +64,43 @@ public class GitHub {
     public String getApiKey() {
         if (this.resolvedApiKey == null) {
             String keyOrPath = githubExtension.getAccessToken();
-            if (keyOrPath == null) {
-                return null;
-            }
             this.resolvedApiKey = resolveApiKey(keyOrPath);
         }
         return this.resolvedApiKey;
     }
 
-    public String getRepoName() {
-        String[] repoParts = resourcesExtension.getRepoUrl().split("/");
-        return repoParts[3];
+    public String getResourceRepoName() {
+        String repoUrl = resourcesExtension.getRepoUrl();
+        if (repoUrl == null || repoUrl.trim().isEmpty()) {
+            return null;
+        }
+        String[] repoParts = repoUrl.split("/");
+        return repoParts.length > 3 ? repoParts[3] : null;
     }
 
-    public String getRepoOwner() {
-        String[] repoParts = resourcesExtension.getRepoUrl().split("/");
-        return repoParts[4];
+    public String getResourceRepoOwner() {
+        String repoUrl = resourcesExtension.getRepoUrl();
+        if (repoUrl == null || repoUrl.trim().isEmpty()) {
+            return null;
+        }
+        String[] repoParts = repoUrl.split("/");
+        return repoParts.length > 4 ? repoParts[4] : null;
     }
 
     private boolean isSshKey(String key) {
         return key != null && key.contains("-----BEGIN") && key.contains("PRIVATE KEY");
     }
 
-    public CredentialsProvider getCredentialsProvider() {
+    public CredentialsProvider getCredentialsProvider(String repoOwner) {
         String apiKey = getApiKey();
         if (apiKey == null) {
             return null;
-        } else if (
-                apiKey.startsWith("ghp_") ||
-                        apiKey.startsWith("github_pat_")
-        ) {
-            return new UsernamePasswordCredentialsProvider(getRepoOwner(), getApiKey());
+        } else if (apiKey.startsWith("ghp_") || apiKey.startsWith("github_pat_")) {
+            return new UsernamePasswordCredentialsProvider(repoOwner, apiKey);
         } else if (isSshKey(apiKey)) {
             return null;
         }
-        throw new RuntimeException("Invalid API key format: " + apiKey);
+        throw new RuntimeException("Invalid API key format.");
     }
 
     private TransportConfigCallback getTransportConfigCallback() {
@@ -113,18 +111,26 @@ public class GitHub {
         return null;
     }
 
-
-    public void cloneRepository(File path) throws GitAPIException {
-        String repositoryURL = "https://github.com/" + getRepoOwner() + "/" + getRepoName();
+    public void cloneRepository(File path, String repoOwner, String repoName) throws GitAPIException {
+        String repositoryURL = "https://github.com/" + repoOwner + "/" + repoName;
         logger.log("Cloning repository... (" + repositoryURL + ")");
         try (Git ignored = Git.cloneRepository()
                 .setURI(repositoryURL)
-                .setCredentialsProvider(getCredentialsProvider())
+                .setCredentialsProvider(getCredentialsProvider(repoOwner))
                 .setTransportConfigCallback(getTransportConfigCallback())
                 .setDirectory(path)
                 .call()) {
             logger.log("Repository cloned successfully.");
         }
+    }
+
+    public void cloneRepository(File path) throws GitAPIException {
+        String repoOwner = getResourceRepoOwner();
+        String repoName = getResourceRepoName();
+        if (repoOwner == null || repoName == null) {
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+        }
+        cloneRepository(path, repoOwner, repoName);
     }
 
     public boolean doesRepoExist(File path) {
@@ -140,6 +146,10 @@ public class GitHub {
     }
 
     public boolean isRepoUpToDate(File path) {
+        String repoOwner = getResourceRepoOwner();
+        if (repoOwner == null) {
+            throw new IllegalStateException("Cannot determine repository owner because resourcesExtension.repoUrl is not configured.");
+        }
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         try (
                 Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
@@ -148,50 +158,36 @@ public class GitHub {
                         .build();
                 Git git = new Git(repository)
         ) {
-            git.fetch().setCredentialsProvider(getCredentialsProvider()).setTransportConfigCallback(getTransportConfigCallback()).call();
+            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner)).setTransportConfigCallback(getTransportConfigCallback()).call();
             String branch = repository.getBranch();
             ObjectId localCommit = repository.resolve("refs/heads/" + branch);
             ObjectId remoteCommit = repository.resolve("refs/remotes/origin/" + branch);
-            if (localCommit != null && remoteCommit != null) {
-                return localCommit.equals(remoteCommit);
-            } else {
-                return false;
-            }
+            return localCommit != null && localCommit.equals(remoteCommit);
         } catch (IOException | GitAPIException exception) {
             return false;
         }
     }
 
-    public void pullRepository(File path) throws GitAPIException, IOException {
-        pullRepository(path, null);
-    }
-
     public void pullRepository(File path, String branch) throws GitAPIException, IOException {
-        CredentialsProvider credentialsProvider = getCredentialsProvider();
-        TransportConfigCallback transportConfigCallback = getTransportConfigCallback();
-
+        String repoOwner = getResourceRepoOwner();
+        if (repoOwner == null) {
+            throw new IllegalStateException("Cannot determine repository owner because resourcesExtension.repoUrl is not configured.");
+        }
         try (Git repo = Git.open(path)) {
             Repository repository = repo.getRepository();
             Git git = new Git(repository);
-            git.fetch().setCredentialsProvider(credentialsProvider).setTransportConfigCallback(transportConfigCallback).call();
+            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner)).setTransportConfigCallback(getTransportConfigCallback()).call();
 
             if (branch == null) {
-                List<Ref> branches = git.branchList().call();
-                if (branches.size() > 1) {
-                    logger.warn("Repository has multiple branches, might pull wrong branch...");
-                    for (Ref branch2 : branches) {
-                        logger.warn("Branch: " + branch2.getName());
-                    }
-                }
-                branch = branches.get(0).getName();
+                branch = repository.getBranch();
             }
 
             PullCommand pullCmd = git.pull()
-                    .setCredentialsProvider(credentialsProvider)
-                    .setTransportConfigCallback(transportConfigCallback)
+                    .setCredentialsProvider(getCredentialsProvider(repoOwner))
+                    .setTransportConfigCallback(getTransportConfigCallback())
                     .setRemoteBranchName(branch);
 
-            logger.log("Pulling Repository branch" + branch);
+            logger.log("Pulling Repository branch " + branch);
             PullResult result = pullCmd.call();
             if (!result.isSuccessful()) {
                 logger.error("Pull failed: " + branch);
@@ -201,11 +197,11 @@ public class GitHub {
         }
     }
 
-    public void cloneOrPullRepository(File path) throws GitAPIException, IOException {
-        cloneOrPullRepository(path, null);
+    public void pullRepository(File path) throws GitAPIException, IOException {
+        pullRepository(path, null);
     }
 
-    public void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException {
+    public void cloneOrPullRepository(File path, String repoOwner, String repoName, String branch) throws GitAPIException, IOException {
         if (doesRepoExist(path)) {
             if (!isRepoUpToDate(path))
                 pullRepository(path, branch);
@@ -213,118 +209,132 @@ public class GitHub {
                 logger.log("Repository is up to date.");
             }
         } else {
-            cloneRepository(path);
+            cloneRepository(path, repoOwner, repoName);
         }
     }
 
-    public File getAsset(String version) {
+    public void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException {
+        String repoOwner = getResourceRepoOwner();
+        String repoName = getResourceRepoName();
+        if (repoOwner == null || repoName == null) {
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+        }
+        cloneOrPullRepository(path, repoOwner, repoName, branch);
+    }
+
+    public void cloneOrPullRepository(File path) throws GitAPIException, IOException {
+        cloneOrPullRepository(path, null);
+    }
+
+    public File getAsset(String repoOwner, String repoName, String version) {
         org.kohsuke.github.GitHub github = getGitHub();
-        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), getRepoOwner());
+        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
 
         if (!direction.exists() && !direction.mkdirs())
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
 
-        File jar = new File(direction, getRepoName() + "-" + version + ".jar");
+        File jar = new File(direction, repoName + "-" + version + ".jar");
 
         logger.debug("Starting the process to implement jar: " + jar.getName());
         if (!jar.exists()) {
             try {
-                List<GHRelease> releases = github.getRepository(getRepoOwner() + "/" + getRepoName()).listReleases().toList();
-                GHRelease targetRelease = null;
-                for (GHRelease release : releases) {
-                    if (release.getTagName().equals(version))
-                        targetRelease = release;
-                }
+                GHRelease targetRelease = github.getRepository(repoOwner + "/" + repoName).getReleaseByTagName(version);
+
                 if (targetRelease != null) {
-                    List<GHAsset> assets = targetRelease.listAssets().toList();
-                    if (!assets.isEmpty()) {
-                        for (GHAsset asset : assets) {
-                            if (asset.getName().equals(getRepoName() + ".jar")) {
-                                downloadAsset(jar, asset);
-                                return jar;
-                            }
+                    for (GHAsset asset : targetRelease.listAssets()) {
+                        if (asset.getName().equals(repoName + ".jar")) {
+                            downloadAsset(jar, asset, repoOwner, repoName);
+                            return jar;
                         }
-                    } else {
-                        throw new RuntimeException("No assets found for the release for " + getRepoOwner() + ":" + getRepoName());
                     }
+                    throw new RuntimeException("No matching asset found for the release for " + repoOwner + ":" + repoName);
                 } else {
-                    throw new RuntimeException("Release not found for " + getRepoOwner() + ":" + getRepoName());
+                    throw new RuntimeException("Release not found for " + repoOwner + ":" + repoName);
                 }
             } catch (IOException e) {
-                throw new RuntimeException("Github exception while pulling asset: " + e.getMessage() + " (retrying in 5 seconds...)");
+                throw new RuntimeException("GitHub exception while pulling asset: " + e.getMessage(), e);
             }
-            throw new RuntimeException("Could not find an valid asset for " + getRepoOwner() + ":" + getRepoName());
         } else {
             logger.debug("Jar already exists: " + jar.getName());
             return jar;
         }
     }
 
-    public void downloadAsset(File direction, GHAsset asset) throws IOException {
-        logger.log("Downloading dependency from " + getRepoOwner() + "/" + getRepoName());
-        String downloadUrl = "https://api.github.com/repos/" + getRepoOwner() + "/" + getRepoName() + "/releases/assets/" + asset.getId();
+    public File getAsset(String version) {
+        String repoOwner = getResourceRepoOwner();
+        String repoName = getResourceRepoName();
+        if (repoOwner == null || repoName == null) {
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+        }
+        return getAsset(repoOwner, repoName, version);
+    }
+
+    public void downloadAsset(File direction, GHAsset asset, String repoOwner, String repoName) throws IOException {
+        logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-                .url(downloadUrl)
+                .url(asset.getBrowserDownloadUrl())
                 .addHeader("Accept", "application/octet-stream")
                 .build();
-        Response response = client.newCall(request).execute();
-        if (!response.isSuccessful()) {
-            response.close();
-            throw new IOException("Failed to download asset: " + response);
-        } else if (response.body() != null) {
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                throw new IOException("Failed to download asset: " + response);
+            }
             byte[] bytes = response.body().bytes();
             try (FileOutputStream fos = new FileOutputStream(direction)) {
                 fos.write(bytes);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
             }
         }
-        logger.log("Download completed for dependency " + getRepoOwner() + "/" + getRepoName());
+        logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
     }
 
-    public GHRelease getLatestRelease() {
-        org.kohsuke.github.GitHub github = getGitHub();
+    public GHRelease getLatestRelease(String repoOwner, String repoName) {
         try {
-            logger.debug("Fetching releases from GitHub " + getRepoOwner() + "/" + getRepoName());
-            List<GHRelease> releases = github.getRepository(getRepoOwner() + "/" + getRepoName()).listReleases().toList();
-            logger.debug("Found releases for " + getRepoName() + ": " + releases);
-            if (!releases.isEmpty()) {
-                logger.debug("Latest release found for " + getRepoName() + ": " + releases.get(0).getTagName());
-                return releases.get(0);
-            } else
-                throw new RuntimeException("No releases found for " + getRepoName());
+            logger.debug("Fetching latest release from GitHub " + repoOwner + "/" + repoName);
+            return getGitHub().getRepository(repoOwner + "/" + repoName).getLatestRelease();
         } catch (IOException e) {
             logger.error("Error fetching releases: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
 
-    public String getLatestVersion() {
-        GHRelease latestRelease = getLatestRelease();
-        return latestRelease.getTagName();
+    public GHRelease getLatestRelease() {
+        String repoOwner = getResourceRepoOwner();
+        String repoName = getResourceRepoName();
+        if (repoOwner == null || repoName == null) {
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+        }
+        return getLatestRelease(repoOwner, repoName);
     }
 
+    public String getLatestVersion(String repoOwner, String repoName) {
+        GHRelease latestRelease = getLatestRelease(repoOwner, repoName);
+        return latestRelease != null ? latestRelease.getTagName() : null;
+    }
 
+    public String getLatestVersion() {
+        String repoOwner = getResourceRepoOwner();
+        String repoName = getResourceRepoName();
+        if (repoOwner == null || repoName == null) {
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+        }
+        return getLatestVersion(repoOwner, repoName);
+    }
 
     public org.kohsuke.github.GitHub getGitHub() {
-        org.kohsuke.github.GitHub github;
         try {
-            if (getApiKey() == null) {
-                github = org.kohsuke.github.GitHub.connectAnonymously();
-                logger.debug("Pulling from github anonymously");
+            String apiKey = getApiKey();
+            if (apiKey == null || isSshKey(apiKey)) {
+                return org.kohsuke.github.GitHub.connectAnonymously();
             } else {
-                github = org.kohsuke.github.GitHub.connectUsingOAuth(getApiKey());
-                logger.debug("Pulling from github using OAuth");
+                return org.kohsuke.github.GitHub.connectUsingOAuth(apiKey);
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return github;
     }
 
     private static class SshTransportConfigCallback implements TransportConfigCallback {
-
         private final String privateKey;
 
         public SshTransportConfigCallback(String privateKey) {
