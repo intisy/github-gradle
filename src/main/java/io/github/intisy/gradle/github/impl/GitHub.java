@@ -10,7 +10,6 @@ import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.PullResult;
@@ -33,7 +32,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.security.Security;
 
 /**
  * GitHub helper class for managing GitHub repositories, releases, and assets.
@@ -54,8 +52,6 @@ public class GitHub {
      * @param githubExtension the github extension containing access token configuration
      */
     public GitHub(Logger logger, ResourcesExtension resourcesExtension, GithubExtension githubExtension) {
-        Security.addProvider(new BouncyCastleProvider());
-
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
@@ -176,7 +172,30 @@ public class GitHub {
         String apiKey = getApiKey();
         if (isSshKey(apiKey)) {
             logger.debug("API key is an SSH key. Creating SshTransportConfigCallback.");
-            return new SshTransportConfigCallback(apiKey, logger);
+            return new TransportConfigCallback() {
+                @Override
+                public void configure(Transport transport) {
+                    if (transport instanceof SshTransport) {
+                        logger.debug("Configuring SshTransport with custom JschConfigSessionFactory.");
+                        SshTransport sshTransport = (SshTransport) transport;
+                        sshTransport.setSshSessionFactory(new JschConfigSessionFactory() {
+                            @Override
+                            protected void configure(OpenSshConfig.Host hc, Session session) {
+                                logger.debug("Jsch session configure: Disabling StrictHostKeyChecking.");
+                                session.setConfig("StrictHostKeyChecking", "no");
+                            }
+
+                            @Override
+                            protected JSch createDefaultJSch(FS fs) throws JSchException {
+                                logger.debug("Jsch createDefaultJSch: Adding private key identity 'deploy-key'.");
+                                JSch defaultJSch = super.createDefaultJSch(fs);
+                                defaultJSch.addIdentity("deploy-key", apiKey.getBytes(), null, null);
+                                return defaultJSch;
+                            }
+                        });
+                    }
+                }
+            };
         }
         logger.debug("No SSH key provided. Returning null TransportConfigCallback.");
         return null;
@@ -597,39 +616,6 @@ public class GitHub {
         } catch (IOException e) {
             logger.error("Could not connect to GitHub: " + e.getMessage(), e);
             throw new RuntimeException(e);
-        }
-    }
-
-    private static class SshTransportConfigCallback implements TransportConfigCallback {
-        private final String privateKey;
-        private final Logger logger;
-
-        public SshTransportConfigCallback(String privateKey, Logger logger) {
-            this.privateKey = privateKey;
-            this.logger = logger;
-        }
-
-        @Override
-        public void configure(Transport transport) {
-            if (transport instanceof SshTransport) {
-                logger.debug("Configuring SshTransport with custom JschConfigSessionFactory.");
-                SshTransport sshTransport = (SshTransport) transport;
-                sshTransport.setSshSessionFactory(new JschConfigSessionFactory() {
-                    @Override
-                    protected void configure(OpenSshConfig.Host hc, Session session) {
-                        logger.debug("Jsch session configure: Disabling StrictHostKeyChecking.");
-                        session.setConfig("StrictHostKeyChecking", "no");
-                    }
-
-                    @Override
-                    protected JSch createDefaultJSch(FS fs) throws JSchException {
-                        logger.debug("Jsch createDefaultJSch: Adding private key identity 'deploy-key'.");
-                        JSch defaultJSch = super.createDefaultJSch(fs);
-                        defaultJSch.addIdentity("deploy-key", privateKey.getBytes(), null, null);
-                        return defaultJSch;
-                    }
-                });
-            }
         }
     }
 }
