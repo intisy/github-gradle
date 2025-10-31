@@ -1,40 +1,91 @@
 package io.github.intisy.gradle.github;
 
 import org.gradle.api.Project;
-import org.gradle.api.logging.LogLevel;
 
+/**
+ * A logger for the GitHub plugin.
+ */
 public class Logger {
+    private static final String PREFIX = "[GitHub] ";
     private final GithubExtension extension;
-    private final Project project;
+    private final org.gradle.api.logging.Logger gradleLogger;
 
+    /**
+     * Creates a new logger.
+     * @param project The project.
+     */
     public Logger(Project project) {
         this(project.getExtensions().getByType(GithubExtension.class), project);
     }
 
+    /**
+     * Creates a new logger.
+     * @param extension The GitHub extension.
+     * @param project The project.
+     */
     public Logger(GithubExtension extension, Project project) {
         if (extension == null || project == null) {
             throw new NullPointerException("extension and project cannot be null");
         }
         this.extension = extension;
-        this.project = project;
+        this.gradleLogger = project.getLogger();
     }
 
+    /**
+     * Logs a standard lifecycle message, visible in the default Gradle output.
+     * @param message The message to log.
+     */
     public void log(String message) {
-        project.getLogger().lifecycle(message);
+        gradleLogger.lifecycle(PREFIX + message);
     }
 
+    /**
+     * Logs an error message.
+     * @param message The message to log.
+     */
     public void error(String message) {
-        project.getLogger().error(message);
+        gradleLogger.error(PREFIX + message);
     }
 
+    /**
+     * Logs an error message along with an exception's stack trace.
+     * @param message The message to log.
+     * @param throwable The exception to log.
+     */
+    public void error(String message, Throwable throwable) {
+        gradleLogger.error(PREFIX + message, throwable);
+    }
+
+    /**
+     * Logs a debug message.
+     * <p>
+     * This message will be shown at the LIFECYCLE level (visible by default) only if
+     * the user sets `github.debug = true` in their build script, providing an easy
+     * way to enable verbose logging for this plugin specifically.
+     * @param message The message to log.
+     */
     public void debug(String message) {
-        LogLevel logLevel = project.getGradle().getStartParameter().getLogLevel();
-        if (extension.isDebug() || logLevel.equals(LogLevel.INFO) || logLevel.equals(LogLevel.DEBUG)) {
-            project.getLogger().lifecycle(message);
+        if (extension.isDebug()) {
+            gradleLogger.lifecycle(PREFIX + "[DEBUG] " + message);
+        } else {
+            gradleLogger.debug(PREFIX + message);
         }
     }
 
+    /**
+     * Logs a warning message.
+     * @param message The message to log.
+     */
     public void warn(String message) {
-        project.getLogger().warn(message);
+        gradleLogger.warn(PREFIX + message);
+    }
+
+    /**
+     * Logs a warning message along with an exception's stack trace.
+     * @param message The message to log.
+     * @param throwable The exception to log.
+     */
+    public void warn(String message, Throwable throwable) {
+        gradleLogger.warn(PREFIX + message, throwable);
     }
 }
