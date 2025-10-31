@@ -6,10 +6,17 @@ import org.gradle.api.Project;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
 
+/**
+ * A helper class for interacting with Gradle.
+ */
 public class Gradle {
+    /**
+     * Modifies the build file of a project.
+     * @param project The project.
+     * @param searchString The string to search for.
+     * @param replacement The string to replace with.
+     */
     public static void modifyBuildFile(Project project, String searchString, String replacement) {
         File buildFile = project.getBuildFile();
         Logger logger = new Logger(project);
@@ -27,6 +34,10 @@ public class Gradle {
         }
     }
 
+    /**
+     * Safely refreshes the Gradle project.
+     * @param project The project.
+     */
     public static void safeSoftRefreshGradle(Project project) {
         Logger logger = new Logger(project);
         logger.log("Attempting safe configuration refresh...");
