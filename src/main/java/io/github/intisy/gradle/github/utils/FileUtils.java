@@ -18,7 +18,7 @@ public class FileUtils {
      */
     public static void copyDirectory(Path sourceDir, Path destDir) throws IOException {
         if (!Files.exists(sourceDir) || !Files.isDirectory(sourceDir)) {
-            throw new IllegalArgumentException("Source directory does not exist or is not a directory.");
+            throw new IllegalArgumentException("Source directory does not exist or is not a directory: " + sourceDir);
         }
 
         Files.walk(sourceDir).forEach(sourcePath -> {
