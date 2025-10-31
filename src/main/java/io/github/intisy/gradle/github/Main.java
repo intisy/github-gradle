@@ -56,14 +56,14 @@ class Main implements Plugin<Project> {
                         gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
 
                         if (resourcesExtension.isBuildOnly()) {
-                            dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+                            dir = project.getBuildDir().toPath().resolve("resources").toFile();
                         }
 
                         FileUtils.deleteDirectory(dir.toPath());
 
                         if (dir.mkdirs()) {
                             logger.debug("Copying resources from " + path + " to: " + dir);
-                            FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()), dir.toPath());
+                            FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()).resolve(dir.getParentFile().getName()), dir.toPath());
                         } else {
                             logger.error("Failed to create directory: " + dir);
                         }
