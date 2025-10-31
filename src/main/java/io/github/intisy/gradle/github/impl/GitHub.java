@@ -387,10 +387,37 @@ public class GitHub {
                 pullRepository(path, branch);
             } else {
                 logger.log("Repository is up to date.");
+                ensureCorrectBranch(path, branch);
             }
         } else {
             logger.debug("Repository does not exist, cloning...");
             cloneRepository(path, repoOwner, repoName);
+        }
+    }
+
+    /**
+     * Ensures that the given Git repository is on the specified branch. If the current branch
+     * does not match the specified branch, it will attempt to check out the desired branch.
+     *
+     * @param path the file path to the Git repository
+     * @param branch the desired branch to ensure is checked out; if null, no action is taken
+     * @throws IOException if an I/O error occurs while accessing the repository
+     * @throws GitAPIException if a Git-specific error occurs during operations such as checkout
+     */
+    private void ensureCorrectBranch(File path, String branch) throws IOException, GitAPIException {
+        if (branch == null) {
+            return;
+        }
+        try (Git git = Git.open(path)) {
+            String currentBranch = git.getRepository().getBranch();
+            if (!currentBranch.equals(branch)) {
+                logger.log("Current branch '" + currentBranch + "' is not the desired branch '" + branch + "'. Checking out '" + branch + "'...");
+                git.checkout().setName(branch).call();
+                logger.log("Successfully checked out branch '" + branch + "'.");
+            }
+        } catch (IOException | GitAPIException e) {
+            logger.error("Failed to checkout branch '" + branch + "': " + e.getMessage(), e);
+            throw e;
         }
     }
 
