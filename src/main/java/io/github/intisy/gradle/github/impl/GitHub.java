@@ -106,7 +106,7 @@ public class GitHub {
         String repoUrl = resourcesExtension.getRepoUrl();
         logger.debug("Reading repoUrl from resourcesExtension: '" + repoUrl + "'");
         if (repoUrl == null || repoUrl.trim().isEmpty()) {
-            logger.debug("repoUrl is null or empty.");
+            logger.debug("Variable resourcesExtension.repoUrl is null or empty.");
             return null;
         }
         String[] repoParts = repoUrl.split("/");
@@ -220,11 +220,11 @@ public class GitHub {
      * @throws GitAPIException if the clone operation fails
      */
     public void cloneRepository(File path) throws GitAPIException {
-        logger.debug("cloneRepository called without owner/name, using resourcesExtension.");
+        logger.debug("Method cloneRepository called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured properly.");
+            throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured properly.");
         }
         cloneRepository(path, repoOwner, repoName);
     }
@@ -379,11 +379,11 @@ public class GitHub {
      * @throws IOException if an I/O error occurs
      */
     public void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException {
-        logger.debug("cloneOrPullRepository called without owner/name, using resourcesExtension.");
+        logger.debug("Method cloneOrPullRepository called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+            throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         cloneOrPullRepository(path, repoOwner, repoName, branch);
     }
@@ -460,11 +460,11 @@ public class GitHub {
      * @return the downloaded JAR file
      */
     public File getAsset(String version) {
-        logger.debug("getAsset called without owner/name, using resourcesExtension.");
+        logger.debug("Method getAsset called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+            throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         return getAsset(repoOwner, repoName, version);
     }
@@ -535,11 +535,11 @@ public class GitHub {
      * @return the latest release, or null if no releases exist
      */
     public GHRelease getLatestRelease() {
-        logger.debug("getLatestRelease called without owner/name, using resourcesExtension.");
+        logger.debug("Method getLatestRelease called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+            throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         return getLatestRelease(repoOwner, repoName);
     }
@@ -565,11 +565,11 @@ public class GitHub {
      * @return the latest version tag, or null if no releases exist
      */
     public String getLatestVersion() {
-        logger.debug("getLatestVersion called without owner/name, using resourcesExtension.");
+        logger.debug("Method getLatestVersion called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+            throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         return getLatestVersion(repoOwner, repoName);
     }
