@@ -12,6 +12,15 @@ public class Logger {
 
     /**
      * Creates a new logger.
+     * @param extension The GitHub extension.
+     */
+    public Logger(GithubExtension extension) {
+        this.extension = extension;
+        this.gradleLogger = org.gradle.api.logging.Logging.getLogger(Logger.class);
+    }
+
+    /**
+     * Creates a new logger.
      * @param project The project.
      */
     public Logger(Project project) {
@@ -65,7 +74,7 @@ public class Logger {
      * @param message The message to log.
      */
     public void debug(String message) {
-        if (extension.isDebug()) {
+        if (extension == null || extension.isDebug()) {
             gradleLogger.lifecycle(PREFIX + "[DEBUG] " + message);
         } else {
             gradleLogger.debug(PREFIX + message);
