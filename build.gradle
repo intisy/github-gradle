@@ -68,8 +68,7 @@ dependencies {
     implementation "org.eclipse.jgit:org.eclipse.jgit:6.9.0.202403050737-r"
     implementation "org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:6.9.0.202403050737-r"
 
-    implementation "org.bouncycastle:bcprov-jdk18on:1.78.1"
-
+    implementation "com.github.mwiede:jsch:0.2.23"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
