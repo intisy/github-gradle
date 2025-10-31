@@ -4,6 +4,7 @@ import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -13,7 +14,6 @@ import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
-import org.gradle.internal.impldep.org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,64 +30,56 @@ class Main implements org.gradle.api.Plugin<Project> {
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
 		Logger logger = new Logger(githubExtension, project);
-		GitHub gitHub = new GitHub(logger);
 
 		ResourcesExtension resourcesExtension = project.getExtensions().create("resources", ResourcesExtension.class);
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 
-		Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> {
-			task.doLast(t -> {
-				logger.debug("Process resource event called on " + project.getName());
-				if (resourcesExtension.getRepoUrl() != null) {
-					logger.debug("Found an repository in the resource extension");
+		JavaPluginConvention javaConvention = project.getConvention()
+				.getPlugin(JavaPluginConvention.class);
 
-					JavaPluginConvention javaConvention = project.getConvention()
-							.getPlugin(JavaPluginConvention.class);
+		SourceSet main = javaConvention.getSourceSets()
+				.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 
-					SourceSet main = javaConvention.getSourceSets()
-							.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+		Set<File> resourceDirs = main.getResources().getSrcDirs();
+		GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
-					Set<File> resourceDirs = main.getResources().getSrcDirs();
-					String[] repoParts = resourcesExtension.getRepoUrl().split("/");
+		Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
+            logger.debug("Process resource event called on " + project.getName());
+            if (resourcesExtension.getRepoUrl() != null) {
+                logger.debug("Found an repository in the resource extension");
 
-					String repoOwner = repoParts[3];
-					String repoName = repoParts[4];
+                File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getRepoOwner() + "-" + gitHub.getRepoName()).toFile();
 
-					File path = GradleUtils.getGradleHome().resolve("resources").resolve(repoOwner + "-" + repoName).toFile();
+                for (File dir : resourceDirs) {
+                    try {
+                        gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
 
-					for (File dir : resourceDirs) {
-						try {
-							gitHub.cloneOrPullRepository(path, repoOwner, repoName, githubExtension.getAccessToken(), resourcesExtension.getBranch());
+                        if (resourcesExtension.isBuildOnly()) {
+                            dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+                        }
 
-							if (resourcesExtension.isBuildOnly()) {
-								dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
-							}
+                        FileUtils.deleteDirectory(dir.toPath());
 
-							FileUtils.deleteDirectory(dir.toPath());
+                        if (dir.mkdirs()) {
+                            logger.debug("Copying resources from " + path + " to: " + dir);
+                            FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()), dir.toPath());
+                        } else {
+                            logger.error("Failed to create directory: " + dir);
+                        }
+                    } catch (GitAPIException | IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        }));
 
-							if (dir.mkdirs()) {
-								logger.debug("Copying resources from " + path + " to: " + dir);
-								FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()), dir.toPath());
-							} else {
-								logger.error("Failed to create directory: " + dir);
-							}
-						} catch (GitAPIException | IOException e) {
-							throw new RuntimeException(e);
-						}
-					}
-				}
-			});
-		});
-
-		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> {
-			project.getTasks().named("processResources", Copy.class, processResources -> {
-				logger.debug("Process resource event found on " + project.getName());
-				processResources.dependsOn(processGitHubResources);
-			});
-		});
+		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> project.getTasks().named("processResources", Copy.class, processResources -> {
+            logger.debug("Process resource event found on " + project.getName());
+            processResources.dependsOn(processGitHubResources);
+        }));
 
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-            File jar = gitHub.getAsset(dependency.getName(), dependency.getGroup(), dependency.getVersion(), githubExtension.getAccessToken());
+            File jar = gitHub.getAsset(dependency.getVersion());
 
             project.getDependencies().add("implementation", project.files(jar));
         }));
@@ -119,7 +111,7 @@ class Main implements org.gradle.api.Plugin<Project> {
 						String version = dependency.getVersion();
 
 						logger.debug("Updating GitHub dependency: " + name);
-						String newVersion = gitHub.getLatestVersion(group, name, githubExtension.getAccessToken());
+						String newVersion = gitHub.getLatestVersion();
 						if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
