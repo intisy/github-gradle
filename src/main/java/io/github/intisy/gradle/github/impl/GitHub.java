@@ -412,7 +412,11 @@ public class GitHub {
             String currentBranch = git.getRepository().getBranch();
             if (!currentBranch.equals(branch)) {
                 logger.log("Current branch '" + currentBranch + "' is not the desired branch '" + branch + "'. Checking out '" + branch + "'...");
-                git.checkout().setName(branch).call();
+                git.checkout()
+                        .setCreateBranch(true)
+                        .setName(branch)
+                        .setStartPoint("origin/" + branch)
+                        .call();
                 logger.log("Successfully checked out branch '" + branch + "'.");
             }
         } catch (IOException | GitAPIException e) {
