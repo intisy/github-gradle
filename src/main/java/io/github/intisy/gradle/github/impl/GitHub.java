@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github.impl;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+import com.jcraft.jzlib.*;
 import io.github.intisy.gradle.github.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.ResourcesExtension;
