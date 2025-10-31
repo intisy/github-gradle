@@ -66,7 +66,10 @@ dependencies {
     implementation "org.kohsuke:github-api:1.321"
 
     implementation "org.eclipse.jgit:org.eclipse.jgit:7.4.0.202509020913-r"
-    implementation "org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:7.4.0.202509020913-r"
+    implementation("org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:7.4.0.202509020913-r") {
+        exclude group: 'com.jcraft', module: 'jsch'
+    }
+    implementation "com.github.mwiede:jsch:2.27.5"
 
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
 
