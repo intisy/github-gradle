@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
+import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Action;
@@ -44,52 +45,45 @@ class Main implements Plugin<Project> {
 		GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
 		Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
-			logger.debug("Process resource event called on " + project.getName());
-			if (resourcesExtension.getRepoUrl() != null) {
-				logger.debug("Found a repository in the resource extension");
+            logger.debug("Process resource event called on " + project.getName());
+            if (resourcesExtension.getRepoUrl() != null) {
+                logger.debug("Found an repository in the resource extension");
 
-				File sourceRepoPath = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+                File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
 
-				try {
-					gitHub.cloneOrPullRepository(sourceRepoPath, resourcesExtension.getBranch());
+                for (File dir : resourceDirs) {
+                    try {
+                        gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
 
-					for (File destinationDir : resourceDirs) {
-						File finalDestination;
-						if (resourcesExtension.isBuildOnly()) {
-							finalDestination = project.getBuildDir().toPath().resolve("resources").resolve(destinationDir.getParentFile().getName()).toFile();
-						} else {
-                            finalDestination = destinationDir;
+                        if (resourcesExtension.isBuildOnly()) {
+                            dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
                         }
 
-                        File sourceResourcePath = sourceRepoPath.toPath().resolve(resourcesExtension.getPath()).toFile();
+                        FileUtils.deleteDirectory(dir.toPath());
 
-						if (!sourceResourcePath.exists()) {
-							logger.warn("Source resource path does not exist, skipping sync: " + sourceResourcePath);
-							continue;
-						}
-
-						logger.debug("Syncing resources from " + sourceResourcePath + " to: " + finalDestination);
-
-						project.sync(copySpec -> {
-							copySpec.from(sourceResourcePath);
-							copySpec.into(finalDestination);
-						});
-					}
-				} catch (GitAPIException | IOException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}));
+                        if (dir.mkdirs()) {
+                            logger.debug("Copying resources from " + path + " to: " + dir);
+                            FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()), dir.toPath());
+                        } else {
+                            logger.error("Failed to create directory: " + dir);
+                        }
+                    } catch (GitAPIException | IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        }));
 
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> project.getTasks().named("processResources", Copy.class, processResources -> {
-			logger.debug("Process resource event found on " + project.getName());
-			processResources.dependsOn(processGitHubResources);
-		}));
+            logger.debug("Process resource event found on " + project.getName());
+            processResources.dependsOn(processGitHubResources);
+        }));
 
 		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
 			File jar = gitHub.getAsset(dependency.getGroup(), dependency.getName(), dependency.getVersion());
-			project.getDependencies().add("implementation", project.files(jar));
-		}));
+
+            project.getDependencies().add("implementation", project.files(jar));
+        }));
 
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
@@ -130,8 +124,8 @@ class Main implements Plugin<Project> {
 					if (refresh)
 						Gradle.safeSoftRefreshGradle(project);
 				});
-			});
-	}
+		});
+    }
 
 	public Set<Dependency> getDependencies(Project project) {
 		Set<Dependency> dependencyList = new HashSet<>();
