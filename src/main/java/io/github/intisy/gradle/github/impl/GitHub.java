@@ -33,6 +33,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 
+/**
+ * GitHub helper class for managing GitHub repositories, releases, and assets.
+ * Provides methods for cloning, pulling, and fetching repository information.
+ */
 @SuppressWarnings("unused")
 public class GitHub {
     private final Logger logger;
@@ -40,6 +44,13 @@ public class GitHub {
     private final GithubExtension githubExtension;
     private String resolvedApiKey;
 
+    /**
+     * Constructs a new GitHub helper instance.
+     *
+     * @param logger the logger instance for debug and error messages
+     * @param resourcesExtension the resources extension containing repository configuration
+     * @param githubExtension the github extension containing access token configuration
+     */
     public GitHub(Logger logger, ResourcesExtension resourcesExtension, GithubExtension githubExtension) {
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
@@ -71,6 +82,12 @@ public class GitHub {
         return keyOrPath;
     }
 
+    /**
+     * Gets the GitHub API key, resolving it from a file if necessary.
+     * The key is cached after the first resolution.
+     *
+     * @return the resolved API key, or null if not configured
+     */
     public String getApiKey() {
         if (this.resolvedApiKey == null) {
             logger.debug("API key not cached, resolving from extension.");
@@ -80,6 +97,11 @@ public class GitHub {
         return this.resolvedApiKey;
     }
 
+    /**
+     * Extracts the repository name from the configured repository URL.
+     *
+     * @return the repository name, or null if not configured
+     */
     public String getResourceRepoName() {
         String repoUrl = resourcesExtension.getRepoUrl();
         logger.debug("Reading repoUrl from resourcesExtension: '" + repoUrl + "'");
@@ -88,11 +110,17 @@ public class GitHub {
             return null;
         }
         String[] repoParts = repoUrl.split("/");
-        String repoName = repoParts.length > 3 ? repoParts[3] : null;
+        String lastPart = repoParts[repoParts.length - 1];
+        String repoName = lastPart.endsWith(".git") ? lastPart.substring(0, lastPart.length() - 4) : lastPart;
         logger.debug("Parsed repository name: '" + repoName + "'");
         return repoName;
     }
 
+    /**
+     * Extracts the repository owner from the configured repository URL.
+     *
+     * @return the repository owner, or null if not configured
+     */
     public String getResourceRepoOwner() {
         String repoUrl = resourcesExtension.getRepoUrl();
         logger.debug("Reading repoUrl from resourcesExtension: '" + repoUrl + "'");
@@ -101,7 +129,11 @@ public class GitHub {
             return null;
         }
         String[] repoParts = repoUrl.split("/");
-        String repoOwner = repoParts.length > 4 ? repoParts[4] : null;
+        String repoOwner = repoParts.length > 3 ? repoParts[3] : null;
+        if (repoUrl.startsWith("git@")) {
+            String partAfterColon = repoUrl.split(":")[1];
+            repoOwner = partAfterColon.split("/")[0];
+        }
         logger.debug("Parsed repository owner: '" + repoOwner + "'");
         return repoOwner;
     }
@@ -112,6 +144,12 @@ public class GitHub {
         return isSsh;
     }
 
+    /**
+     * Creates a credentials provider for Git operations.
+     *
+     * @param repoOwner the repository owner for authentication
+     * @return the credentials provider, or null if SSH authentication is used
+     */
     public CredentialsProvider getCredentialsProvider(String repoOwner) {
         logger.debug("Attempting to get CredentialsProvider for owner: " + repoOwner);
         String apiKey = getApiKey();
@@ -140,8 +178,27 @@ public class GitHub {
         return null;
     }
 
+    private String getRepositoryURL(String repoOwner, String repoName) {
+        if (isSshKey(getApiKey())) {
+            String url = String.format("git@github.com:%s/%s.git", repoOwner, repoName);
+            logger.debug("Detected SSH key, using SSH URL for Git operations: " + url);
+            return url;
+        }
+        String url = String.format("https://github.com/%s/%s", repoOwner, repoName);
+        logger.debug("Using HTTPS URL for Git operations: " + url);
+        return url;
+    }
+
+    /**
+     * Clones a GitHub repository to the specified path.
+     *
+     * @param path the directory to clone the repository into
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @throws GitAPIException if the clone operation fails
+     */
     public void cloneRepository(File path, String repoOwner, String repoName) throws GitAPIException {
-        String repositoryURL = "https://github.com/" + repoOwner + "/" + repoName;
+        String repositoryURL = getRepositoryURL(repoOwner, repoName);
         logger.log("Cloning repository... (" + repositoryURL + ") into " + path.getAbsolutePath());
         try (Git ignored = Git.cloneRepository()
                 .setURI(repositoryURL)
@@ -156,16 +213,28 @@ public class GitHub {
         }
     }
 
+    /**
+     * Clones the configured resource repository to the specified path.
+     *
+     * @param path the directory to clone the repository into
+     * @throws GitAPIException if the clone operation fails
+     */
     public void cloneRepository(File path) throws GitAPIException {
         logger.debug("cloneRepository called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
         if (repoOwner == null || repoName == null) {
-            throw new IllegalStateException("resourcesExtension.repoUrl is not configured.");
+            throw new IllegalStateException("resourcesExtension.repoUrl is not configured properly.");
         }
         cloneRepository(path, repoOwner, repoName);
     }
 
+    /**
+     * Checks if a Git repository exists at the specified path.
+     *
+     * @param path the directory to check
+     * @return true if a repository exists, false otherwise
+     */
     public boolean doesRepoExist(File path) {
         logger.debug("Checking if repository exists at: " + path.getAbsolutePath());
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -182,6 +251,12 @@ public class GitHub {
         }
     }
 
+    /**
+     * Checks if the local repository is up-to-date with the remote.
+     *
+     * @param path the repository directory
+     * @return true if up-to-date, false otherwise
+     */
     public boolean isRepoUpToDate(File path) {
         logger.debug("Checking if repository is up-to-date at: " + path.getAbsolutePath());
         String repoOwner = getResourceRepoOwner();
@@ -213,6 +288,14 @@ public class GitHub {
         }
     }
 
+    /**
+     * Pulls the latest changes from the remote repository.
+     *
+     * @param path the repository directory
+     * @param branch the branch to pull, or null for the current branch
+     * @throws GitAPIException if the pull operation fails
+     * @throws IOException if an I/O error occurs
+     */
     public void pullRepository(File path, String branch) throws GitAPIException, IOException {
         logger.debug("Attempting to pull repository at " + path.getAbsolutePath());
         String repoOwner = getResourceRepoOwner();
@@ -250,10 +333,27 @@ public class GitHub {
         }
     }
 
+    /**
+     * Pulls the latest changes from the current branch of the remote repository.
+     *
+     * @param path the repository directory
+     * @throws GitAPIException if the pull operation fails
+     * @throws IOException if an I/O error occurs
+     */
     public void pullRepository(File path) throws GitAPIException, IOException {
         pullRepository(path, null);
     }
 
+    /**
+     * Clones a repository if it doesn't exist, otherwise pulls the latest changes.
+     *
+     * @param path the repository directory
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @param branch the branch to pull, or null for the current branch
+     * @throws GitAPIException if the clone or pull operation fails
+     * @throws IOException if an I/O error occurs
+     */
     public void cloneOrPullRepository(File path, String repoOwner, String repoName, String branch) throws GitAPIException, IOException {
         logger.debug("Executing cloneOrPull for " + repoOwner + "/" + repoName + " at " + path.getAbsolutePath());
         if (doesRepoExist(path)) {
@@ -270,6 +370,14 @@ public class GitHub {
         }
     }
 
+    /**
+     * Clones the configured resource repository if it doesn't exist, otherwise pulls the latest changes.
+     *
+     * @param path the repository directory
+     * @param branch the branch to pull, or null for the current branch
+     * @throws GitAPIException if the clone or pull operation fails
+     * @throws IOException if an I/O error occurs
+     */
     public void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException {
         logger.debug("cloneOrPullRepository called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
@@ -280,10 +388,25 @@ public class GitHub {
         cloneOrPullRepository(path, repoOwner, repoName, branch);
     }
 
+    /**
+     * Clones the configured resource repository if it doesn't exist, otherwise pulls the latest changes from the current branch.
+     *
+     * @param path the repository directory
+     * @throws GitAPIException if the clone or pull operation fails
+     * @throws IOException if an I/O error occurs
+     */
     public void cloneOrPullRepository(File path) throws GitAPIException, IOException {
         cloneOrPullRepository(path, null);
     }
 
+    /**
+     * Downloads and caches a release asset JAR file from a GitHub repository.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @param version the release version tag
+     * @return the downloaded JAR file
+     */
     public File getAsset(String repoOwner, String repoName, String version) {
         logger.debug("Attempting to get asset for " + repoOwner + "/" + repoName + " version " + version);
         org.kohsuke.github.GitHub github = getGitHub();
@@ -330,6 +453,12 @@ public class GitHub {
         }
     }
 
+    /**
+     * Downloads and caches a release asset JAR file from the configured resource repository.
+     *
+     * @param version the release version tag
+     * @return the downloaded JAR file
+     */
     public File getAsset(String version) {
         logger.debug("getAsset called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
@@ -340,6 +469,15 @@ public class GitHub {
         return getAsset(repoOwner, repoName, version);
     }
 
+    /**
+     * Downloads a GitHub release asset to the specified file location.
+     *
+     * @param direction the destination file
+     * @param asset the GitHub asset to download
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @throws IOException if the download fails
+     */
     public void downloadAsset(File direction, GHAsset asset, String repoOwner, String repoName) throws IOException {
         String downloadUrl = asset.getBrowserDownloadUrl();
         logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
@@ -368,6 +506,13 @@ public class GitHub {
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
     }
 
+    /**
+     * Fetches the latest release from a GitHub repository.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @return the latest release, or null if no releases exist
+     */
     public GHRelease getLatestRelease(String repoOwner, String repoName) {
         logger.debug("Fetching latest release from GitHub API for " + repoOwner + "/" + repoName);
         try {
@@ -384,6 +529,11 @@ public class GitHub {
         }
     }
 
+    /**
+     * Fetches the latest release from the configured resource repository.
+     *
+     * @return the latest release, or null if no releases exist
+     */
     public GHRelease getLatestRelease() {
         logger.debug("getLatestRelease called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
@@ -394,6 +544,13 @@ public class GitHub {
         return getLatestRelease(repoOwner, repoName);
     }
 
+    /**
+     * Gets the latest version tag from a GitHub repository.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @return the latest version tag, or null if no releases exist
+     */
     public String getLatestVersion(String repoOwner, String repoName) {
         logger.debug("Getting latest version for " + repoOwner + "/" + repoName);
         GHRelease latestRelease = getLatestRelease(repoOwner, repoName);
@@ -402,6 +559,11 @@ public class GitHub {
         return version;
     }
 
+    /**
+     * Gets the latest version tag from the configured resource repository.
+     *
+     * @return the latest version tag, or null if no releases exist
+     */
     public String getLatestVersion() {
         logger.debug("getLatestVersion called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
@@ -412,6 +574,11 @@ public class GitHub {
         return getLatestVersion(repoOwner, repoName);
     }
 
+    /**
+     * Creates and returns a GitHub API client instance.
+     *
+     * @return the GitHub API client
+     */
     public org.kohsuke.github.GitHub getGitHub() {
         logger.debug("Getting GitHub API client instance.");
         try {
