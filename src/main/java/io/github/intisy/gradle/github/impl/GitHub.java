@@ -64,15 +64,7 @@ public class GitHub {
     }
 
     private boolean isSshKey(String key) {
-        return key != null && (
-                key.startsWith("ssh-rsa") ||
-                        key.startsWith("ecdsa-sha2-nistp256") ||
-                        key.startsWith("ecdsa-sha2-nistp384") ||
-                        key.startsWith("ecdsa-sha2-nistp521") ||
-                        key.startsWith("ssh-ed25519") ||
-                        key.startsWith("sk-ecdsa-sha2-nistp256@openssh.com") ||
-                        key.startsWith("sk-ssh-ed25519@openssh.com")
-        );
+        return key != null && key.contains("-----BEGIN") && key.contains("PRIVATE KEY");
     }
 
     public CredentialsProvider getCredentialsProvider() {
@@ -133,7 +125,7 @@ public class GitHub {
                         .build();
                 Git git = new Git(repository)
         ) {
-            git.fetch().setTransportConfigCallback(getTransportConfigCallback()).call();
+            git.fetch().setCredentialsProvider(getCredentialsProvider()).setTransportConfigCallback(getTransportConfigCallback()).call();
             String branch = repository.getBranch();
             ObjectId localCommit = repository.resolve("refs/heads/" + branch);
             ObjectId remoteCommit = repository.resolve("refs/remotes/origin/" + branch);
