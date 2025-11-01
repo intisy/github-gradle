@@ -61,9 +61,12 @@ class Main implements Plugin<Project> {
 
                         FileUtils.deleteDirectory(dir.toPath());
 
+						if (!resourcesExtension.getPath().equals("/") && !resourcesExtension.getPath().isEmpty())
+							path = path.toPath().resolve(resourcesExtension.getPath()).toFile();
+
                         if (dir.mkdirs()) {
                             logger.debug("Copying resources from " + path + " to: " + dir);
-                            FileUtils.copyDirectory(path.toPath().resolve(resourcesExtension.getPath()), dir.toPath());
+                            FileUtils.copyDirectory(path.toPath(), dir.toPath());
                         } else {
                             logger.error("Failed to create directory: " + dir);
                         }
