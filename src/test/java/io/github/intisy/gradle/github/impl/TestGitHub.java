@@ -25,8 +25,7 @@ public class TestGitHub {
 
         ResourcesExtension resourcesExtension = new ResourcesExtension();
         resourcesExtension.setRepoUrl("https://github.com/Blizzity/libraries");
-        resourcesExtension.setBranch("application");
-        resourcesExtension.setPath("main");
+        resourcesExtension.setBranch("main");
 
         Logger logger = new Logger(githubExtension);
         GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);

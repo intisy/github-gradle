@@ -4,6 +4,9 @@ import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 import com.jcraft.jzlib.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.github.intisy.gradle.github.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.ResourcesExtension;
@@ -26,13 +29,13 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.transport.ssh.jsch.JschConfigSessionFactory;
 import org.eclipse.jgit.transport.ssh.jsch.OpenSshConfig;
 import org.eclipse.jgit.util.FS;
-import org.kohsuke.github.GHAsset;
-import org.kohsuke.github.GHRelease;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 
 /**
  * GitHub helper class for managing GitHub repositories, releases, and assets.
@@ -44,6 +47,8 @@ public class GitHub {
     private final ResourcesExtension resourcesExtension;
     private final GithubExtension githubExtension;
     private String resolvedApiKey;
+    private final OkHttpClient httpClient;
+    private final Gson gson;
 
     /**
      * Constructs a new GitHub helper instance.
@@ -57,25 +62,68 @@ public class GitHub {
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
         this.resolvedApiKey = null;
+        this.httpClient = new OkHttpClient();
+        this.gson = new Gson();
         logger.debug("GitHub helper initialized.");
     }
 
+    /**
+     * Checks if a string looks like a file path (even if the file doesn't exist).
+     *
+     * @param value the string to check
+     * @return true if the string appears to be a file path
+     */
+    private boolean looksLikeFilePath(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+
+        if (value.contains("/") || value.contains("\\")) {
+            return true;
+        }
+
+        if (value.matches(".*\\.[a-zA-Z0-9]{1,10}$")) {
+            return true;
+        }
+
+        try {
+            Paths.get(value);
+            File f = new File(value);
+            return f.isAbsolute() || value.contains(File.separator);
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolves an API key from either a direct value or a file path.
+     *
+     * @param keyOrPath the API key value or path to a file containing the key
+     * @return the resolved API key, or null if input is null
+     * @throws RuntimeException if the key appears to be a file path but the file doesn't exist or can't be read
+     */
     private String resolveApiKey(String keyOrPath) {
         logger.debug("Resolving API key...");
         if (keyOrPath == null) {
             logger.debug("API key is null.");
             return null;
         }
-        File keyFile = new File(keyOrPath);
-        if (keyFile.exists() && keyFile.isFile()) {
-            try {
-                logger.debug("API key appears to be a file path, reading content from: " + keyFile.getAbsolutePath());
-                String keyContent = new String(Files.readAllBytes(keyFile.toPath()));
-                logger.debug("Successfully read API key from file.");
-                return keyContent;
-            } catch (IOException e) {
-                logger.error("Failed to read API key from file: " + keyOrPath, e);
-                throw new RuntimeException("Failed to read API key from file: " + keyOrPath, e);
+
+        if (looksLikeFilePath(keyOrPath)) {
+            File keyFile = new File(keyOrPath);
+            if (keyFile.exists() && keyFile.isFile()) {
+                try {
+                    logger.debug("API key appears to be a file path, reading content from: " + keyFile.getAbsolutePath());
+                    String keyContent = new String(Files.readAllBytes(keyFile.toPath())).trim();
+                    logger.debug("Successfully read API key from file.");
+                    return keyContent;
+                } catch (IOException e) {
+                    logger.error("Failed to read API key from file: " + keyOrPath, e);
+                    throw new RuntimeException("Failed to read API key from file: " + keyOrPath, e);
+                }
+            } else {
+                logger.error("API key appears to be a file path, but the file does not exist: " + keyOrPath);
+                throw new RuntimeException("API key file does not exist: " + keyOrPath);
             }
         } else {
             logger.debug("API key is not a file path, using value directly.");
@@ -139,10 +187,28 @@ public class GitHub {
         return repoOwner;
     }
 
+    /**
+     * Checks if a string is an SSH private key.
+     *
+     * @param key the string to check
+     * @return true if the key appears to be an SSH private key
+     */
     private boolean isSshKey(String key) {
         boolean isSsh = key != null && key.contains("-----BEGIN") && key.contains("PRIVATE KEY");
         logger.debug("Checking if key is SSH private key... Result: " + isSsh);
         return isSsh;
+    }
+
+    /**
+     * Checks if a string is a GitHub Personal Access Token.
+     *
+     * @param key the string to check
+     * @return true if the key is a GitHub PAT
+     */
+    private boolean isGitHubPAT(String key) {
+        boolean isPAT = key != null && (key.startsWith("ghp_") || key.startsWith("github_pat_"));
+        logger.debug("Checking if key is GitHub PAT... Result: " + isPAT);
+        return isPAT;
     }
 
     /**
@@ -157,7 +223,7 @@ public class GitHub {
         if (apiKey == null) {
             logger.debug("No API key provided. Returning null CredentialsProvider.");
             return null;
-        } else if (apiKey.startsWith("ghp_") || apiKey.startsWith("github_pat_")) {
+        } else if (isGitHubPAT(apiKey)) {
             logger.debug("API key is a GitHub PAT. Creating UsernamePasswordCredentialsProvider.");
             return new UsernamePasswordCredentialsProvider(repoOwner, apiKey);
         } else if (isSshKey(apiKey)) {
@@ -168,6 +234,11 @@ public class GitHub {
         throw new RuntimeException("Invalid API key format.");
     }
 
+    /**
+     * Creates a transport configuration callback for SSH authentication.
+     *
+     * @return the transport configuration callback, or null if SSH is not used
+     */
     private TransportConfigCallback getTransportConfigCallback() {
         logger.debug("Attempting to get TransportConfigCallback.");
         String apiKey = getApiKey();
@@ -202,6 +273,13 @@ public class GitHub {
         return null;
     }
 
+    /**
+     * Constructs the appropriate Git repository URL based on authentication type.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @return the Git repository URL (SSH or HTTPS)
+     */
     private String getRepositoryURL(String repoOwner, String repoName) {
         if (isSshKey(getApiKey())) {
             String url = String.format("git@github.com:%s/%s.git", repoOwner, repoName);
@@ -463,6 +541,27 @@ public class GitHub {
     }
 
     /**
+     * Makes an authenticated GitHub API request.
+     *
+     * @param url the API URL to request
+     * @return the response object
+     * @throws IOException if the request fails
+     */
+    private Response makeGitHubApiRequest(String url) throws IOException {
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(url)
+                .addHeader("Accept", "application/vnd.github+json")
+                .addHeader("X-GitHub-Api-Version", "2022-11-28");
+
+        String apiKey = getApiKey();
+        if (apiKey != null && isGitHubPAT(apiKey)) {
+            requestBuilder.addHeader("Authorization", "Bearer " + apiKey);
+        }
+
+        return httpClient.newCall(requestBuilder.build()).execute();
+    }
+
+    /**
      * Downloads and caches a release asset JAR file from a GitHub repository.
      *
      * @param repoOwner the repository owner
@@ -472,7 +571,6 @@ public class GitHub {
      */
     public File getAsset(String repoOwner, String repoName, String version) {
         logger.debug("Attempting to get asset for " + repoOwner + "/" + repoName + " version " + version);
-        org.kohsuke.github.GitHub github = getGitHub();
         File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         logger.debug("Asset cache directory: " + direction.getAbsolutePath());
 
@@ -489,22 +587,35 @@ public class GitHub {
         if (!jar.exists()) {
             logger.debug("Asset not found in cache. Fetching from GitHub API.");
             try {
-                logger.debug("Getting repository from API: " + repoOwner + "/" + repoName);
-                GHRelease targetRelease = github.getRepository(repoOwner + "/" + repoName).getReleaseByTagName(version);
+                String apiUrl = String.format("https://api.github.com/repos/%s/%s/releases/tags/%s",
+                        repoOwner, repoName, version);
+                logger.debug("Fetching release from: " + apiUrl);
 
-                if (targetRelease != null) {
-                    logger.debug("Found release '" + targetRelease.getName() + "' with tag " + version);
-                    for (GHAsset asset : targetRelease.listAssets()) {
-                        logger.debug("Checking asset: '" + asset.getName() + "'");
-                        if (asset.getName().equals(repoName + ".jar")) {
+                try (Response response = makeGitHubApiRequest(apiUrl)) {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        throw new RuntimeException("Failed to fetch release: " + response.code() + " " + response.message());
+                    }
+
+                    JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
+                    JsonArray assets = release.getAsJsonArray("assets");
+
+                    if (assets == null || assets.size() == 0) {
+                        throw new RuntimeException("No assets found for release " + version);
+                    }
+
+                    for (int i = 0; i < assets.size(); i++) {
+                        JsonObject asset = assets.get(i).getAsJsonObject();
+                        String assetName = asset.get("name").getAsString();
+                        logger.debug("Checking asset: '" + assetName + "'");
+
+                        if (assetName.equals(repoName + ".jar")) {
                             logger.debug("Found matching asset. Downloading...");
-                            downloadAsset(jar, asset, repoOwner, repoName);
+                            String downloadUrl = asset.get("browser_download_url").getAsString();
+                            downloadAssetFromUrl(jar, downloadUrl, repoOwner, repoName);
                             return jar;
                         }
                     }
                     throw new RuntimeException("No matching asset found for the release for " + repoOwner + ":" + repoName);
-                } else {
-                    throw new RuntimeException("Release not found for " + repoOwner + ":" + repoName);
                 }
             } catch (IOException e) {
                 logger.error("IOException while getting asset: " + e.getMessage(), e);
@@ -533,32 +644,32 @@ public class GitHub {
     }
 
     /**
-     * Downloads a GitHub release asset to the specified file location.
+     * Downloads a GitHub release asset from a URL to the specified file location.
      *
-     * @param direction the destination file
-     * @param asset the GitHub asset to download
+     * @param destination the destination file
+     * @param downloadUrl the asset download URL
      * @param repoOwner the repository owner
      * @param repoName the repository name
      * @throws IOException if the download fails
      */
-    public void downloadAsset(File direction, GHAsset asset, String repoOwner, String repoName) throws IOException {
-        String downloadUrl = asset.getBrowserDownloadUrl();
+    private void downloadAssetFromUrl(File destination, String downloadUrl, String repoOwner, String repoName) throws IOException {
         logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
         logger.debug("Asset download URL: " + downloadUrl);
-        logger.debug("Destination file: " + direction.getAbsolutePath());
-        OkHttpClient client = new OkHttpClient();
+        logger.debug("Destination file: " + destination.getAbsolutePath());
+
         Request request = new Request.Builder()
                 .url(downloadUrl)
                 .addHeader("Accept", "application/octet-stream")
                 .build();
-        try (Response response = client.newCall(request).execute()) {
+
+        try (Response response = httpClient.newCall(request).execute()) {
             logger.debug("HTTP response: " + response.code() + " " + response.message());
             if (!response.isSuccessful() || response.body() == null) {
                 throw new IOException("Failed to download asset: " + response);
             }
             byte[] bytes = response.body().bytes();
             logger.debug("Download size: " + bytes.length + " bytes.");
-            try (FileOutputStream fos = new FileOutputStream(direction)) {
+            try (FileOutputStream fos = new FileOutputStream(destination)) {
                 fos.write(bytes);
             }
             logger.debug("Asset written to file successfully.");
@@ -570,22 +681,47 @@ public class GitHub {
     }
 
     /**
+     * Downloads a GitHub release asset to the specified file location.
+     *
+     * @deprecated Use downloadAssetFromUrl instead
+     * @param direction the destination file
+     * @param asset the GitHub asset object (no longer supported)
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @throws IOException if the download fails
+     */
+    @Deprecated
+    public void downloadAsset(File direction, Object asset, String repoOwner, String repoName) throws IOException {
+        throw new UnsupportedOperationException("This method has been removed. Use REST API methods instead.");
+    }
+
+    /**
      * Fetches the latest release from a GitHub repository.
      *
      * @param repoOwner the repository owner
      * @param repoName the repository name
-     * @return the latest release, or null if no releases exist
+     * @return JSON object representing the latest release, or null if no releases exist
      */
-    public GHRelease getLatestRelease(String repoOwner, String repoName) {
+    public JsonObject getLatestRelease(String repoOwner, String repoName) {
         logger.debug("Fetching latest release from GitHub API for " + repoOwner + "/" + repoName);
         try {
-            GHRelease release = getGitHub().getRepository(repoOwner + "/" + repoName).getLatestRelease();
-            if (release != null) {
-                logger.debug("Found latest release with tag: " + release.getTagName());
-            } else {
-                logger.debug("No releases found for " + repoOwner + "/" + repoName);
+            String apiUrl = String.format("https://api.github.com/repos/%s/%s/releases/latest",
+                    repoOwner, repoName);
+
+            try (Response response = makeGitHubApiRequest(apiUrl)) {
+                if (response.code() == 404) {
+                    logger.debug("No releases found for " + repoOwner + "/" + repoName);
+                    return null;
+                }
+
+                if (!response.isSuccessful() || response.body() == null) {
+                    throw new RuntimeException("Failed to fetch latest release: " + response.code() + " " + response.message());
+                }
+
+                JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
+                logger.debug("Found latest release with tag: " + release.get("tag_name").getAsString());
+                return release;
             }
-            return release;
         } catch (IOException e) {
             logger.error("Error fetching latest release: " + e.getMessage(), e);
             throw new RuntimeException(e);
@@ -595,9 +731,9 @@ public class GitHub {
     /**
      * Fetches the latest release from the configured resource repository.
      *
-     * @return the latest release, or null if no releases exist
+     * @return JSON object representing the latest release, or null if no releases exist
      */
-    public GHRelease getLatestRelease() {
+    public JsonObject getLatestRelease() {
         logger.debug("Method getLatestRelease called without owner/name, using resourcesExtension.");
         String repoOwner = getResourceRepoOwner();
         String repoName = getResourceRepoName();
@@ -616,8 +752,8 @@ public class GitHub {
      */
     public String getLatestVersion(String repoOwner, String repoName) {
         logger.debug("Getting latest version for " + repoOwner + "/" + repoName);
-        GHRelease latestRelease = getLatestRelease(repoOwner, repoName);
-        String version = latestRelease != null ? latestRelease.getTagName() : null;
+        JsonObject latestRelease = getLatestRelease(repoOwner, repoName);
+        String version = latestRelease != null ? latestRelease.get("tag_name").getAsString() : null;
         logger.debug("Latest version resolved to: '" + version + "'");
         return version;
     }
@@ -635,27 +771,5 @@ public class GitHub {
             throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         return getLatestVersion(repoOwner, repoName);
-    }
-
-    /**
-     * Creates and returns a GitHub API client instance.
-     *
-     * @return the GitHub API client
-     */
-    public org.kohsuke.github.GitHub getGitHub() {
-        logger.debug("Getting GitHub API client instance.");
-        try {
-            String apiKey = getApiKey();
-            if (apiKey == null || isSshKey(apiKey)) {
-                logger.debug("Connecting to GitHub anonymously.");
-                return org.kohsuke.github.GitHub.connectAnonymously();
-            } else {
-                logger.debug("Connecting to GitHub using OAuth PAT.");
-                return org.kohsuke.github.GitHub.connectUsingOAuth(apiKey);
-            }
-        } catch (IOException e) {
-            logger.error("Could not connect to GitHub: " + e.getMessage(), e);
-            throw new RuntimeException(e);
-        }
     }
 }
