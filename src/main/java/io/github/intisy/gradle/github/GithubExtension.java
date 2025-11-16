@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github;
 
 import java.io.File;
 import java.nio.file.Path;
+import org.gradle.api.Action;
 
 /**
  * Extension for configuring GitHub integration.
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 public class GithubExtension {
     private String accessToken;
     private boolean debug;
+    private final ResourcesExtension resources = new ResourcesExtension();
 
     /**
      * @param debug Whether to enable debug logging.
@@ -51,5 +53,20 @@ public class GithubExtension {
      */
     public String getAccessToken() {
         return accessToken;
+    }
+
+    /**
+     * @return The nested resources extension.
+     */
+    public ResourcesExtension getResources() {
+        return resources;
+    }
+
+    /**
+     * Configures the nested resources extension using a Gradle action.
+     * @param action The configuration action.
+     */
+    public void resources(Action<? super ResourcesExtension> action) {
+        action.execute(resources);
     }
 }
