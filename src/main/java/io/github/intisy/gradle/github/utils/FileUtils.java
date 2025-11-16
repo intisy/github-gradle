@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 /**
  * Author: Finn Birich
@@ -21,23 +23,25 @@ public class FileUtils {
             throw new IllegalArgumentException("Source directory does not exist or is not a directory: " + sourceDir);
         }
 
-        Files.walk(sourceDir).forEach(sourcePath -> {
-            try {
-                if (sourcePath.toString().contains(".git")) {
-                    return;
-                }
-                Path targetPath = destDir.resolve(sourceDir.relativize(sourcePath));
-                if (Files.isDirectory(sourcePath)) {
-                    if (!Files.exists(targetPath)) {
-                        Files.createDirectories(targetPath);
+        try (Stream<Path> files = Files.walk(sourceDir)) {
+            files.forEach(sourcePath -> {
+                try {
+                    if (sourcePath.toString().contains(".git")) {
+                        return;
                     }
-                } else {
-                    Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    Path targetPath = destDir.resolve(sourceDir.relativize(sourcePath));
+                    if (Files.isDirectory(sourcePath)) {
+                        if (!Files.exists(targetPath)) {
+                            Files.createDirectories(targetPath);
+                        }
+                    } else {
+                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException("Error copying directory", e);
                 }
-            } catch (IOException e) {
-                throw new RuntimeException("Error copying directory", e);
-            }
-        });
+            });
+        }
     }
 
     /**
@@ -48,15 +52,16 @@ public class FileUtils {
      */
     public static void deleteDirectory(Path dir) throws IOException {
         if (Files.exists(dir) && Files.isDirectory(dir)) {
-            Files.walk(dir)
-                .sorted((path1, path2) -> path2.compareTo(path1)) // Sort in reverse order to delete files before directories
-                .forEach(path -> {
-                    try {
-                        Files.delete(path);
-                    } catch (IOException e) {
-                        throw new RuntimeException("Error deleting directory", e);
-                    }
-                });
+            try (Stream<Path> files = Files.walk(dir)) {
+                files.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Error deleting directory", e);
+                        }
+                    });
+            }
         }
     }
 }

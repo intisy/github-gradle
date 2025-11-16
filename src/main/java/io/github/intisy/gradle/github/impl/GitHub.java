@@ -598,7 +598,7 @@ public class GitHub {
                     JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
                     JsonArray assets = release.getAsJsonArray("assets");
 
-                    if (assets == null || assets.size() == 0) {
+                    if (assets == null || assets.isEmpty()) {
                         throw new RuntimeException("No assets found for release " + version);
                     }
 
@@ -687,10 +687,9 @@ public class GitHub {
      * @param asset the GitHub asset object (no longer supported)
      * @param repoOwner the repository owner
      * @param repoName the repository name
-     * @throws IOException if the download fails
      */
     @Deprecated
-    public void downloadAsset(File direction, Object asset, String repoOwner, String repoName) throws IOException {
+    public void downloadAsset(File direction, Object asset, String repoOwner, String repoName) {
         throw new UnsupportedOperationException("This method has been removed. Use REST API methods instead.");
     }
 
