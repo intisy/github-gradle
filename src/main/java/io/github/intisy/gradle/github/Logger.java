@@ -88,13 +88,4 @@ public class Logger {
     public void warn(String message) {
         gradleLogger.warn(PREFIX + message);
     }
-
-    /**
-     * Logs a warning message along with an exception's stack trace.
-     * @param message The message to log.
-     * @param throwable The exception to log.
-     */
-    public void warn(String message, Throwable throwable) {
-        gradleLogger.warn(PREFIX + message, throwable);
-    }
 }

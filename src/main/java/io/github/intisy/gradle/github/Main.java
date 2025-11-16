@@ -12,7 +12,7 @@ import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
 
@@ -35,10 +35,9 @@ class Main implements Plugin<Project> {
 
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
 
-		JavaPluginConvention javaConvention = project.getConvention()
-				.getPlugin(JavaPluginConvention.class);
+		JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
 
-		SourceSet main = javaConvention.getSourceSets()
+		SourceSet main = javaExtension.getSourceSets()
 				.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 
 		Set<File> resourceDirs = main.getResources().getSrcDirs();
@@ -56,7 +55,8 @@ class Main implements Plugin<Project> {
                         gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
 
                         if (resourcesExtension.isBuildOnly()) {
-                            dir = project.getBuildDir().toPath().resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+                            dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
+                                    .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
                         }
 
                         FileUtils.deleteDirectory(dir.toPath());

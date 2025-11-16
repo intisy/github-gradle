@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github;
 import java.io.File;
 import java.nio.file.Path;
 import org.gradle.api.Action;
+import groovy.lang.Closure;
 
 /**
  * Extension for configuring GitHub integration.
@@ -68,5 +69,17 @@ public class GithubExtension {
      */
     public void resources(Action<? super ResourcesExtension> action) {
         action.execute(resources);
+    }
+
+    /**
+     * Configures the nested resources extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: resources { ... }
+     * @param closure The configuration closure.
+     */
+    public void resources(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(resources);
+        closure.call(resources);
     }
 }
