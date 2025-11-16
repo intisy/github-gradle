@@ -5,10 +5,10 @@ package io.github.intisy.gradle.github;
  */
 @SuppressWarnings("unused")
 public class ResourcesExtension {
-    private String branch = "main";
-    private String path = "/";
-    private String repoUrl;
-    private boolean buildOnly;
+    String branch = "main";
+    String path = "/";
+    String repoUrl;
+    boolean buildOnly;
 
     /**
      * @return Whether to only build the resources without including them in the project.

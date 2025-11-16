@@ -30,7 +30,7 @@ class Main implements Plugin<Project> {
 	 */
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
-		ResourcesExtension resourcesExtension = project.getExtensions().create("resources", ResourcesExtension.class);
+		ResourcesExtension resourcesExtension = githubExtension.getResources();
 		Logger logger = new Logger(githubExtension, project);
 
 		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
