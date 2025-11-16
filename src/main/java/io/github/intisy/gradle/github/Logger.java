@@ -1,14 +1,16 @@
 package io.github.intisy.gradle.github;
 
 import org.gradle.api.Project;
+import org.gradle.api.logging.LogLevel;
+import org.gradle.api.logging.Logging;
 
 /**
  * A logger for the GitHub plugin.
  */
 public class Logger {
-    private static final String PREFIX = "[GitHub] ";
     private final GithubExtension extension;
-    private final org.gradle.api.logging.Logger gradleLogger;
+    private final org.gradle.api.logging.Logger logger;
+    private Project project;
 
     /**
      * Creates a new logger.
@@ -16,7 +18,7 @@ public class Logger {
      */
     public Logger(GithubExtension extension) {
         this.extension = extension;
-        this.gradleLogger = org.gradle.api.logging.Logging.getLogger(Logger.class);
+        this.logger = Logging.getLogger(Logger.class);
     }
 
     /**
@@ -37,7 +39,8 @@ public class Logger {
             throw new NullPointerException("extension and project cannot be null");
         }
         this.extension = extension;
-        this.gradleLogger = project.getLogger();
+        this.logger = project.getLogger();
+        this.project = project;
     }
 
     /**
@@ -45,7 +48,7 @@ public class Logger {
      * @param message The message to log.
      */
     public void log(String message) {
-        gradleLogger.lifecycle(PREFIX + message);
+        logger.lifecycle(message);
     }
 
     /**
@@ -53,7 +56,7 @@ public class Logger {
      * @param message The message to log.
      */
     public void error(String message) {
-        gradleLogger.error(PREFIX + message);
+        logger.error(message);
     }
 
     /**
@@ -62,7 +65,7 @@ public class Logger {
      * @param throwable The exception to log.
      */
     public void error(String message, Throwable throwable) {
-        gradleLogger.error(PREFIX + message, throwable);
+        logger.error(message, throwable);
     }
 
     /**
@@ -74,10 +77,9 @@ public class Logger {
      * @param message The message to log.
      */
     public void debug(String message) {
-        if (extension == null || extension.isDebug()) {
-            gradleLogger.lifecycle(PREFIX + "[DEBUG] " + message);
-        } else {
-            gradleLogger.debug(PREFIX + message);
+        LogLevel logLevel;
+        if (extension.isDebug() || project != null && ((logLevel = project.getGradle().getStartParameter().getLogLevel()).equals(LogLevel.INFO) || logLevel.equals(LogLevel.DEBUG))) {
+            logger.lifecycle(message);
         }
     }
 
@@ -86,6 +88,6 @@ public class Logger {
      * @param message The message to log.
      */
     public void warn(String message) {
-        gradleLogger.warn(PREFIX + message);
+        logger.warn(message);
     }
 }

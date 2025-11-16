@@ -10,9 +10,10 @@ import groovy.lang.Closure;
  */
 @SuppressWarnings("unused")
 public class GithubExtension {
+    private final ResourcesExtension resources = new ResourcesExtension();
+
     private String accessToken;
     private boolean debug;
-    private final ResourcesExtension resources = new ResourcesExtension();
 
     /**
      * @param debug Whether to enable debug logging.
