@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github;
+package io.github.intisy.gradle.github.extension;
 
 /**
  * Extension for configuring external resources to be used in the project.
