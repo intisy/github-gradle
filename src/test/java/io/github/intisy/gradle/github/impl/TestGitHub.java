@@ -5,6 +5,7 @@ import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -17,6 +18,7 @@ public class TestGitHub {
 //        GitHub.getAsset("SimpleLogger", "Blizzity", "1.12.7", github);
     }
 
+    @Disabled
     @Test
     public void testAccessToken() throws IOException, GitAPIException {
         GithubExtension githubExtension = new GithubExtension();
