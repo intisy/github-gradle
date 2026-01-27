@@ -1,5 +1,7 @@
 package io.github.intisy.gradle.github;
 
+import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
 import io.github.intisy.gradle.github.utils.FileUtils;
