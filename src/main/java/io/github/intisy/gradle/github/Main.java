@@ -20,13 +20,19 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Main class.
+ * Main class that implements a Gradle Plugin for managing GitHub-related functionalities in projects.
+ * This plugin integrates with the GitHub API and provides tasks for managing resources and dependencies.
  */
 class Main implements Plugin<Project> {
 	/**
-	 * Applies all the project stuff.
+	 * Applies the GitHub plugin to the given Gradle project. This method is responsible for configuring
+	 * project-level tasks, extensions, and dependencies related to GitHub integration.
+	 *
+	 * @param project The Gradle project on which the plugin is being applied. This object represents the
+	 *                project instance that acts as the target for configurations and tasks.
 	 */
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
@@ -92,7 +98,7 @@ class Main implements Plugin<Project> {
 			task.setGroup("github");
 			task.setDescription("Implement an github dependency");
 			task.doLast(t -> {
-				for (Dependency dependency : getDependencies(project)) {
+				for (Dependency dependency : getAllDependencies(project)) {
 					String group = dependency.getGroup();
 					String name = dependency.getName();
 					String version = dependency.getVersion();
@@ -107,7 +113,7 @@ class Main implements Plugin<Project> {
 				task.setDescription("Updates all GitHub dependencies");
 				task.doLast(t -> {
 					boolean refresh = false;
-					Set<Dependency> dependencyList = getDependencies(project);
+					Set<Dependency> dependencyList = getAllDependencies(project);
 					logger.debug("Updating GitHub dependencies: " + dependencyList);
 					for (Dependency dependency : dependencyList) {
 						String group = dependency.getGroup();
@@ -118,7 +124,9 @@ class Main implements Plugin<Project> {
 						String newVersion = gitHub.getLatestVersion(group, name);
 						if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
-							Gradle.modifyBuildFile(project, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
+							for (Project p : GradleUtils.getAllProjectsRecursive(project)) {
+								Gradle.modifyBuildFile(p, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
+							}
 							refresh = true;
 						} else {
 							logger.log("Dependency " + group + "/" + name + " is already up to date");
@@ -130,14 +138,27 @@ class Main implements Plugin<Project> {
 		});
     }
 
+	/**
+	 * Aggregates all dependencies from the given project and its subprojects.
+	 *
+	 * @param project The Gradle project for which dependencies are to be retrieved. This includes the
+	 *                specified project as well as all its subprojects.
+	 * @return A set containing all {@code Dependency} objects from the given project and its subprojects.
+	 */
+	public Set<Dependency> getAllDependencies(Project project) {
+		return project.getAllprojects().stream().flatMap(p -> getDependencies(p).stream()).collect(Collectors.toSet());
+	}
+
+	/**
+	 * Retrieves the set of dependencies associated with the "githubImplementation" configuration
+	 * of the specified Gradle project.
+	 *
+	 * @param project The Gradle project from which dependencies are to be retrieved. This project
+	 *                should have a "githubImplementation" configuration defined.
+	 * @return A set of {@code Dependency} objects representing all dependencies declared
+	 *         under the "githubImplementation" configuration of the given project.
+	 */
 	public Set<Dependency> getDependencies(Project project) {
-		Set<Dependency> dependencyList = new HashSet<>();
-		project.getAllprojects().forEach(p -> {
-			if (!p.equals(project.getRootProject())) {
-				dependencyList.addAll(p.getConfigurations().getByName("githubImplementation").getAllDependencies());
-			}
-		});
-		dependencyList.addAll(project.getConfigurations().getByName("githubImplementation").getAllDependencies());
-		return dependencyList;
+		return new HashSet<>(project.getConfigurations().getByName("githubImplementation").getAllDependencies());
 	}
 }
