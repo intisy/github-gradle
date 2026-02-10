@@ -561,6 +561,102 @@ public class GitHub {
     }
 
     /**
+     * Builds a user-friendly error message for a failed GitHub API response.
+     * Consumes the response body if present. Call only when the response is not successful.
+     *
+     * @param response the failed HTTP response (body will be consumed)
+     * @param context  description of what was being requested (e.g. "release owner/repo tag v1.0")
+     * @return a detailed error message including remediation hints
+     */
+    private String buildGitHubApiErrorMessage(Response response, String context) {
+        int code = response.code();
+        String statusMessage = response.message();
+        String bodyMessage = null;
+        if (response.body() != null) {
+            try {
+                String body = response.body().string();
+                if (body != null && !body.isEmpty()) {
+                    try {
+                        JsonObject json = gson.fromJson(body, JsonObject.class);
+                        if (json.has("message")) {
+                            bodyMessage = json.get("message").getAsString();
+                        }
+                    } catch (Exception e) {
+                        bodyMessage = body.length() > 200 ? body.substring(0, 200) + "..." : body;
+                    }
+                }
+            } catch (IOException e) {
+                // ignore when reading error body
+            }
+        }
+
+        StringBuilder msg = new StringBuilder();
+        msg.append("GitHub API request failed for ").append(context).append(". ");
+        msg.append("HTTP ").append(code).append(" ").append(statusMessage);
+        if (bodyMessage != null) {
+            msg.append(" — ").append(bodyMessage);
+        }
+        msg.append(".\n\n");
+
+        switch (code) {
+            case 401:
+                msg.append("FIX: Add a GitHub Personal Access Token so the plugin can access the API.\n");
+                if (getApiKey() == null) {
+                    msg.append("  • In build.gradle add: github { accessToken = \"ghp_YOUR_TOKEN\" }\n");
+                    msg.append("  • Or set the GITHUB_TOKEN environment variable.\n");
+                } else {
+                    msg.append("  • Your token is set but was rejected. Check it is valid and not expired.\n");
+                    msg.append("  • Create or regenerate a PAT at: https://github.com/settings/tokens\n");
+                }
+                msg.append("  • For public repos no scope is needed; for private repos enable the 'repo' scope.");
+                break;
+            case 403:
+                if (bodyMessage != null && bodyMessage.toLowerCase().contains("rate limit")) {
+                    msg.append("FIX: GitHub API rate limit exceeded (60/hr unauthenticated).\n");
+                    msg.append("  • Add a token to get 5,000 requests/hour: github { accessToken = \"ghp_YOUR_TOKEN\" } in build.gradle\n");
+                    msg.append("  • Or wait and retry later.");
+                } else {
+                    msg.append("FIX: Request forbidden — token may lack permission.\n");
+                    msg.append("  • For private repositories, ensure your PAT has the 'repo' scope.\n");
+                    msg.append("  • Update token at: https://github.com/settings/tokens");
+                }
+                break;
+            case 404:
+                msg.append("FIX: Repository or release not found.\n");
+                msg.append("  • Check that the owner, repo name, and release tag are correct in your githubImplementation dependency.\n");
+                msg.append("  • If the repo is private, ensure your token has access to it.");
+                break;
+            default:
+                msg.append("FIX: Check your network and GitHub status. Retry with --info for more details.");
+                break;
+        }
+        return msg.toString();
+    }
+
+    /**
+     * Builds a user-friendly error message for a failed HTTP response when the body is not JSON
+     * (e.g. asset download). Does not consume the response body.
+     */
+    private String buildHttpErrorMessage(int code, String statusMessage, String context) {
+        StringBuilder msg = new StringBuilder();
+        msg.append("Download failed for ").append(context).append(". HTTP ").append(code).append(" ").append(statusMessage).append(".\n\n");
+        switch (code) {
+            case 401:
+                msg.append("FIX: Add a token so the plugin can download the asset: github { accessToken = \"ghp_YOUR_TOKEN\" } in build.gradle, or set GITHUB_TOKEN.");
+                break;
+            case 403:
+                msg.append("FIX: If rate limited, add a token (github { accessToken = \"...\" }). If forbidden, ensure your PAT has the 'repo' scope for this repository.");
+                break;
+            case 404:
+                msg.append("FIX: Check that the release and asset exist at the given tag. For private repos, ensure your token has access.");
+                break;
+            default:
+                break;
+        }
+        return msg.toString();
+    }
+
+    /**
      * Downloads and caches a release asset JAR file from a GitHub repository.
      *
      * @param repoOwner the repository owner
@@ -591,8 +687,12 @@ public class GitHub {
                 logger.debug("Fetching release from: " + apiUrl);
 
                 try (Response response = makeGitHubApiRequest(apiUrl)) {
-                    if (!response.isSuccessful() || response.body() == null) {
-                        throw new RuntimeException("Failed to fetch release: " + response.code() + " " + response.message());
+                    if (!response.isSuccessful()) {
+                        String context = String.format("release %s/%s tag %s", repoOwner, repoName, version);
+                        throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                    }
+                    if (response.body() == null) {
+                        throw new RuntimeException("GitHub API returned empty body for release " + repoOwner + "/" + repoName + " tag " + version + ".");
                     }
 
                     JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
@@ -663,8 +763,12 @@ public class GitHub {
 
         try (Response response = httpClient.newCall(request).execute()) {
             logger.debug("HTTP response: " + response.code() + " " + response.message());
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new IOException("Failed to download asset: " + response);
+            if (!response.isSuccessful()) {
+                String context = repoOwner + "/" + repoName;
+                throw new IOException(buildHttpErrorMessage(response.code(), response.message(), context));
+            }
+            if (response.body() == null) {
+                throw new IOException("Empty response body when downloading " + repoOwner + "/" + repoName + ".");
             }
             byte[] bytes = response.body().bytes();
             logger.debug("Download size: " + bytes.length + " bytes.");
@@ -712,8 +816,12 @@ public class GitHub {
                     return null;
                 }
 
-                if (!response.isSuccessful() || response.body() == null) {
-                    throw new RuntimeException("Failed to fetch latest release: " + response.code() + " " + response.message());
+                if (!response.isSuccessful()) {
+                    String context = String.format("latest release for %s/%s", repoOwner, repoName);
+                    throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                }
+                if (response.body() == null) {
+                    throw new RuntimeException("GitHub API returned empty body for latest release " + repoOwner + "/" + repoName + ".");
                 }
 
                 JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
