@@ -29,12 +29,20 @@ import org.eclipse.jgit.transport.JschConfigSessionFactory;
 import org.eclipse.jgit.transport.OpenSshConfig;
 import org.eclipse.jgit.util.FS;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * GitHub helper class for managing GitHub repositories, releases, and assets.
@@ -781,6 +789,76 @@ public class GitHub {
             throw e;
         }
         logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
+    }
+
+    /**
+     * Reads the embedded github-dependencies metadata from a JAR file.
+     * The metadata is stored at {@code META-INF/github-dependencies.json} and contains
+     * a JSON array of objects with group, name, and version fields. This location is
+     * safe from obfuscation tools (ProGuard, R8, etc.) which only process class files.
+     *
+     * @param jar the JAR file to read metadata from
+     * @return a list of dependency entries as [group, name, version] arrays, empty if no metadata found
+     */
+    public List<String[]> readGithubDependencies(File jar) {
+        List<String[]> dependencies = new ArrayList<>();
+        try (ZipFile zipFile = new ZipFile(jar)) {
+            ZipEntry entry = zipFile.getEntry("META-INF/github-dependencies.json");
+            if (entry == null) {
+                logger.debug("No github-dependencies.json found in " + jar.getName());
+                return dependencies;
+            }
+            try (InputStream is = zipFile.getInputStream(entry);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                StringBuilder content = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line);
+                }
+                JsonArray array = gson.fromJson(content.toString(), JsonArray.class);
+                for (int i = 0; i < array.size(); i++) {
+                    JsonObject dep = array.get(i).getAsJsonObject();
+                    String group = dep.get("group").getAsString();
+                    String name = dep.get("name").getAsString();
+                    String version = dep.get("version").getAsString();
+                    dependencies.add(new String[]{group, name, version});
+                    logger.debug("Found transitive dependency: " + group + ":" + name + ":" + version);
+                }
+            }
+        } catch (IOException e) {
+            logger.debug("Could not read github-dependencies.json from " + jar.getName() + ": " + e.getMessage());
+        }
+        return dependencies;
+    }
+
+    /**
+     * Downloads a release asset JAR and recursively resolves its transitive GitHub dependencies.
+     * Each dependency's JAR is inspected for embedded {@code META-INF/github-dependencies.json}
+     * metadata, and any listed dependencies are downloaded recursively. A resolved-set prevents
+     * cycles and duplicate downloads.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName the repository name
+     * @param version the release version tag
+     * @param resolved set of already-resolved dependency keys ({@code "owner:name:version"}) for cycle detection
+     * @param collected list that all resolved JAR files (including transitives) are added to
+     */
+    public void getAssetWithTransitives(String repoOwner, String repoName, String version,
+                                        Set<String> resolved, List<File> collected) {
+        String key = repoOwner + ":" + repoName + ":" + version;
+        if (!resolved.add(key)) {
+            logger.debug("Already resolved " + key + ", skipping (cycle prevention).");
+            return;
+        }
+
+        File jar = getAsset(repoOwner, repoName, version);
+        collected.add(jar);
+
+        List<String[]> transitiveDeps = readGithubDependencies(jar);
+        for (String[] dep : transitiveDeps) {
+            logger.debug("Resolving transitive dependency: " + dep[0] + ":" + dep[1] + ":" + dep[2]);
+            getAssetWithTransitives(dep[0], dep[1], dep[2], resolved, collected);
+        }
     }
 
     /**
