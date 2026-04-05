@@ -19,8 +19,12 @@ import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -90,11 +94,65 @@ class Main implements Plugin<Project> {
             processResources.dependsOn(processGitHubResources);
         }));
 
-		project.afterEvaluate(proj -> githubImplementation.getDependencies().all(dependency -> {
-			File jar = gitHub.getAsset(dependency.getGroup(), dependency.getName(), dependency.getVersion());
+		project.afterEvaluate(proj -> {
+			Set<String> resolved = new HashSet<>();
+			List<File> allJars = new ArrayList<>();
 
-            project.getDependencies().add("implementation", project.files(jar));
-        }));
+			for (Dependency dependency : githubImplementation.getDependencies()) {
+				gitHub.getAssetWithTransitives(
+						dependency.getGroup(), dependency.getName(), dependency.getVersion(),
+						resolved, allJars);
+			}
+
+			for (File jar : allJars) {
+				project.getDependencies().add("implementation", project.files(jar));
+			}
+		});
+
+		project.getPlugins().withType(JavaPlugin.class, javaPlugin -> {
+			Task generateMeta = project.getTasks().create("generateGithubDependencyMetadata", task -> {
+				task.setGroup("github");
+				task.setDescription("Generates META-INF/github-dependencies.json from githubImplementation dependencies");
+				task.doLast(t -> {
+					Set<Dependency> deps = getDependencies(project);
+					if (deps.isEmpty()) {
+						logger.debug("No githubImplementation dependencies to write metadata for.");
+						return;
+					}
+
+					StringBuilder json = new StringBuilder("[\n");
+					boolean first = true;
+					for (Dependency dep : deps) {
+						if (!first) json.append(",\n");
+						first = false;
+						json.append("  {\"group\":\"").append(dep.getGroup())
+							.append("\",\"name\":\"").append(dep.getName())
+							.append("\",\"version\":\"").append(dep.getVersion())
+							.append("\"}");
+					}
+					json.append("\n]");
+
+					File outputDir = new File(project.getLayout().getBuildDirectory().getAsFile().get(),
+							"generated/resources/github-deps/META-INF");
+					if (!outputDir.exists() && !outputDir.mkdirs()) {
+						throw new RuntimeException("Failed to create directory: " + outputDir);
+					}
+					File outputFile = new File(outputDir, "github-dependencies.json");
+					try (FileWriter writer = new FileWriter(outputFile)) {
+						writer.write(json.toString());
+						logger.debug("Wrote github-dependencies.json: " + outputFile.getAbsolutePath());
+					} catch (IOException e) {
+						throw new RuntimeException("Failed to write github-dependencies.json", e);
+					}
+				});
+			});
+
+			main.getResources().srcDir(new File(project.getLayout().getBuildDirectory().getAsFile().get(),
+					"generated/resources/github-deps"));
+
+			project.getTasks().named("processResources", Copy.class, processResources ->
+					processResources.dependsOn(generateMeta));
+		});
 
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
