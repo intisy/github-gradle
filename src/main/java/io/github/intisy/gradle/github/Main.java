@@ -243,9 +243,14 @@ class Main implements Plugin<Project> {
 					owner = publishExtension.getOwner() != null ? publishExtension.getOwner() : ownerRepo[0];
 					repo  = publishExtension.getRepo()  != null ? publishExtension.getRepo()  : ownerRepo[1];
 				}
-				logger.log("Publishing " + owner + "/" + repo + " version " + version);
+								String tag = publishExtension.getTag() != null
+					        ? publishExtension.getTag()
+					        : version;
+				String releaseName = publishExtension.getReleaseName();
 
-				JsonObject release = gitHub.createRelease(owner, repo, version);
+				logger.log("Publishing " + owner + "/" + repo + " tag " + tag + " version " + version);
+
+				JsonObject release = gitHub.createRelease(owner, repo, tag, releaseName);
 				String uploadUrl = release.get("upload_url").getAsString();
 
 				List<ArtifactEntry> entries = publishExtension.getArtifacts();
