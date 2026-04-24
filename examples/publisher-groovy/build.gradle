@@ -16,10 +16,12 @@ version = "2.0.0"
 //   jar     -> auto-selects shadow/fat JAR from build/libs/, else first .jar
 // ---------------------------------------------------------------------------
 publishGithub {
-    owner   = "my-org"
-    repo    = "my-repo"
-    version = "2.0.0"
-    jar     = file("build/libs/my-app.jar")
+    owner       = "my-org"
+    repo        = "my-repo"
+    version     = "2.0.0"          // used for dependency resolution by consumers
+    tag         = "v2.0.0"         // git tag pushed to GitHub; defaults to version if omitted
+    releaseName = "Release 2.0.0"  // human-readable title on the release page; defaults to tag
+    jar         = file("build/libs/my-app.jar")
 }
 
 // ---------------------------------------------------------------------------
@@ -61,10 +63,12 @@ github {
     accessToken = "ghp_YOUR_TOKEN_HERE"
 
     publish {
-        owner   = "my-org"
-        repo    = "my-repo"
-        version = "2.0.0"
-        jar     = file("build/libs/my-app.jar")
+        owner       = "my-org"
+        repo        = "my-repo"
+        version     = "2.0.0"
+        tag         = "v2.0.0"
+        releaseName = "Release 2.0.0"
+        jar         = file("build/libs/my-app.jar")
     }
 }
 

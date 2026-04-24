@@ -44,6 +44,8 @@ public class PublishExtension {
     private String owner;
     private String repo;
     private String version;
+    private String tag;
+    private String releaseName;
     private File jar;
     private final List<ArtifactEntry> artifacts = new ArrayList<ArtifactEntry>();
 
@@ -96,6 +98,43 @@ public class PublishExtension {
      */
     public String getVersion() {
         return version;
+    }
+
+    /**
+     * Override the git tag pushed to GitHub for this release.
+     * When null (default) the tag equals {@link #getVersion()} (after fallback to {@code project.version}).
+     * Use this to prefix or format the tag independently of the version string,
+     * e.g. {@code tag = "v1.0"} while {@code version = "1.0"}.
+     *
+     * @param tag the tag name, e.g. {@code "v2.0.0"}
+     */
+    public void setTag(String tag) {
+        this.tag = tag;
+    }
+
+    /**
+     * @return the overridden tag, or null to use the resolved version string
+     */
+    public String getTag() {
+        return tag;
+    }
+
+    /**
+     * Override the human-readable release title shown on GitHub.
+     * When null (default) the title equals the resolved tag.
+     * Use this to set a descriptive name, e.g. {@code releaseName = "Release 1.0"}.
+     *
+     * @param releaseName the release title
+     */
+    public void setReleaseName(String releaseName) {
+        this.releaseName = releaseName;
+    }
+
+    /**
+     * @return the overridden release title, or null to use the resolved tag
+     */
+    public String getReleaseName() {
+        return releaseName;
     }
 
     /**
