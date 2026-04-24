@@ -6,18 +6,14 @@ plugins {
 group   = "com.example"
 version = "2.0.0"
 
-dependencies {
-    implementation "com.google.guava:guava:33.2.1-jre"
-}
-
 // ---------------------------------------------------------------------------
-// Form A — Top-level publishGithub extension
+// Form A -- Top-level publishGithub extension
 //
 // All four fields are optional:
-//   owner   → auto-detected from git remote origin if omitted
-//   repo    → auto-detected from git remote origin if omitted
-//   version → falls back to project.version if omitted
-//   jar     → auto-selects shadow/fat JAR from build/libs/, else first .jar
+//   owner   -> auto-detected from git remote origin if omitted
+//   repo    -> auto-detected from git remote origin if omitted
+//   version -> falls back to project.version if omitted
+//   jar     -> auto-selects shadow/fat JAR from build/libs/, else first .jar
 // ---------------------------------------------------------------------------
 publishGithub {
     owner   = "my-org"
@@ -27,11 +23,39 @@ publishGithub {
 }
 
 // ---------------------------------------------------------------------------
-// Form B — Nested inside the github { } block
+// Multi-JAR form: publish several artifacts in one release.
+// Each artifact is downloaded by consumers using its classifier.
+//   githubImplementation "my-org:my-repo:2.0.0"       -> downloads my-repo.jar
+//   githubImplementation "my-org:my-repo:2.0.0:api"   -> downloads my-repo-api.jar
+//   githubImplementation "my-org:my-repo:2.0.0:fat"   -> downloads my-repo-fat.jar
+//
+// In practice you would use either the single-jar form above OR the multi-jar
+// form below, not both.
+// ---------------------------------------------------------------------------
+/*
+publishGithub {
+    artifacts {
+        artifact {
+            classifier = ""
+            jar        = file("build/libs/my-app.jar")
+        }
+        artifact {
+            classifier = "api"
+            jar        = file("build/libs/my-app-api.jar")
+        }
+        artifact {
+            classifier = "fat"
+            jar        = file("build/libs/my-app-fat.jar")
+        }
+    }
+}
+*/
+
+// ---------------------------------------------------------------------------
+// Form B -- Nested inside the github { } block
 //
 // This configures the SAME PublishExtension instance as Form A above.
 // In practice you would use one form or the other, not both.
-// Both are shown here for reference.
 // ---------------------------------------------------------------------------
 github {
     accessToken = "ghp_YOUR_TOKEN_HERE"

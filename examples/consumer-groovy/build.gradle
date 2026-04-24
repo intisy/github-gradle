@@ -11,10 +11,20 @@ github {
 }
 
 dependencies {
-    // githubImplementation pulls a JAR from a GitHub release.
+    // githubImplementation pulls the default JAR from a GitHub release.
     // Format:  OWNER:REPO:VERSION
-    //   OWNER   — GitHub user or organisation (e.g. "my-org")
-    //   REPO    — repository name            (e.g. "my-library")
-    //   VERSION — release tag                (e.g. "1.0.0")
+    //   OWNER   -- GitHub user or organisation (e.g. "my-org")
+    //   REPO    -- repository name            (e.g. "my-library")
+    //   VERSION -- release tag                (e.g. "1.0.0")
     githubImplementation "my-org:my-library:1.0.0"
+
+    // Add a 4th segment to select a specific classifier from the same release.
+    // The plugin will look for the asset named "my-library-api.jar" on the release.
+    //   githubImplementation "my-org:my-library:1.0.0:api"
+
+    // Other scope configurations (same OWNER:REPO:VERSION[:CLASSIFIER] syntax):
+    //   githubApi              "my-org:my-library:1.0.0"   // leaked to consumers (requires java-library plugin)
+    //   githubCompileOnly      "my-org:annotations:1.0.0"  // compile classpath only
+    //   githubCompileOnlyApi   "my-org:annotations:1.0.0"  // compile only, leaked (requires java-library plugin)
+    //   githubRuntimeOnly      "my-org:driver:1.0.0"       // runtime classpath only
 }
