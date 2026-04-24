@@ -665,6 +665,88 @@ public class GitHub {
     }
 
     /**
+     * Attempts to fetch a GitHub release by tag, trying the given tag first and then
+     * a "v"-prefixed or "v"-stripped variant as a fallback.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName  the repository name
+     * @param version   the release version tag as declared by the consumer
+     * @return the parsed release JSON object
+     * @throws RuntimeException if neither tag variant resolves to a release
+     */
+    public JsonObject fetchReleaseByTag(String repoOwner, String repoName, String version) {
+        String[] tagsToTry = version.startsWith("v")
+                ? new String[]{version, version.substring(1)}
+                : new String[]{version, "v" + version};
+
+        for (String tag : tagsToTry) {
+            String apiUrl = String.format("https://api.github.com/repos/%s/%s/releases/tags/%s",
+                    repoOwner, repoName, tag);
+            logger.debug("Trying release tag: " + tag);
+            try (Response response = makeGitHubApiRequest(apiUrl)) {
+                if (response.code() == 404) {
+                    logger.debug("Tag '" + tag + "' not found, trying next variant.");
+                    continue;
+                }
+                if (!response.isSuccessful()) {
+                    String context = "release " + repoOwner + "/" + repoName + " tag " + tag;
+                    throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                }
+                if (response.body() == null) {
+                    throw new RuntimeException("GitHub API returned empty body for release "
+                            + repoOwner + "/" + repoName + " tag " + tag + ".");
+                }
+                return gson.fromJson(response.body().string(), JsonObject.class);
+            } catch (IOException e) {
+                logger.debug("IOException for tag '" + tag + "': " + e.getMessage());
+            }
+        }
+        throw new RuntimeException("No release found for " + repoOwner + "/" + repoName
+                + " with tag '" + version + "' or '" + tagsToTry[1] + "'.");
+    }
+
+    /**
+     * Selects the best JAR asset from a release using a prioritized matching strategy:
+     * (1) exact {@code repoName.jar}, (2) {@code repoName-version.jar},
+     * (3) {@code repoName-standalone.jar}, (4) first {@code .jar} not ending in
+     * {@code -sources.jar} or {@code -javadoc.jar}.
+     *
+     * @param assets   the release assets JSON array
+     * @param repoName the repository name
+     * @param version  the release version tag
+     * @return the selected asset JSON object, or null if no suitable JAR found
+     */
+    public JsonObject selectJarAsset(JsonArray assets, String repoName, String version) {
+        JsonObject fallback = null;
+        for (int i = 0; i < assets.size(); i++) {
+            JsonObject asset = assets.get(i).getAsJsonObject();
+            String name = asset.get("name").getAsString();
+            logger.debug("Checking asset: '" + name + "'");
+            if (name.equals(repoName + ".jar")) {
+                logger.debug("Matched exact: " + name);
+                return asset;
+            }
+            if (name.equals(repoName + "-" + version + ".jar")) {
+                logger.debug("Matched versioned: " + name);
+                return asset;
+            }
+            if (name.equals(repoName + "-standalone.jar")) {
+                logger.debug("Matched standalone: " + name);
+                return asset;
+            }
+            if (fallback == null && name.endsWith(".jar")
+                    && !name.endsWith("-sources.jar")
+                    && !name.endsWith("-javadoc.jar")) {
+                fallback = asset;
+            }
+        }
+        if (fallback != null) {
+            logger.debug("Using fallback JAR: " + fallback.get("name").getAsString());
+        }
+        return fallback;
+    }
+
+    /**
      * Downloads and caches a release asset JAR file from a GitHub repository.
      *
      * @param repoOwner the repository owner
@@ -689,45 +771,26 @@ public class GitHub {
 
         if (!jar.exists()) {
             logger.debug("Asset not found in cache. Fetching from GitHub API.");
-            try {
-                String apiUrl = String.format("https://api.github.com/repos/%s/%s/releases/tags/%s",
-                        repoOwner, repoName, version);
-                logger.debug("Fetching release from: " + apiUrl);
+            JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
+            JsonArray assets = release.getAsJsonArray("assets");
 
-                try (Response response = makeGitHubApiRequest(apiUrl)) {
-                    if (!response.isSuccessful()) {
-                        String context = String.format("release %s/%s tag %s", repoOwner, repoName, version);
-                        throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
-                    }
-                    if (response.body() == null) {
-                        throw new RuntimeException("GitHub API returned empty body for release " + repoOwner + "/" + repoName + " tag " + version + ".");
-                    }
-
-                    JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
-                    JsonArray assets = release.getAsJsonArray("assets");
-
-                    if (assets == null || assets.isEmpty()) {
-                        throw new RuntimeException("No assets found for release " + version);
-                    }
-
-                    for (int i = 0; i < assets.size(); i++) {
-                        JsonObject asset = assets.get(i).getAsJsonObject();
-                        String assetName = asset.get("name").getAsString();
-                        logger.debug("Checking asset: '" + assetName + "'");
-
-                        if (assetName.equals(repoName + ".jar")) {
-                            logger.debug("Found matching asset. Downloading...");
-                            String downloadUrl = asset.get("browser_download_url").getAsString();
-                            downloadAssetFromUrl(jar, downloadUrl, repoOwner, repoName);
-                            return jar;
-                        }
-                    }
-                    throw new RuntimeException("No matching asset found for the release for " + repoOwner + ":" + repoName);
-                }
-            } catch (IOException e) {
-                logger.error("IOException while getting asset: " + e.getMessage(), e);
-                throw new RuntimeException("GitHub exception while pulling asset: " + e.getMessage(), e);
+            if (assets == null || assets.isEmpty()) {
+                throw new RuntimeException("No assets found for release " + version);
             }
+
+            JsonObject selected = selectJarAsset(assets, repoName, version);
+            if (selected == null) {
+                throw new RuntimeException("No matching JAR asset found for " + repoOwner + ":" + repoName
+                        + ". Available assets don't include a .jar file (excluding -sources.jar and -javadoc.jar).");
+            }
+
+            String downloadUrl = selected.get("browser_download_url").getAsString();
+            try {
+                downloadAssetFromUrl(jar, downloadUrl, repoOwner, repoName);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to download asset from " + downloadUrl + ": " + e.getMessage(), e);
+            }
+            return jar;
         } else {
             logger.debug("Jar already exists in cache: " + jar.getName());
             return jar;
@@ -955,5 +1018,148 @@ public class GitHub {
             throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
         }
         return getLatestVersion(repoOwner, repoName);
+    }
+
+    /**
+     * Makes an authenticated POST request to the GitHub API with a JSON body.
+     *
+     * @param url      the API URL
+     * @param jsonBody the JSON request body
+     * @return the HTTP response (caller must close)
+     * @throws IOException if the request fails
+     */
+    private Response makeGitHubApiPostRequest(String url, String jsonBody) throws IOException {
+        okhttp3.MediaType JSON = okhttp3.MediaType.parse("application/json; charset=utf-8");
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, JSON);
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(url)
+                .post(body)
+                .addHeader("Accept", "application/vnd.github+json")
+                .addHeader("X-GitHub-Api-Version", "2022-11-28");
+
+        String apiKey = getApiKey();
+        if (apiKey != null && isGitHubPAT(apiKey)) {
+            requestBuilder.addHeader("Authorization", "Bearer " + apiKey);
+        }
+
+        return httpClient.newCall(requestBuilder.build()).execute();
+    }
+
+    /**
+     * Reads the git remote "origin" URL from the project directory and parses it
+     * into {@code [owner, repo]}.  Supports both HTTPS and SSH remote URLs.
+     *
+     * @param projectDir the root directory of the Git repository
+     * @return a two-element array {@code {owner, repo}}
+     * @throws RuntimeException if no "origin" remote is configured or the URL cannot be parsed
+     */
+    public String[] getRemoteOwnerAndRepo(File projectDir) {
+        logger.debug("Resolving GitHub owner/repo from git remote in: " + projectDir.getAbsolutePath());
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+        try (org.eclipse.jgit.lib.Repository repository = builder
+                .setGitDir(new File(projectDir, ".git"))
+                .readEnvironment()
+                .findGitDir()
+                .build()) {
+            String remoteUrl = repository.getConfig().getString("remote", "origin", "url");
+            if (remoteUrl == null || remoteUrl.trim().isEmpty()) {
+                throw new RuntimeException(
+                        "No git remote 'origin' found in " + projectDir.getAbsolutePath() + ". "
+                        + "Add a remote with: git remote add origin https://github.com/OWNER/REPO");
+            }
+            logger.debug("Remote origin URL: " + remoteUrl);
+
+            String ownerAndRepo;
+            if (remoteUrl.startsWith("git@")) {
+                // git@github.com:owner/repo.git
+                ownerAndRepo = remoteUrl.split(":")[1];
+            } else {
+                // https://github.com/owner/repo.git
+                String[] parts = remoteUrl.split("/");
+                ownerAndRepo = parts[parts.length - 2] + "/" + parts[parts.length - 1];
+            }
+            if (ownerAndRepo.endsWith(".git")) {
+                ownerAndRepo = ownerAndRepo.substring(0, ownerAndRepo.length() - 4);
+            }
+            String[] result = ownerAndRepo.split("/");
+            if (result.length < 2) {
+                throw new RuntimeException("Cannot parse owner/repo from remote URL: " + remoteUrl);
+            }
+            logger.debug("Resolved owner=" + result[0] + " repo=" + result[1]);
+            return new String[]{result[0], result[1]};
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read git config from " + projectDir + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Creates a GitHub release for the given tag.
+     *
+     * @param owner   the repository owner
+     * @param repo    the repository name
+     * @param tagName the tag to create the release for (GitHub auto-creates a lightweight tag if absent)
+     * @return the created release JSON object (contains {@code upload_url})
+     * @throws RuntimeException if the release already exists (422), auth fails, or the API errors
+     */
+    public JsonObject createRelease(String owner, String repo, String tagName) {
+        logger.debug("Creating release '" + tagName + "' on " + owner + "/" + repo);
+        JsonObject body = new JsonObject();
+        body.addProperty("tag_name", tagName);
+        body.addProperty("name", tagName);
+        String apiUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases";
+        try (Response response = makeGitHubApiPostRequest(apiUrl, gson.toJson(body))) {
+            if (response.code() == 422) {
+                throw new RuntimeException(
+                        "Release for tag '" + tagName + "' already exists on " + owner + "/" + repo + ". "
+                        + "Delete the existing release first, or bump the version.");
+            }
+            if (!response.isSuccessful()) {
+                String context = "create release " + owner + "/" + repo + " tag " + tagName;
+                throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+            }
+            if (response.body() == null) {
+                throw new RuntimeException("GitHub API returned empty body when creating release " + tagName + ".");
+            }
+            JsonObject release = gson.fromJson(response.body().string(), JsonObject.class);
+            logger.log("Created release '" + tagName + "' on " + owner + "/" + repo);
+            return release;
+        } catch (IOException e) {
+            throw new RuntimeException("IOException creating release: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Uploads a file as a release asset to GitHub.
+     *
+     * @param uploadUrl the {@code upload_url} from the release object (URI template stripped automatically)
+     * @param file      the file to upload
+     * @param assetName the asset name as it will appear in the release
+     * @throws IOException if the upload fails
+     */
+    public void uploadReleaseAsset(String uploadUrl, File file, String assetName) throws IOException {
+        String cleanUrl = uploadUrl.replace("{?name,label}", "") + "?name=" + assetName;
+        logger.debug("Uploading " + file.getName() + " to: " + cleanUrl);
+
+        byte[] fileBytes = Files.readAllBytes(file.toPath());
+        okhttp3.MediaType OCTET = okhttp3.MediaType.parse("application/octet-stream");
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(fileBytes, OCTET);
+        Request.Builder builder = new Request.Builder()
+                .url(cleanUrl)
+                .post(body)
+                .addHeader("Accept", "application/vnd.github+json")
+                .addHeader("X-GitHub-Api-Version", "2022-11-28");
+
+        String apiKey = getApiKey();
+        if (apiKey != null && isGitHubPAT(apiKey)) {
+            builder.addHeader("Authorization", "Bearer " + apiKey);
+        }
+
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException(buildHttpErrorMessage(response.code(), response.message(),
+                        "upload asset " + assetName));
+            }
+            logger.log("Uploaded " + assetName + " (" + fileBytes.length + " bytes)");
+        }
     }
 }

@@ -1,0 +1,48 @@
+plugins {
+    id "java"
+    id "io.github.intisy.github-gradle" version "1.3.8"
+}
+
+group   = "com.example"
+version = "2.0.0"
+
+dependencies {
+    implementation "com.google.guava:guava:33.2.1-jre"
+}
+
+// ---------------------------------------------------------------------------
+// Form A — Top-level publishGithub extension
+//
+// All four fields are optional:
+//   owner   → auto-detected from git remote origin if omitted
+//   repo    → auto-detected from git remote origin if omitted
+//   version → falls back to project.version if omitted
+//   jar     → auto-selects shadow/fat JAR from build/libs/, else first .jar
+// ---------------------------------------------------------------------------
+publishGithub {
+    owner   = "my-org"
+    repo    = "my-repo"
+    version = "2.0.0"
+    jar     = file("build/libs/my-app.jar")
+}
+
+// ---------------------------------------------------------------------------
+// Form B — Nested inside the github { } block
+//
+// This configures the SAME PublishExtension instance as Form A above.
+// In practice you would use one form or the other, not both.
+// Both are shown here for reference.
+// ---------------------------------------------------------------------------
+github {
+    accessToken = "ghp_YOUR_TOKEN_HERE"
+
+    publish {
+        owner   = "my-org"
+        repo    = "my-repo"
+        version = "2.0.0"
+        jar     = file("build/libs/my-app.jar")
+    }
+}
+
+// The publishGithub task depends on build, so a single command is enough:
+//   gradle publishGithub
