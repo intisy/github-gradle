@@ -13,7 +13,7 @@ def main = "${group}.${artifact_id}.Main"
 
 shadowJar {
     archiveClassifier = ''
-    archiveFileName = "${artifact_name}-standalone.jar"
+    archiveFileName = "${artifact_name}-${version}-standalone.jar"
     manifest {
         attributes 'Main-Class': main
     }
