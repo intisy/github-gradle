@@ -1,6 +1,7 @@
 package io.github.intisy.gradle.github;
 
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.extension.ArtifactEntry;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.extension.PublishExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
@@ -15,6 +16,9 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.ExternalDependency;
+import org.gradle.api.artifacts.ModuleDependencyCapabilitiesHandler;
+import org.gradle.api.artifacts.dsl.ArtifactHandler;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.tasks.Copy;
@@ -24,9 +28,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,6 +42,36 @@ import java.util.stream.Collectors;
  * Main plugin class.
  */
 class Main implements Plugin<Project> {
+
+	/** Names of all GitHub dependency configurations created by this plugin, in declaration order. */
+	private static final List<String> GITHUB_CONFIGS = Collections.unmodifiableList(Arrays.asList(
+		"githubImplementation",
+		"githubApi",
+		"githubCompileOnly",
+		"githubCompileOnlyApi",
+		"githubRuntimeOnly"
+	));
+
+	/**
+	 * Maps each GitHub configuration to the native Gradle configuration it feeds.
+	 * {@code api} and {@code compileOnlyApi} require the {@code java-library} plugin.
+	 */
+	private static final Map<String, String> GITHUB_TO_GRADLE;
+	static {
+		Map<String, String> m = new HashMap<String, String>();
+		m.put("githubImplementation",  "implementation");
+		m.put("githubApi",             "api");
+		m.put("githubCompileOnly",     "compileOnly");
+		m.put("githubCompileOnlyApi",  "compileOnlyApi");
+		m.put("githubRuntimeOnly",     "runtimeOnly");
+		GITHUB_TO_GRADLE = Collections.unmodifiableMap(m);
+	}
+
+	/** Gradle configurations that require the {@code java-library} plugin. */
+	private static final Set<String> JAVA_LIBRARY_CONFIGS = new HashSet<String>(Arrays.asList(
+		"api", "compileOnlyApi"
+	));
+
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
 		ResourcesExtension resourcesExtension = githubExtension.getResources();
@@ -42,7 +80,11 @@ class Main implements Plugin<Project> {
 		project.getExtensions().add("publishGithub", publishExtension);
 
 		Logger logger = new Logger(githubExtension, project);
-		Configuration githubImplementation = project.getConfigurations().create("githubImplementation");
+
+		for (String cfgName : GITHUB_CONFIGS) {
+			project.getConfigurations().create(cfgName);
+		}
+
 		JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
 		SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 		Set<File> resourceDirs = main.getResources().getSrcDirs();
@@ -82,13 +124,28 @@ class Main implements Plugin<Project> {
 		}));
 
 		project.afterEvaluate(proj -> {
-			Set<String> resolved = new HashSet<>();
-			List<File> allJars = new ArrayList<>();
-			for (Dependency dependency : githubImplementation.getDependencies()) {
-				gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, allJars);
-			}
-			for (File jar : allJars) {
-				project.getDependencies().add("implementation", project.files(jar));
+			Set<String> resolved = new HashSet<String>();
+			List<File> allJars = new ArrayList<File>();
+			for (String cfgName : GITHUB_CONFIGS) {
+				String nativeCfg = GITHUB_TO_GRADLE.get(cfgName);
+				boolean needsJavaLibrary = JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
+				if (needsJavaLibrary && !proj.getPlugins().hasPlugin("java-library")) {
+					continue;
+				}
+				Configuration cfg = proj.getConfigurations().getByName(cfgName);
+				for (Dependency dependency : cfg.getDependencies()) {
+					String classifier = extractClassifier(dependency);
+					List<File> jars = new ArrayList<File>();
+					if (classifier.isEmpty()) {
+						gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
+					} else {
+						File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
+						if (jar != null) jars.add(jar);
+					}
+					for (File jar : jars) {
+						proj.getDependencies().add(nativeCfg, proj.files(jar));
+					}
+				}
 			}
 		});
 
@@ -127,13 +184,10 @@ class Main implements Plugin<Project> {
 
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
-			task.setDescription("Implement an github dependency");
+			task.setDescription("Prints all GitHub dependencies across all configurations");
 			task.doLast(t -> {
 				for (Dependency dependency : getAllDependencies(project)) {
-					String group = dependency.getGroup();
-					String name = dependency.getName();
-					String version = dependency.getVersion();
-					logger.log("Github Dependency named " + name + " version " + version + " from user" + group);
+					logger.log("Github Dependency named " + dependency.getName() + " version " + dependency.getVersion() + " from user" + dependency.getGroup());
 				}
 			});
 		});
@@ -168,10 +222,9 @@ class Main implements Plugin<Project> {
 
 		project.getTasks().register("publishGithub", task -> {
 			task.setGroup("github");
-			task.setDescription("Creates a GitHub release and uploads the project JAR");
+			task.setDescription("Creates a GitHub release and uploads the project JAR(s)");
 			task.dependsOn("build");
 			task.doLast(t -> {
-				// --- Version: publishGithub extension > project.version ---
 				String version = publishExtension.getVersion() != null
 					        ? publishExtension.getVersion()
 					        : project.getVersion().toString();
@@ -180,7 +233,6 @@ class Main implements Plugin<Project> {
 					        + "Set version in your build.gradle, or set publishGithub { version = \"1.0.0\" }.");
 				}
 
-				// --- Owner/repo: publishGithub extension > git remote origin ---
 				String owner;
 				String repo;
 				if (publishExtension.getOwner() != null && publishExtension.getRepo() != null) {
@@ -193,49 +245,36 @@ class Main implements Plugin<Project> {
 				}
 				logger.log("Publishing " + owner + "/" + repo + " version " + version);
 
-				// --- JAR: publishGithub extension > auto-select from build/libs/ ---
-				File jarToUpload = publishExtension.getJar();
-				if (jarToUpload != null) {
-					if (!jarToUpload.exists()) {
-						throw new RuntimeException("Configured publishGithub.jar does not exist: " + jarToUpload.getAbsolutePath());
-					}
-					logger.log("Using configured jar: " + jarToUpload.getName());
-				} else {
-					File buildLibs = new File(project.getLayout().getBuildDirectory().getAsFile().get(), "libs");
-					if (!buildLibs.exists() || !buildLibs.isDirectory()) {
-						throw new RuntimeException("No build/libs/ directory found. Run build first, "
-						        + "or set publishGithub { jar = file(\"path/to/my.jar\") }.");
-					}
-					File regularJar = null;
-					File[] files = buildLibs.listFiles();
-					if (files != null) {
-						for (File f : files) {
-							String fname = f.getName();
-							if (!fname.endsWith(".jar")) continue;
-							if (fname.endsWith("-sources.jar") || fname.endsWith("-javadoc.jar")) continue;
-							if (fname.contains("-standalone") || fname.contains("-all") || fname.contains("-shadow")) {
-								jarToUpload = f; break;
-							}
-							if (regularJar == null) regularJar = f;
-						}
-					}
-					if (jarToUpload == null) jarToUpload = regularJar;
-					if (jarToUpload == null) {
-						throw new RuntimeException("No JAR found in " + buildLibs.getAbsolutePath()
-						        + " (excluding -sources.jar / -javadoc.jar). "
-						        + "Set publishGithub { jar = file(\"path/to/my.jar\") } to specify one explicitly.");
-					}
-					logger.log("Selected artifact: " + jarToUpload.getName());
-				}
-
-				// --- Create release and upload ---
 				JsonObject release = gitHub.createRelease(owner, repo, version);
 				String uploadUrl = release.get("upload_url").getAsString();
-				String assetName = repo + ".jar";
-				try {
-					gitHub.uploadReleaseAsset(uploadUrl, jarToUpload, assetName);
-				} catch (IOException e) {
-					throw new RuntimeException("Failed to upload asset: " + e.getMessage(), e);
+
+				List<ArtifactEntry> entries = publishExtension.getArtifacts();
+				if (!entries.isEmpty()) {
+					for (ArtifactEntry entry : entries) {
+						File jar = entry.getJar();
+						if (jar == null) {
+							throw new RuntimeException("An artifact entry in publishGithub.artifacts has no jar configured.");
+						}
+						if (!jar.exists()) {
+							throw new RuntimeException("Artifact JAR does not exist: " + jar.getAbsolutePath());
+						}
+						String assetName = buildAssetName(repo, entry.getClassifier());
+						logger.log("Uploading artifact: " + jar.getName() + " as " + assetName);
+						try {
+							gitHub.uploadReleaseAsset(uploadUrl, jar, assetName);
+						} catch (IOException e) {
+							throw new RuntimeException("Failed to upload asset " + assetName + ": " + e.getMessage(), e);
+						}
+					}
+				} else {
+					File jarToUpload = resolveSingleJar(publishExtension, project, logger);
+					String assetName = repo + ".jar";
+					logger.log("Uploading: " + jarToUpload.getName() + " as " + assetName);
+					try {
+						gitHub.uploadReleaseAsset(uploadUrl, jarToUpload, assetName);
+					} catch (IOException e) {
+						throw new RuntimeException("Failed to upload asset: " + e.getMessage(), e);
+					}
 				}
 				logger.log("Published " + owner + "/" + repo + " " + version + " successfully.");
 			});
@@ -243,8 +282,91 @@ class Main implements Plugin<Project> {
 	}
 
 	/**
+	 * Builds the GitHub release asset file name for the given repo and classifier.
+	 *
+	 * @param repo       the repository name
+	 * @param classifier the artifact classifier (blank means default)
+	 * @return e.g. {@code "my-repo.jar"} or {@code "my-repo-api.jar"}
+	 */
+	private String buildAssetName(String repo, String classifier) {
+		if (classifier == null || classifier.isEmpty()) {
+			return repo + ".jar";
+		}
+		return repo + "-" + classifier + ".jar";
+	}
+
+	/**
+	 * Resolves the single JAR to upload when no explicit {@code artifacts} list is configured.
+	 * Prefers shadow/fat JARs; falls back to the first regular JAR in {@code build/libs/}.
+	 *
+	 * @param ext     the publish extension
+	 * @param project the Gradle project
+	 * @param logger  the logger
+	 * @return the resolved JAR file (never null)
+	 * @throws RuntimeException if no suitable JAR is found
+	 */
+	private File resolveSingleJar(PublishExtension ext, Project project, Logger logger) {
+		if (ext.getJar() != null) {
+			if (!ext.getJar().exists()) {
+				throw new RuntimeException("Configured publishGithub.jar does not exist: " + ext.getJar().getAbsolutePath());
+			}
+			logger.log("Using configured jar: " + ext.getJar().getName());
+			return ext.getJar();
+		}
+		File buildLibs = new File(project.getLayout().getBuildDirectory().getAsFile().get(), "libs");
+		if (!buildLibs.exists() || !buildLibs.isDirectory()) {
+			throw new RuntimeException("No build/libs/ directory found. Run build first, "
+			        + "or set publishGithub { jar = file(\"path/to/my.jar\") }.");
+		}
+		File regularJar = null;
+		File fatJar = null;
+		File[] files = buildLibs.listFiles();
+		if (files != null) {
+			for (File f : files) {
+				String fname = f.getName();
+				if (!fname.endsWith(".jar")) continue;
+				if (fname.endsWith("-sources.jar") || fname.endsWith("-javadoc.jar")) continue;
+				if (fname.contains("-standalone") || fname.contains("-all") || fname.contains("-shadow")) {
+					fatJar = f;
+					break;
+				}
+				if (regularJar == null) regularJar = f;
+			}
+		}
+		File result = fatJar != null ? fatJar : regularJar;
+		if (result == null) {
+			throw new RuntimeException("No JAR found in " + buildLibs.getAbsolutePath()
+			        + " (excluding -sources.jar / -javadoc.jar). "
+			        + "Set publishGithub { jar = file(\"path/to/my.jar\") } to specify one explicitly.");
+		}
+		logger.log("Selected artifact: " + result.getName());
+		return result;
+	}
+
+	/**
+	 * Extracts the classifier from a dependency declared as
+	 * {@code "OWNER:REPO:VERSION:CLASSIFIER"}.
+	 *
+	 * <p>Gradle parses the 4th colon-segment as an artifact classifier accessible via
+	 * {@code ExternalDependency.getArtifacts()}. Returns an empty string when no classifier
+	 * is present (the common case).
+	 *
+	 * @param dependency the Gradle dependency
+	 * @return the classifier string, or {@code ""} if absent
+	 */	private String extractClassifier(Dependency dependency) {
+		if (dependency instanceof ExternalDependency) {
+			ExternalDependency ext = (ExternalDependency) dependency;
+			if (!ext.getArtifacts().isEmpty()) {
+				String classifier = ext.getArtifacts().iterator().next().getClassifier();
+				return classifier != null ? classifier : "";
+			}
+		}
+		return "";
+	}
+
+	/**
 	 * @param project the project
-	 * @return all githubImplementation dependencies across all subprojects
+	 * @return all github dependency configurations' dependencies across all subprojects
 	 */
 	public Set<Dependency> getAllDependencies(Project project) {
 		return project.getAllprojects().stream().flatMap(p -> getDependencies(p).stream()).collect(Collectors.toSet());
@@ -252,9 +374,16 @@ class Main implements Plugin<Project> {
 
 	/**
 	 * @param project the project
-	 * @return githubImplementation dependencies for this project only
+	 * @return all github dependency configurations' dependencies for this project only
 	 */
 	public Set<Dependency> getDependencies(Project project) {
-		return new LinkedHashSet<>(project.getConfigurations().getByName("githubImplementation").getDependencies());
+		Set<Dependency> all = new LinkedHashSet<Dependency>();
+		for (String cfgName : GITHUB_CONFIGS) {
+			Configuration cfg = project.getConfigurations().findByName(cfgName);
+			if (cfg != null) {
+				all.addAll(cfg.getDependencies());
+			}
+		}
+		return all;
 	}
 }
