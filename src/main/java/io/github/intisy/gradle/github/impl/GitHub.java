@@ -925,6 +925,53 @@ public class GitHub {
     }
 
     /**
+     * Downloads and caches a classifier-specific JAR asset from a GitHub release.
+     *
+     * <p>The expected asset name on the release is {@code repoName-classifier.jar}.
+     * The file is cached under the same owner directory as {@link #getAsset}.
+     *
+     * @param repoOwner  the repository owner
+     * @param repoName   the repository name
+     * @param version    the release version tag
+     * @param classifier the artifact classifier (e.g. {@code "api"}, {@code "fat"})
+     * @return the downloaded JAR file, or null if no matching asset exists in the release
+     */
+    public File getAssetWithClassifier(String repoOwner, String repoName, String version, String classifier) {
+        logger.debug("Fetching classifier asset '" + classifier + "' for " + repoOwner + "/" + repoName + " " + version);
+        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+        if (!direction.exists() && !direction.mkdirs()) {
+            throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
+        }
+        String assetFileName = repoName + "-" + classifier + "-" + version + ".jar";
+        File jar = new File(direction, assetFileName);
+        if (jar.exists()) {
+            logger.debug("Classifier asset already cached: " + jar.getName());
+            return jar;
+        }
+        JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
+        JsonArray assets = release.getAsJsonArray("assets");
+        if (assets == null || assets.isEmpty()) {
+            return null;
+        }
+        String expectedName = repoName + "-" + classifier + ".jar";
+        for (int i = 0; i < assets.size(); i++) {
+            JsonObject asset = assets.get(i).getAsJsonObject();
+            String name = asset.get("name").getAsString();
+            if (name.equals(expectedName)) {
+                String downloadUrl = asset.get("browser_download_url").getAsString();
+                try {
+                    downloadAssetFromUrl(jar, downloadUrl, repoOwner, repoName);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to download classifier asset " + expectedName + ": " + e.getMessage(), e);
+                }
+                return jar;
+            }
+        }
+        logger.debug("No asset named '" + expectedName + "' found in release " + version);
+        return null;
+    }
+
+    /**
      * Downloads a GitHub release asset to the specified file location.
      *
      * @deprecated Use downloadAssetFromUrl instead

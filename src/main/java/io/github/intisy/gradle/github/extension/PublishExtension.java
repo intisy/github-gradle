@@ -1,28 +1,42 @@
 package io.github.intisy.gradle.github.extension;
 
+import org.gradle.api.Action;
+import groovy.lang.Closure;
+
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Extension for configuring the {@code publishGithub} task.
- * Register it in your build.gradle inside a {@code publish { }} block:
  *
- * <pre>
- * github {
- *     publish {
- *         owner   = "my-org"
- *         repo    = "my-repo"
- *         version = "2.0.0"
- *         jar     = file("build/libs/my-fat.jar")
- *     }
- * }
- * </pre>
- *
- * Every field is optional and falls back to auto-detection when null:
+ * <p>All fields are optional and fall back to auto-detection when null:
  * <ul>
  *   <li>{@code owner} / {@code repo} — parsed from the git remote {@code origin} URL</li>
  *   <li>{@code version} — taken from {@code project.version}</li>
  *   <li>{@code jar} — the shadow/fat JAR in {@code build/libs/}, or the first regular JAR</li>
  * </ul>
+ *
+ * <p>Single-JAR shorthand (backward-compatible):
+ * <pre>
+ * publishGithub {
+ *     owner   = "my-org"
+ *     repo    = "my-repo"
+ *     version = "2.0.0"
+ *     jar     = file("build/libs/my-lib.jar")
+ * }
+ * </pre>
+ *
+ * <p>Multi-JAR with classifiers:
+ * <pre>
+ * publishGithub {
+ *     artifacts {
+ *         artifact { classifier = "";    jar = file("build/libs/my-lib.jar") }
+ *         artifact { classifier = "api"; jar = file("build/libs/my-lib-api.jar") }
+ *         artifact { classifier = "fat"; jar = file("build/libs/my-lib-fat.jar") }
+ *     }
+ * }
+ * </pre>
  */
 @SuppressWarnings("unused")
 public class PublishExtension {
@@ -31,6 +45,7 @@ public class PublishExtension {
     private String repo;
     private String version;
     private File jar;
+    private final List<ArtifactEntry> artifacts = new ArrayList<ArtifactEntry>();
 
     /**
      * Override the GitHub repository owner.
@@ -84,7 +99,8 @@ public class PublishExtension {
     }
 
     /**
-     * Override the JAR file to upload.
+     * Override the single JAR file to upload.
+     * Ignored when {@link #getArtifacts()} is non-empty.
      * When null (default) the task auto-selects the shadow/fat JAR from
      * {@code build/libs/}, or falls back to the first regular JAR found there.
      *
@@ -99,5 +115,63 @@ public class PublishExtension {
      */
     public File getJar() {
         return jar;
+    }
+
+    /**
+     * Returns the list of explicit artifacts to upload.
+     * When non-empty this list takes precedence over the single {@link #getJar()} field.
+     *
+     * @return mutable list of {@link ArtifactEntry} instances
+     */
+    public List<ArtifactEntry> getArtifacts() {
+        return artifacts;
+    }
+
+    /**
+     * Adds a single artifact entry, configured by the given Gradle action.
+     *
+     * @param action action that receives and configures an {@link ArtifactEntry}
+     */
+    public void artifact(Action<? super ArtifactEntry> action) {
+        ArtifactEntry entry = new ArtifactEntry();
+        action.execute(entry);
+        artifacts.add(entry);
+    }
+
+    /**
+     * Adds a single artifact entry, configured by the given Groovy closure.
+     *
+     * @param closure closure that configures an {@link ArtifactEntry}
+     */
+    public void artifact(Closure<?> closure) {
+        ArtifactEntry entry = new ArtifactEntry();
+        if (closure != null) {
+            closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+            closure.setDelegate(entry);
+            closure.call(entry);
+        }
+        artifacts.add(entry);
+    }
+
+    /**
+     * Opens a configuration block in which multiple {@link #artifact} calls can be made.
+     * This is a convenience wrapper so users can write {@code artifacts { artifact { } }}.
+     *
+     * @param action action that calls {@link #artifact} one or more times on this extension
+     */
+    public void artifacts(Action<? super PublishExtension> action) {
+        action.execute(this);
+    }
+
+    /**
+     * Opens a Groovy-DSL configuration block for multiple artifact entries.
+     *
+     * @param closure closure in which {@code artifact { }} calls are made
+     */
+    public void artifacts(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(this);
+        closure.call(this);
     }
 }
