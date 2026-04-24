@@ -1,0 +1,20 @@
+plugins {
+    id "java"
+    id "io.github.intisy.github-gradle" version "1.3.8"
+}
+
+// Configure the plugin with your GitHub personal access token.
+// The token needs read access to the repository hosting the release asset.
+github {
+    // You can also pass a File or Path instead of a raw string.
+    accessToken = "ghp_YOUR_TOKEN_HERE"
+}
+
+dependencies {
+    // githubImplementation pulls a JAR from a GitHub release.
+    // Format:  OWNER:REPO:VERSION
+    //   OWNER   — GitHub user or organisation (e.g. "my-org")
+    //   REPO    — repository name            (e.g. "my-library")
+    //   VERSION — release tag                (e.g. "1.0.0")
+    githubImplementation "my-org:my-library:1.0.0"
+}
