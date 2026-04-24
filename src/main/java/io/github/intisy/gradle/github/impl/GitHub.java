@@ -561,7 +561,7 @@ public class GitHub {
                 .addHeader("X-GitHub-Api-Version", "2022-11-28");
 
         String apiKey = getApiKey();
-        if (apiKey != null && isGitHubPAT(apiKey)) {
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
             requestBuilder.addHeader("Authorization", "Bearer " + apiKey);
         }
 
@@ -827,10 +827,14 @@ public class GitHub {
         logger.debug("Asset download URL: " + downloadUrl);
         logger.debug("Destination file: " + destination.getAbsolutePath());
 
-        Request request = new Request.Builder()
+        Request.Builder assetRequestBuilder = new Request.Builder()
                 .url(downloadUrl)
-                .addHeader("Accept", "application/octet-stream")
-                .build();
+                .addHeader("Accept", "application/octet-stream");
+        String downloadApiKey = getApiKey();
+        if (downloadApiKey != null && !downloadApiKey.trim().isEmpty()) {
+            assetRequestBuilder.addHeader("Authorization", "Bearer " + downloadApiKey);
+        }
+        Request request = assetRequestBuilder.build();
 
         try (Response response = httpClient.newCall(request).execute()) {
             logger.debug("HTTP response: " + response.code() + " " + response.message());
@@ -1085,7 +1089,7 @@ public class GitHub {
                 .addHeader("X-GitHub-Api-Version", "2022-11-28");
 
         String apiKey = getApiKey();
-        if (apiKey != null && isGitHubPAT(apiKey)) {
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
             requestBuilder.addHeader("Authorization", "Bearer " + apiKey);
         }
 
@@ -1208,7 +1212,7 @@ public class GitHub {
                 .addHeader("X-GitHub-Api-Version", "2022-11-28");
 
         String apiKey = getApiKey();
-        if (apiKey != null && isGitHubPAT(apiKey)) {
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
             builder.addHeader("Authorization", "Bearer " + apiKey);
         }
 
