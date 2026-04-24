@@ -1140,26 +1140,37 @@ public class GitHub {
     }
 
     /**
-     * Creates a GitHub release for the given tag.
+     * Creates a GitHub release for the given tag, reusing the existing release if the tag already exists.
      *
-     * @param owner   the repository owner
-     * @param repo    the repository name
-     * @param tagName the tag to create the release for (GitHub auto-creates a lightweight tag if absent)
-     * @return the created release JSON object (contains {@code upload_url})
-     * @throws RuntimeException if the release already exists (422), auth fails, or the API errors
+     * <p>If a release for {@code tagName} already exists it is returned as-is so that
+     * additional assets can still be uploaded to it without failing the build.
+     *
+     * @param owner       the repository owner
+     * @param repo        the repository name
+     * @param tagName     the git tag for the release (GitHub auto-creates a lightweight tag if absent)
+     * @param releaseName the human-readable release title; if null, defaults to {@code tagName}
+     * @return the release JSON object (contains {@code upload_url})
+     * @throws RuntimeException if auth fails or the API errors
      */
-    public JsonObject createRelease(String owner, String repo, String tagName) {
-        logger.debug("Creating release '" + tagName + "' on " + owner + "/" + repo);
+    public JsonObject createRelease(String owner, String repo, String tagName, String releaseName) {
+        String title = releaseName != null ? releaseName : tagName;
+        logger.debug("Checking for existing release '" + tagName + "' on " + owner + "/" + repo);
+        try {
+            JsonObject existing = fetchReleaseByTag(owner, repo, tagName);
+            logger.log("Release '" + tagName + "' already exists \u2014 uploading assets to existing release.");
+            return existing;
+        } catch (RuntimeException e) {
+            String msg = e.getMessage();
+            if (msg == null || !msg.startsWith("No release found")) {
+                throw e;
+            }
+        }
+        logger.debug("Creating release '" + tagName + "' (title: '" + title + "') on " + owner + "/" + repo);
         JsonObject body = new JsonObject();
         body.addProperty("tag_name", tagName);
-        body.addProperty("name", tagName);
+        body.addProperty("name", title);
         String apiUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases";
         try (Response response = makeGitHubApiPostRequest(apiUrl, gson.toJson(body))) {
-            if (response.code() == 422) {
-                throw new RuntimeException(
-                        "Release for tag '" + tagName + "' already exists on " + owner + "/" + repo + ". "
-                        + "Delete the existing release first, or bump the version.");
-            }
             if (!response.isSuccessful()) {
                 String context = "create release " + owner + "/" + repo + " tag " + tagName;
                 throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
