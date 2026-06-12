@@ -30,6 +30,7 @@ public class ArtifactEntry {
 
     private File jar;
     private String classifier = "";
+    private boolean modules = false;
 
     /**
      * Sets the JAR file to upload for this artifact.
@@ -62,5 +63,23 @@ public class ArtifactEntry {
      */
     public String getClassifier() {
         return classifier == null ? "" : classifier;
+    }
+
+    /**
+     * When true, this entry expands to one asset per subproject ({@code <repo>-<module>.jar}) instead of
+     * uploading {@link #getJar()}; the {@code jar} and {@code classifier} fields are then ignored. Lets a
+     * multi-module library publish all its modules alongside any regular classified jars in one release.
+     *
+     * @param modules whether this entry represents all subproject modules
+     */
+    public void setModules(boolean modules) {
+        this.modules = modules;
+    }
+
+    /**
+     * @return whether this entry expands to all subproject modules
+     */
+    public boolean isModules() {
+        return modules;
     }
 }
