@@ -23,6 +23,7 @@ import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.bundling.Jar;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -36,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
@@ -138,6 +140,8 @@ class Main implements Plugin<Project> {
 					List<File> jars = new ArrayList<File>();
 					if (classifier.isEmpty()) {
 						gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
+					} else if (classifier.equals("all")) {
+						gitHub.getAllModuleAssets(dependency.getGroup(), dependency.getName(), dependency.getVersion(), jars);
 					} else {
 						File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
 						if (jar != null) jars.add(jar);
@@ -224,6 +228,16 @@ class Main implements Plugin<Project> {
 			task.setGroup("github");
 			task.setDescription("Creates a GitHub release and uploads the project JAR(s)");
 			task.dependsOn("build");
+			task.dependsOn((Callable<List<Task>>) () -> {
+				List<Task> moduleJars = new ArrayList<Task>();
+				if (hasModuleArtifact(publishExtension)) {
+					for (Project sub : project.getSubprojects()) {
+						Task jarTask = sub.getTasks().findByName("jar");
+						if (jarTask != null) moduleJars.add(jarTask);
+					}
+				}
+				return moduleJars;
+			});
 			task.doLast(t -> {
 				String version = publishExtension.getVersion() != null
 					        ? publishExtension.getVersion()
@@ -253,7 +267,7 @@ class Main implements Plugin<Project> {
 				JsonObject release = gitHub.createRelease(owner, repo, tag, releaseName);
 				String uploadUrl = release.get("upload_url").getAsString();
 
-				List<ArtifactEntry> entries = publishExtension.getArtifacts();
+				List<ArtifactEntry> entries = expandArtifacts(publishExtension.getArtifacts(), project, repo, logger);
 				if (!entries.isEmpty()) {
 					for (ArtifactEntry entry : entries) {
 						File jar = entry.getJar();
@@ -298,6 +312,76 @@ class Main implements Plugin<Project> {
 			return repo + ".jar";
 		}
 		return repo + "-" + classifier + ".jar";
+	}
+
+	/**
+	 * Builds the artifact list for multi-module publishing: one entry per subproject, using its {@code jar}
+	 * task output and a classifier equal to the subproject name with the {@code <repo>-} prefix stripped
+	 * (so {@code dough-common} in repo {@code dough} uploads as {@code dough-common.jar}, not
+	 * {@code dough-dough-common.jar}).
+	 *
+	 * @param project the (root) project whose subprojects are published
+	 * @param repo    the repository name (used to strip the module prefix)
+	 * @param logger  the logger
+	 * @return one {@link ArtifactEntry} per subproject that produces a jar
+	 */
+	private List<ArtifactEntry> buildModuleArtifacts(Project project, String repo, Logger logger) {
+		List<ArtifactEntry> entries = new ArrayList<ArtifactEntry>();
+		for (Project sub : project.getSubprojects()) {
+			Task jarTask = sub.getTasks().findByName("jar");
+			if (!(jarTask instanceof Jar)) {
+				logger.debug("Skipping subproject without a jar task: " + sub.getName());
+				continue;
+			}
+			File jar = ((Jar) jarTask).getArchiveFile().get().getAsFile();
+			String name = sub.getName();
+			String classifier = name.startsWith(repo + "-") ? name.substring(repo.length() + 1) : name;
+			ArtifactEntry entry = new ArtifactEntry();
+			entry.setJar(jar);
+			entry.setClassifier(classifier);
+			entries.add(entry);
+			logger.debug("Module artifact: " + sub.getName() + " -> " + buildAssetName(repo, classifier));
+		}
+		if (entries.isEmpty()) {
+			throw new RuntimeException("An artifact { modules = true } entry was declared but no subprojects with a jar task were found.");
+		}
+		return entries;
+	}
+
+	/**
+	 * Expands the declared artifact entries into the final upload list. Each {@code modules = true} entry is
+	 * replaced by one entry per subproject (see {@link #buildModuleArtifacts}); all other entries pass through
+	 * unchanged, so module assets and regular classified jars can be published together in one release.
+	 *
+	 * @param declared the artifact entries configured on the extension
+	 * @param project  the (root) project whose subprojects back any module entries
+	 * @param repo     the repository name
+	 * @param logger   the logger
+	 * @return the expanded artifact entries to upload
+	 */
+	private List<ArtifactEntry> expandArtifacts(List<ArtifactEntry> declared, Project project, String repo, Logger logger) {
+		List<ArtifactEntry> expanded = new ArrayList<ArtifactEntry>();
+		for (ArtifactEntry entry : declared) {
+			if (entry.isModules()) {
+				expanded.addAll(buildModuleArtifacts(project, repo, logger));
+			} else {
+				expanded.add(entry);
+			}
+		}
+		return expanded;
+	}
+
+	/**
+	 * @param publishExtension the publish extension
+	 * @return true if any declared artifact entry has {@code modules = true}
+	 */
+	private boolean hasModuleArtifact(PublishExtension publishExtension) {
+		for (ArtifactEntry entry : publishExtension.getArtifacts()) {
+			if (entry.isModules()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

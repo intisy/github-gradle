@@ -976,6 +976,59 @@ public class GitHub {
     }
 
     /**
+     * Downloads every module asset from a multi-module release (all assets named
+     * {@code repoName-<classifier>.jar}, excluding {@code -sources.jar}/{@code -javadoc.jar}). Backs the
+     * reserved {@code :all} classifier so a consumer can pull the whole library without listing each module.
+     * Each jar is cached under the same owner directory as {@link #getAsset}.
+     *
+     * @param repoOwner the repository owner
+     * @param repoName  the repository name
+     * @param version   the release version tag
+     * @param collected list that the downloaded module JAR files are added to
+     */
+    public void getAllModuleAssets(String repoOwner, String repoName, String version, List<File> collected) {
+        logger.debug("Fetching all module assets for " + repoOwner + "/" + repoName + " " + version);
+        JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
+        JsonArray assets = release.getAsJsonArray("assets");
+        if (assets == null || assets.isEmpty()) {
+            throw new RuntimeException("No assets found for release " + version + " of " + repoOwner + "/" + repoName + ".");
+        }
+        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+        if (!direction.exists() && !direction.mkdirs()) {
+            throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
+        }
+        String prefix = repoName + "-";
+        int count = 0;
+        for (int i = 0; i < assets.size(); i++) {
+            JsonObject asset = assets.get(i).getAsJsonObject();
+            String name = asset.get("name").getAsString();
+            if (!name.startsWith(prefix) || !name.endsWith(".jar")
+                    || name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar")) {
+                continue;
+            }
+            String classifier = name.substring(prefix.length(), name.length() - ".jar".length());
+            File jar = new File(direction, repoName + "-" + classifier + "-" + version + ".jar");
+            if (!jar.exists()) {
+                String downloadUrl = asset.get("browser_download_url").getAsString();
+                try {
+                    downloadAssetFromUrl(jar, downloadUrl, repoOwner, repoName);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to download module asset " + name + ": " + e.getMessage(), e);
+                }
+            } else {
+                logger.debug("Module asset already cached: " + jar.getName());
+            }
+            collected.add(jar);
+            count++;
+        }
+        if (count == 0) {
+            throw new RuntimeException("No module assets ('" + prefix + "*.jar') found in release " + version
+                    + " of " + repoOwner + "/" + repoName + ". Was it published with an artifact { modules = true } entry?");
+        }
+        logger.debug("Resolved " + count + " module asset(s) for " + repoOwner + "/" + repoName + ".");
+    }
+
+    /**
      * Downloads a GitHub release asset to the specified file location.
      *
      * @deprecated Use downloadAssetFromUrl instead
