@@ -87,43 +87,46 @@ class Main implements Plugin<Project> {
 			project.getConfigurations().create(cfgName);
 		}
 
-		JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
-		SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-		Set<File> resourceDirs = main.getResources().getSrcDirs();
 		GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
-		Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
-			logger.debug("Process resource event called on " + project.getName());
-			if (resourcesExtension.getRepoUrl() != null) {
-				logger.debug("Found an repository in the resource extension");
-				File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
-				for (File dir : resourceDirs) {
-					try {
-						gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
-						if (resourcesExtension.isBuildOnly()) {
-							dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
-							        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
+			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
+			SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+			Set<File> resourceDirs = main.getResources().getSrcDirs();
+
+			Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
+				logger.debug("Process resource event called on " + project.getName());
+				if (resourcesExtension.getRepoUrl() != null) {
+					logger.debug("Found an repository in the resource extension");
+					File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+					for (File dir : resourceDirs) {
+						try {
+							gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
+							if (resourcesExtension.isBuildOnly()) {
+								dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
+								        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+							}
+							FileUtils.deleteDirectory(dir.toPath());
+							if (!resourcesExtension.getPath().equals("/") && !resourcesExtension.getPath().isEmpty())
+								path = path.toPath().resolve(resourcesExtension.getPath()).toFile();
+							if (dir.mkdirs()) {
+								logger.debug("Copying resources from " + path + " to: " + dir);
+								FileUtils.copyDirectory(path.toPath(), dir.toPath());
+							} else {
+								logger.error("Failed to create directory: " + dir);
+							}
+						} catch (GitAPIException | IOException e) {
+							throw new RuntimeException(e);
 						}
-						FileUtils.deleteDirectory(dir.toPath());
-						if (!resourcesExtension.getPath().equals("/") && !resourcesExtension.getPath().isEmpty())
-							path = path.toPath().resolve(resourcesExtension.getPath()).toFile();
-						if (dir.mkdirs()) {
-							logger.debug("Copying resources from " + path + " to: " + dir);
-							FileUtils.copyDirectory(path.toPath(), dir.toPath());
-						} else {
-							logger.error("Failed to create directory: " + dir);
-						}
-					} catch (GitAPIException | IOException e) {
-						throw new RuntimeException(e);
 					}
 				}
-			}
-		}));
+			}));
 
-		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) plugin -> project.getTasks().named("processResources", Copy.class, processResources -> {
-			logger.debug("Process resource event found on " + project.getName());
-			processResources.dependsOn(processGitHubResources);
-		}));
+			project.getTasks().named("processResources", Copy.class, processResources -> {
+				logger.debug("Process resource event found on " + project.getName());
+				processResources.dependsOn(processGitHubResources);
+			});
+		});
 
 		project.afterEvaluate(proj -> {
 			Set<String> resolved = new HashSet<String>();
@@ -154,6 +157,8 @@ class Main implements Plugin<Project> {
 		});
 
 		project.getPlugins().withType(JavaPlugin.class, javaPlugin -> {
+			SourceSet main = project.getExtensions().getByType(JavaPluginExtension.class)
+				.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 			Task generateMeta = project.getTasks().create("generateGithubDependencyMetadata", task -> {
 				task.setGroup("github");
 				task.setDescription("Generates META-INF/github-dependencies.json from githubImplementation dependencies");
