@@ -823,7 +823,7 @@ public class GitHub {
      * @throws IOException if the download fails
      */
     private void downloadAssetFromUrl(File destination, String downloadUrl, String repoOwner, String repoName) throws IOException {
-        logger.log("Downloading dependency from " + repoOwner + "/" + repoName);
+        long startTime = System.currentTimeMillis();
         logger.debug("Asset download URL: " + downloadUrl);
         logger.debug("Destination file: " + destination.getAbsolutePath());
 
@@ -855,7 +855,7 @@ public class GitHub {
             logger.error("IOException during asset download: " + e.getMessage(), e);
             throw e;
         }
-        logger.log("Download completed for dependency " + repoOwner + "/" + repoName);
+        logger.log("Download " + downloadUrl + ", took " + (System.currentTimeMillis() - startTime) + " ms");
     }
 
     /**
