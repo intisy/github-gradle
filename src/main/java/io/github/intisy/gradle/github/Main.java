@@ -232,16 +232,17 @@ class Main implements Plugin<Project> {
 		project.getTasks().register("publishGithub", task -> {
 			task.setGroup("github");
 			task.setDescription("Creates a GitHub release and uploads the project JAR(s)");
-			task.dependsOn("build");
 			task.dependsOn((Callable<List<Task>>) () -> {
-				List<Task> moduleJars = new ArrayList<Task>();
+				List<Task> dependencies = new ArrayList<Task>();
+				Task buildTask = project.getTasks().findByName("build");
+				if (buildTask != null) dependencies.add(buildTask);
 				if (hasModuleArtifact(publishExtension)) {
 					for (Project sub : project.getSubprojects()) {
 						Task jarTask = sub.getTasks().findByName("jar");
-						if (jarTask != null) moduleJars.add(jarTask);
+						if (jarTask != null) dependencies.add(jarTask);
 					}
 				}
-				return moduleJars;
+				return dependencies;
 			});
 			task.doLast(t -> {
 				String version = publishExtension.getVersion() != null
