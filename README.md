@@ -50,13 +50,15 @@ dependencies {
 
 ### Authentication
 
-Public releases resolve without a token, but GitHub caps unauthenticated API use at 60 requests/hour. Provide a token to raise that to 5,000/hour and to reach private repositories:
+Public releases resolve without a token, but GitHub caps unauthenticated API use at 60 requests/hour. Provide credentials in the `auth` block to raise that to 5,000/hour and to reach private repositories:
 
 ```groovy
 github {
-    accessToken = "ghp_your_token"       // a raw token,
-    // accessToken = file("secrets/gh.txt") // a file that contains the token,
-    // accessToken = "/home/me/.ssh/id_ed25519" // or an SSH private key for git operations
+    auth {
+        token     = "ghp_your_token"        // a Personal Access Token, or
+        tokenFile = file("secrets/gh.txt")   // a file that contains one
+        sshKey    = file("~/.ssh/id_ed25519") // an SSH private key for git clone/pull
+    }
 }
 ```
 
@@ -97,8 +99,10 @@ Run `gradle updateGithubDependencies` to rewrite every github* coordinate in you
 
 ```groovy
 github {
-    // On a rate limit, fall back to the cached (outdated) jar or keep the current version instead of failing (default false)
-    skipOnRateLimit = true
+    resilience {
+        // On a rate limit, fall back to the cached (outdated) jar or keep the current version instead of failing (default false)
+        skipOnRateLimit = true
+    }
     cli {
         enabled  = true  // route API calls through the local "gh" CLI, reusing its auth and higher limits (default false)
         fallback = true  // fall back to HTTP if gh is unavailable or a call fails (default true)
