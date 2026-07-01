@@ -10,10 +10,22 @@ import groovy.lang.Closure;
  *
  * <pre>
  * github {
- *     accessToken = "ghp_..."   // or a file/path containing the token
  *     debug = true
- *     skipOnRateLimit = true    // skip (don't fail) when a GitHub rate limit is hit
- *     useCli = true             // route API calls through the local "gh" CLI
+ *
+ *     auth {
+ *         token     = "ghp_..."                 // a Personal Access Token
+ *         tokenFile = file("secrets/github.txt") // or a file that contains one
+ *         sshKey    = file("~/.ssh/id_ed25519")  // SSH private key for git clone/pull
+ *     }
+ *
+ *     cli {
+ *         enabled  = true       // route API calls through the local "gh" CLI
+ *         fallback = true       // fall back to HTTP if gh is unavailable or fails (default)
+ *     }
+ *
+ *     resilience {
+ *         skipOnRateLimit = true // degrade gracefully (don't fail) when a GitHub rate limit is hit
+ *     }
  *
  *     publish {
  *         owner   = "my-org"
@@ -33,11 +45,12 @@ import groovy.lang.Closure;
 public class GithubExtension {
     private final ResourcesExtension resources = new ResourcesExtension();
     private final PublishExtension publish = new PublishExtension();
+    private final CliExtension cli = new CliExtension();
+    private final AuthExtension auth = new AuthExtension();
+    private final ResilienceExtension resilience = new ResilienceExtension();
 
     private String accessToken;
     private boolean debug;
-    private boolean skipOnRateLimit;
-    private boolean useCli;
 
     /**
      * @param debug Whether to enable debug logging.
@@ -54,67 +67,169 @@ public class GithubExtension {
     }
 
     /**
-     * Controls how a GitHub API rate limit is handled. When enabled, the plugin degrades gracefully
-     * instead of failing the build: a rate-limited dependency resolution falls back to the cached
-     * (possibly outdated) jar when one exists, and an update check keeps the currently declared
-     * version. Only when no cached copy exists is the dependency skipped. Defaults to {@code false},
-     * which aborts the build on a rate limit.
+     * @return the nested auth extension.
+     */
+    public AuthExtension getAuth() {
+        return auth;
+    }
+
+    /**
+     * Configures the nested auth extension using a Gradle action.
      *
+     * @param action The configuration action.
+     */
+    public void auth(Action<? super AuthExtension> action) {
+        action.execute(auth);
+    }
+
+    /**
+     * Configures the nested auth extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code auth { ... }}
+     *
+     * @param closure The configuration closure.
+     */
+    public void auth(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(auth);
+        closure.call(auth);
+    }
+
+    /**
+     * @return the nested resilience extension.
+     */
+    public ResilienceExtension getResilience() {
+        return resilience;
+    }
+
+    /**
+     * Configures the nested resilience extension using a Gradle action.
+     *
+     * @param action The configuration action.
+     */
+    public void resilience(Action<? super ResilienceExtension> action) {
+        action.execute(resilience);
+    }
+
+    /**
+     * Configures the nested resilience extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code resilience { ... }}
+     *
+     * @param closure The configuration closure.
+     */
+    public void resilience(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(resilience);
+        closure.call(resilience);
+    }
+
+    /**
      * @param skipOnRateLimit whether to degrade gracefully (rather than fail) when the rate limit is hit.
+     * @deprecated Replaced by the nested {@code resilience { skipOnRateLimit = ... }} block. This
+     *             delegates to {@link ResilienceExtension#setSkipOnRateLimit(boolean)} and will be
+     *             removed in a future release.
      */
+    @Deprecated
     public void setSkipOnRateLimit(boolean skipOnRateLimit) {
-        this.skipOnRateLimit = skipOnRateLimit;
+        resilience.setSkipOnRateLimit(skipOnRateLimit);
     }
 
     /**
-     * @return whether rate-limited operations are skipped instead of failing the build.
+     * @return whether rate-limited operations degrade gracefully instead of failing the build.
+     * @deprecated Replaced by the nested {@code resilience { skipOnRateLimit = ... }} block. This
+     *             delegates to {@link ResilienceExtension#isSkipOnRateLimit()} and will be removed
+     *             in a future release.
      */
+    @Deprecated
     public boolean isSkipOnRateLimit() {
-        return skipOnRateLimit;
+        return resilience.isSkipOnRateLimit();
     }
 
     /**
-     * Controls whether GitHub REST calls are routed through the local {@code gh} CLI instead of
-     * direct HTTP. When enabled, the CLI's own authentication and higher rate limits are used;
-     * if {@code gh} is not installed the plugin falls back to HTTP. Defaults to {@code false}.
-     *
-     * @param useCli whether to use the local {@code gh} CLI for API calls.
+     * @return the nested CLI extension.
      */
+    public CliExtension getCli() {
+        return cli;
+    }
+
+    /**
+     * Configures the nested CLI extension using a Gradle action.
+     *
+     * @param action The configuration action.
+     */
+    public void cli(Action<? super CliExtension> action) {
+        action.execute(cli);
+    }
+
+    /**
+     * Configures the nested CLI extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code cli { ... }}
+     *
+     * @param closure The configuration closure.
+     */
+    public void cli(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(cli);
+        closure.call(cli);
+    }
+
+    /**
+     * @param useCli whether to use the local {@code gh} CLI for API calls.
+     * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
+     *             {@link CliExtension#setEnabled(boolean)} and will be removed in a future release.
+     */
+    @Deprecated
     public void setUseCli(boolean useCli) {
-        this.useCli = useCli;
+        cli.setEnabled(useCli);
     }
 
     /**
      * @return whether API calls are routed through the local {@code gh} CLI.
+     * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
+     *             {@link CliExtension#isEnabled()} and will be removed in a future release.
      */
+    @Deprecated
     public boolean isUseCli() {
-        return useCli;
+        return cli.isEnabled();
     }
 
     /**
      * @param accessToken The path to the access token.
+     * @deprecated Replaced by the nested {@code auth { }} block ({@code tokenFile} / {@code sshKey}).
+     *             Still honoured as a fallback and will be removed in a future release.
      */
+    @Deprecated
     public void setAccessToken(Path accessToken) {
         this.accessToken = accessToken.toString();
     }
 
     /**
      * @param accessToken The file containing the access token.
+     * @deprecated Replaced by the nested {@code auth { }} block ({@code tokenFile} / {@code sshKey}).
+     *             Still honoured as a fallback and will be removed in a future release.
      */
+    @Deprecated
     public void setAccessToken(File accessToken) {
         this.accessToken = accessToken.toString();
     }
 
     /**
      * @param accessToken The access token string.
+     * @deprecated Replaced by the nested {@code auth { token = ... }} block. Still honoured as a
+     *             fallback and will be removed in a future release.
      */
+    @Deprecated
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
     }
 
     /**
-     * @return The access token.
+     * @return The access token configured via the deprecated {@code accessToken} field, or null.
+     * @deprecated Prefer {@link #getAuth()}. Retained so the plugin can honour the legacy field.
      */
+    @Deprecated
     public String getAccessToken() {
         return accessToken;
     }

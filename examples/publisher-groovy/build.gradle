@@ -60,7 +60,9 @@ publishGithub {
 // In practice you would use one form or the other, not both.
 // ---------------------------------------------------------------------------
 github {
-    accessToken = "ghp_YOUR_TOKEN_HERE"
+    auth {
+        token = "ghp_YOUR_TOKEN_HERE"
+    }
 
     publish {
         owner       = "my-org"

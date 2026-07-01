@@ -3,19 +3,26 @@ plugins {
     id "io.github.intisy.github-gradle" version "1.3.8"
 }
 
-// Configure the plugin with your GitHub personal access token.
+// Configure the plugin with your GitHub credentials.
 // The token needs read access to the repository hosting the release asset.
 github {
-    // You can also pass a File or Path instead of a raw string.
-    accessToken = "ghp_YOUR_TOKEN_HERE"
+    auth {
+        token = "ghp_YOUR_TOKEN_HERE"
+        // tokenFile = file("secrets/github.txt") // or read the token from a file
+        // sshKey    = file("${System.getProperty('user.home')}/.ssh/id_ed25519") // for git clone/pull
+    }
 
-    // Optional resilience settings (both default to false):
-    //   skipOnRateLimit -- when GitHub's API rate limit is hit, fall back to the cached (outdated) jar
-    //                      -- or keep the currently declared version -- instead of failing the build.
-    //   useCli          -- route API calls through the local "gh" CLI, reusing its auth and higher rate limits
-    //                      (falls back to HTTP automatically if "gh" is not installed).
-    // skipOnRateLimit = true
-    // useCli = true
+    // Optional: degrade gracefully when GitHub's API rate limit is hit -- fall back to the cached
+    // (outdated) jar or keep the currently declared version instead of failing the build (default false).
+    // resilience {
+    //     skipOnRateLimit = true
+    // }
+
+    // Optional: route API calls through the local "gh" CLI, reusing its auth and higher rate limits.
+    // cli {
+    //     enabled  = true  // default false
+    //     fallback = true  // fall back to HTTP if gh is unavailable or a call fails (default true)
+    // }
 }
 
 dependencies {

@@ -155,7 +155,7 @@ class Main implements Plugin<Project> {
 							proj.getDependencies().add(nativeCfg, proj.files(jar));
 						}
 					} catch (RateLimitException e) {
-						if (!githubExtension.isSkipOnRateLimit()) {
+						if (!githubExtension.getResilience().isSkipOnRateLimit()) {
 							throw e;
 						}
 						logger.warn("Rate limited resolving " + dependency.getGroup() + ":" + dependency.getName()
@@ -228,7 +228,7 @@ class Main implements Plugin<Project> {
 						try {
 							newVersion = gitHub.getLatestVersion(group, name);
 						} catch (RateLimitException e) {
-							if (!githubExtension.isSkipOnRateLimit()) {
+							if (!githubExtension.getResilience().isSkipOnRateLimit()) {
 								throw e;
 							}
 							logger.warn("Skipping update check for " + group + "/" + name
