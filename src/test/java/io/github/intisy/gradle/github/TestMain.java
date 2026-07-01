@@ -16,9 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import io.github.intisy.gradle.github.extension.ArtifactEntry;
+import io.github.intisy.gradle.github.extension.AuthExtension;
 import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.extension.PublishExtension;
+import io.github.intisy.gradle.github.extension.ResilienceExtension;
 
 public class TestMain {
 
@@ -251,5 +253,56 @@ public class TestMain {
         assertTrue(github.isUseCli(), "isUseCli should reflect cli.enabled");
         github.getCli().setEnabled(false);
         assertFalse(github.isUseCli(), "isUseCli should mirror cli.enabled both ways");
+    }
+
+    // -------------------------------------------------------------------------
+    // AuthExtension — nested auth { } block
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testAuthExtensionDefaultsAreNull() {
+        AuthExtension auth = new GithubExtension().getAuth();
+        assertNotNull(auth, "auth extension should be available");
+        assertNull(auth.getToken(),     "auth.token should default to null");
+        assertNull(auth.getTokenFile(), "auth.tokenFile should default to null");
+        assertNull(auth.getSshKey(),    "auth.sshKey should default to null");
+    }
+
+    @Test
+    public void testAuthBlockViaAction() {
+        GithubExtension github = new GithubExtension();
+        File tokenFile = new File("secrets/gh.txt");
+        File sshKey = new File("id_ed25519");
+        github.auth(auth -> {
+            auth.setToken("ghp_abc");
+            auth.setTokenFile(tokenFile);
+            auth.setSshKey(sshKey);
+        });
+        assertEquals("ghp_abc", github.getAuth().getToken());
+        assertEquals(tokenFile, github.getAuth().getTokenFile());
+        assertEquals(sshKey,    github.getAuth().getSshKey());
+    }
+
+    // -------------------------------------------------------------------------
+    // ResilienceExtension — nested resilience { } block
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testResilienceDefaultAndBlock() {
+        GithubExtension github = new GithubExtension();
+        ResilienceExtension resilience = github.getResilience();
+        assertNotNull(resilience, "resilience extension should be available");
+        assertFalse(resilience.isSkipOnRateLimit(), "skipOnRateLimit should default to false");
+        github.resilience(r -> r.setSkipOnRateLimit(true));
+        assertTrue(github.getResilience().isSkipOnRateLimit());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedSkipOnRateLimitDelegatesToResilience() {
+        GithubExtension github = new GithubExtension();
+        github.setSkipOnRateLimit(true);
+        assertTrue(github.getResilience().isSkipOnRateLimit(), "setSkipOnRateLimit should delegate to resilience");
+        assertTrue(github.isSkipOnRateLimit(), "isSkipOnRateLimit should reflect resilience");
     }
 }

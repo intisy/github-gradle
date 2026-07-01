@@ -6,6 +6,7 @@ import com.jcraft.jsch.Session;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.extension.AuthExtension;
 import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
@@ -57,6 +58,7 @@ public class GitHub {
     private final ResourcesExtension resourcesExtension;
     private final GithubExtension githubExtension;
     private String resolvedApiKey;
+    private String resolvedSshKey;
     private final OkHttpClient httpClient;
     private final Gson gson;
     private final GitHubCli cli;
@@ -144,18 +146,95 @@ public class GitHub {
     }
 
     /**
-     * Gets the GitHub API key, resolving it from a file if necessary.
-     * The key is cached after the first resolution.
+     * Gets the GitHub token used for REST calls and HTTPS git operations, resolving it from the
+     * {@code auth} extension (or the deprecated {@code accessToken} fallback). Cached after the
+     * first resolution.
      *
-     * @return the resolved API key, or null if not configured
+     * @return the resolved token, or null if none is configured
      */
     public String getApiKey() {
         if (this.resolvedApiKey == null) {
-            logger.debug("API key not cached, resolving from extension.");
-            String keyOrPath = githubExtension.getAccessToken();
-            this.resolvedApiKey = resolveApiKey(keyOrPath);
+            this.resolvedApiKey = resolveToken();
         }
         return this.resolvedApiKey;
+    }
+
+    /**
+     * Resolves the token with precedence {@code auth.token} &rarr; {@code auth.tokenFile} &rarr; the
+     * deprecated {@code accessToken} (only when it is not an SSH key).
+     *
+     * @return the resolved token, or null if none is configured
+     */
+    @SuppressWarnings("deprecation") // reads the deprecated accessToken as a fallback on purpose
+    private String resolveToken() {
+        AuthExtension authConfig = githubExtension.getAuth();
+        if (authConfig.getToken() != null) {
+            logger.debug("Using auth.token.");
+            return authConfig.getToken();
+        }
+        if (authConfig.getTokenFile() != null) {
+            logger.debug("Reading token from auth.tokenFile: " + authConfig.getTokenFile());
+            return readFileTrimmed(authConfig.getTokenFile());
+        }
+        String legacy = resolveApiKey(githubExtension.getAccessToken());
+        if (legacy != null && !isSshKey(legacy)) {
+            logger.debug("Using the deprecated accessToken as the token.");
+            return legacy;
+        }
+        return null;
+    }
+
+    /**
+     * Gets the SSH private key contents used for git transport, resolving it from {@code auth.sshKey}
+     * (or the deprecated {@code accessToken} fallback when that holds an SSH key). Cached after the
+     * first resolution.
+     *
+     * @return the SSH private key contents, or null if none is configured
+     */
+    public String getSshKey() {
+        if (this.resolvedSshKey == null) {
+            this.resolvedSshKey = resolveSshKey();
+        }
+        return this.resolvedSshKey;
+    }
+
+    /**
+     * Resolves the SSH key with precedence {@code auth.sshKey} &rarr; the deprecated {@code accessToken}
+     * (only when it holds an SSH private key).
+     *
+     * @return the SSH private key contents, or null if none is configured
+     */
+    @SuppressWarnings("deprecation") // reads the deprecated accessToken as a fallback on purpose
+    private String resolveSshKey() {
+        AuthExtension authConfig = githubExtension.getAuth();
+        if (authConfig.getSshKey() != null) {
+            logger.debug("Reading SSH key from auth.sshKey: " + authConfig.getSshKey());
+            return readFileTrimmed(authConfig.getSshKey());
+        }
+        String legacy = resolveApiKey(githubExtension.getAccessToken());
+        if (legacy != null && isSshKey(legacy)) {
+            logger.debug("Using the deprecated accessToken as the SSH key.");
+            return legacy;
+        }
+        return null;
+    }
+
+    /**
+     * Reads a file's full contents, trimmed of surrounding whitespace.
+     *
+     * @param file the file to read
+     * @return the trimmed contents
+     * @throws RuntimeException if the file is missing or cannot be read
+     */
+    private String readFileTrimmed(File file) {
+        if (!file.exists() || !file.isFile()) {
+            throw new RuntimeException("Auth file does not exist: " + file.getAbsolutePath());
+        }
+        try {
+            return new String(Files.readAllBytes(file.toPath())).trim();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read auth file: " + file.getAbsolutePath(), e);
+        }
     }
 
     /**
@@ -231,19 +310,13 @@ public class GitHub {
      */
     public CredentialsProvider getCredentialsProvider(String repoOwner) {
         logger.debug("Attempting to get CredentialsProvider for owner: " + repoOwner);
-        String apiKey = getApiKey();
-        if (apiKey == null) {
-            logger.debug("No API key provided. Returning null CredentialsProvider.");
-            return null;
-        } else if (isGitHubPAT(apiKey)) {
-            logger.debug("API key is a GitHub PAT. Creating UsernamePasswordCredentialsProvider.");
-            return new UsernamePasswordCredentialsProvider(repoOwner, apiKey);
-        } else if (isSshKey(apiKey)) {
-            logger.debug("API key is an SSH key. Returning null CredentialsProvider (should be handled by TransportConfigCallback).");
-            return null;
+        String token = getApiKey();
+        if (token != null) {
+            logger.debug("Token present. Creating UsernamePasswordCredentialsProvider.");
+            return new UsernamePasswordCredentialsProvider(repoOwner, token);
         }
-        logger.error("API key format is invalid. It is not a PAT or a valid private key.");
-        throw new RuntimeException("Invalid API key format.");
+        logger.debug("No token provided; SSH or anonymous git transport will be used.");
+        return null;
     }
 
     /**
@@ -253,9 +326,9 @@ public class GitHub {
      */
     private TransportConfigCallback getTransportConfigCallback() {
         logger.debug("Attempting to get TransportConfigCallback.");
-        String apiKey = getApiKey();
-        if (isSshKey(apiKey)) {
-            logger.debug("API key is an SSH key. Creating SshTransportConfigCallback.");
+        final String sshKey = getSshKey();
+        if (sshKey != null) {
+            logger.debug("SSH key present. Creating SshTransportConfigCallback.");
             return new TransportConfigCallback() {
                 @Override
                 public void configure(Transport transport) {
@@ -273,7 +346,7 @@ public class GitHub {
                             protected JSch createDefaultJSch(FS fs) throws JSchException {
                                 logger.debug("Jsch createDefaultJSch: Adding private key identity 'deploy-key'.");
                                 JSch defaultJSch = super.createDefaultJSch(fs);
-                                defaultJSch.addIdentity("deploy-key", apiKey.getBytes(), null, null);
+                                defaultJSch.addIdentity("deploy-key", sshKey.getBytes(), null, null);
                                 return defaultJSch;
                             }
                         });
@@ -293,7 +366,7 @@ public class GitHub {
      * @return the Git repository URL (SSH or HTTPS)
      */
     private String getRepositoryURL(String repoOwner, String repoName) {
-        if (isSshKey(getApiKey())) {
+        if (getSshKey() != null) {
             String url = String.format("git@github.com:%s/%s.git", repoOwner, repoName);
             logger.debug("Detected SSH key, using SSH URL for Git operations: " + url);
             return url;
@@ -836,7 +909,7 @@ public class GitHub {
      * @return the newest matching cached jar, or null if skipping is disabled or nothing is cached
      */
     private File rateLimitFallback(File direction, String prefix, String coordinate) {
-        if (!githubExtension.isSkipOnRateLimit()) {
+        if (!githubExtension.getResilience().isSkipOnRateLimit()) {
             return null;
         }
         File cached = findNewestCachedJar(direction, prefix);
@@ -896,7 +969,7 @@ public class GitHub {
      * @return true if at least one cached module jar was added
      */
     private boolean collectCachedModuleFallback(File direction, String repoName, List<File> collected) {
-        if (!githubExtension.isSkipOnRateLimit()) {
+        if (!githubExtension.getResilience().isSkipOnRateLimit()) {
             return false;
         }
         File[] files = direction.listFiles();
