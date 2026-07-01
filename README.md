@@ -2,9 +2,9 @@
 
 Archives containing JAR files are available as [releases](https://github.com/intisy/github-gradle/releases).
 
-## What is Online Gradle?
+## What is github-gradle?
 
-Online Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
+GitHub Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
 
 ## Usage
 
@@ -37,7 +37,70 @@ Once you have the plugin installed you can use it like so:
 
 ```groovy
 dependencies {
-    githubImplementation "USERNAME:REPOSITORY:TAG"
+    // OWNER:REPOSITORY:TAG resolves the main JAR from that release
+    githubImplementation "intisy:simple-logger:1.12.7"
+    // A 4th segment selects a classifier asset (simple-logger-api.jar)
+    githubImplementation "intisy:simple-logger:1.12.7:api"
+    // The reserved "all" classifier pulls every module of a multi-module release
+    githubImplementation "intisy:dough:1.3.0:all"
+}
+```
+
+## Guide
+
+### Authentication
+
+Public releases resolve without a token, but GitHub caps unauthenticated API use at 60 requests/hour. Provide a token to raise that to 5,000/hour and to reach private repositories:
+
+```groovy
+github {
+    accessToken = "ghp_your_token"       // a raw token,
+    // accessToken = file("secrets/gh.txt") // a file that contains the token,
+    // accessToken = "/home/me/.ssh/id_ed25519" // or an SSH private key for git operations
+}
+```
+
+### Dependency configurations
+
+Every standard Gradle configuration has a github counterpart, all using the OWNER:REPOSITORY:TAG[:CLASSIFIER] coordinate:
+
+```groovy
+dependencies {
+    githubImplementation "intisy:simple-logger:1.12.7"
+    githubApi            "intisy:java-utils:2.0.0"    // leaks to consumers (needs the java-library plugin)
+    githubCompileOnly    "intisy:annotations:1.0.0"   // compile classpath only
+    githubCompileOnlyApi "intisy:annotations:1.0.0"   // compile only + leaked (needs the java-library plugin)
+    githubRuntimeOnly    "intisy:driver:1.0.0"        // runtime classpath only
+}
+```
+
+### Publishing a release
+
+Configure the publishGithub extension and run `gradle publishGithub` to build the project and upload its JAR(s) as a GitHub release. Every field is optional:
+
+```groovy
+publishGithub {
+    owner       = "intisy"          // auto-detected from the git remote if omitted
+    repo        = "my-repo"         // auto-detected from the git remote if omitted
+    version     = "2.0.0"           // defaults to project.version
+    tag         = "v2.0.0"          // defaults to version
+    releaseName = "Release 2.0.0"   // defaults to tag
+    jar         = file("build/libs/my-app.jar") // auto-selected from build/libs if omitted
+}
+```
+
+### Managing installed dependencies
+
+Run `gradle updateGithubDependencies` to rewrite every github* coordinate in your build files to the latest release tag, or `gradle printGithubDependencies` to list them.
+
+### Resilience options
+
+Both are off by default:
+
+```groovy
+github {
+    skipOnRateLimit = true  // on a rate limit, fall back to the cached (outdated) jar or keep the current version instead of failing
+    useCli          = true  // route API calls through the local "gh" CLI, using its auth and higher limits
 }
 ```
 
