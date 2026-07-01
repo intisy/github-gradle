@@ -9,13 +9,16 @@ github {
     // You can also pass a File or Path instead of a raw string.
     accessToken = "ghp_YOUR_TOKEN_HERE"
 
-    // Optional resilience settings (both default to false):
+    // Optional resilience settings:
     //   skipOnRateLimit -- when GitHub's API rate limit is hit, fall back to the cached (outdated) jar
-    //                      -- or keep the currently declared version -- instead of failing the build.
-    //   useCli          -- route API calls through the local "gh" CLI, reusing its auth and higher rate limits
-    //                      (falls back to HTTP automatically if "gh" is not installed).
+    //                      -- or keep the currently declared version -- instead of failing the build (default false).
     // skipOnRateLimit = true
-    // useCli = true
+
+    // Route API calls through the local "gh" CLI, reusing its auth and higher rate limits.
+    // cli {
+    //     enabled  = true  // default false
+    //     fallback = true  // fall back to HTTP if gh is unavailable or a call fails (default true)
+    // }
 }
 
 dependencies {

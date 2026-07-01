@@ -95,12 +95,14 @@ Run `gradle updateGithubDependencies` to rewrite every github* coordinate in you
 
 ### Resilience options
 
-Both are off by default:
-
 ```groovy
 github {
-    skipOnRateLimit = true  // on a rate limit, fall back to the cached (outdated) jar or keep the current version instead of failing
-    useCli          = true  // route API calls through the local "gh" CLI, using its auth and higher limits
+    // On a rate limit, fall back to the cached (outdated) jar or keep the current version instead of failing (default false)
+    skipOnRateLimit = true
+    cli {
+        enabled  = true  // route API calls through the local "gh" CLI, reusing its auth and higher limits (default false)
+        fallback = true  // fall back to HTTP if gh is unavailable or a call fails (default true)
+    }
 }
 ```
 
