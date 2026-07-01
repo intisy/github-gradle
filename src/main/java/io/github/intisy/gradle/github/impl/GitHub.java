@@ -6,6 +6,7 @@ import com.jcraft.jsch.Session;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
@@ -560,7 +561,11 @@ public class GitHub {
      */
     private Response makeGitHubApiRequest(String url) throws IOException {
         if (useCli()) {
-            return cli.request(url, "GET", null);
+            try {
+                return cli.request(url, "GET", null);
+            } catch (IOException e) {
+                rethrowUnlessCliFallback(e);
+            }
         }
 
         Request.Builder requestBuilder = new Request.Builder()
@@ -577,10 +582,39 @@ public class GitHub {
     }
 
     /**
-     * @return true if API calls should be routed through the {@code gh} CLI (enabled and installed).
+     * Decides whether API calls should be routed through the {@code gh} CLI. Returns true only when
+     * the CLI is enabled and installed. When it is enabled but unavailable, HTTP is used if
+     * {@code cli.fallback} is true (the default); otherwise a configuration error is raised.
+     *
+     * @return true to route the call through the {@code gh} CLI, false to use HTTP.
      */
     private boolean useCli() {
-        return githubExtension.isUseCli() && cli.isAvailable();
+        CliExtension cliConfig = githubExtension.getCli();
+        if (!cliConfig.isEnabled()) {
+            return false;
+        }
+        if (cli.isAvailable()) {
+            return true;
+        }
+        if (cliConfig.isFallback()) {
+            return false;
+        }
+        throw new RuntimeException("github.cli.enabled is true but the 'gh' CLI was not found on PATH, "
+                + "and github.cli.fallback is false. Install gh, or set github { cli { fallback = true } }.");
+    }
+
+    /**
+     * Rethrows a failed CLI transport error unless {@code cli.fallback} is enabled, in which case a
+     * warning is logged and the caller proceeds with the HTTP transport instead.
+     *
+     * @param e the CLI transport failure.
+     * @throws IOException if fallback is disabled.
+     */
+    private void rethrowUnlessCliFallback(IOException e) throws IOException {
+        if (!githubExtension.getCli().isFallback()) {
+            throw e;
+        }
+        logger.warn("gh CLI transport failed (" + e.getMessage() + "); falling back to HTTP.");
     }
 
     /**
@@ -1303,7 +1337,11 @@ public class GitHub {
      */
     private Response makeGitHubApiPostRequest(String url, String jsonBody) throws IOException {
         if (useCli()) {
-            return cli.request(url, "POST", jsonBody);
+            try {
+                return cli.request(url, "POST", jsonBody);
+            } catch (IOException e) {
+                rethrowUnlessCliFallback(e);
+            }
         }
 
         okhttp3.MediaType JSON = okhttp3.MediaType.parse("application/json; charset=utf-8");

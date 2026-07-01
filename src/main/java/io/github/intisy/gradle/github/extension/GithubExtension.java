@@ -12,8 +12,12 @@ import groovy.lang.Closure;
  * github {
  *     accessToken = "ghp_..."   // or a file/path containing the token
  *     debug = true
- *     skipOnRateLimit = true    // skip (don't fail) when a GitHub rate limit is hit
- *     useCli = true             // route API calls through the local "gh" CLI
+ *     skipOnRateLimit = true    // degrade gracefully (don't fail) when a GitHub rate limit is hit
+ *
+ *     cli {
+ *         enabled  = true       // route API calls through the local "gh" CLI
+ *         fallback = true       // fall back to HTTP if gh is unavailable or fails (default)
+ *     }
  *
  *     publish {
  *         owner   = "my-org"
@@ -33,11 +37,11 @@ import groovy.lang.Closure;
 public class GithubExtension {
     private final ResourcesExtension resources = new ResourcesExtension();
     private final PublishExtension publish = new PublishExtension();
+    private final CliExtension cli = new CliExtension();
 
     private String accessToken;
     private boolean debug;
     private boolean skipOnRateLimit;
-    private boolean useCli;
 
     /**
      * @param debug Whether to enable debug logging.
@@ -74,21 +78,52 @@ public class GithubExtension {
     }
 
     /**
-     * Controls whether GitHub REST calls are routed through the local {@code gh} CLI instead of
-     * direct HTTP. When enabled, the CLI's own authentication and higher rate limits are used;
-     * if {@code gh} is not installed the plugin falls back to HTTP. Defaults to {@code false}.
-     *
-     * @param useCli whether to use the local {@code gh} CLI for API calls.
+     * @return the nested CLI extension.
      */
+    public CliExtension getCli() {
+        return cli;
+    }
+
+    /**
+     * Configures the nested CLI extension using a Gradle action.
+     *
+     * @param action The configuration action.
+     */
+    public void cli(Action<? super CliExtension> action) {
+        action.execute(cli);
+    }
+
+    /**
+     * Configures the nested CLI extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code cli { ... }}
+     *
+     * @param closure The configuration closure.
+     */
+    public void cli(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(cli);
+        closure.call(cli);
+    }
+
+    /**
+     * @param useCli whether to use the local {@code gh} CLI for API calls.
+     * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
+     *             {@link CliExtension#setEnabled(boolean)} and will be removed in a future release.
+     */
+    @Deprecated
     public void setUseCli(boolean useCli) {
-        this.useCli = useCli;
+        cli.setEnabled(useCli);
     }
 
     /**
      * @return whether API calls are routed through the local {@code gh} CLI.
+     * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
+     *             {@link CliExtension#isEnabled()} and will be removed in a future release.
      */
+    @Deprecated
     public boolean isUseCli() {
-        return useCli;
+        return cli.isEnabled();
     }
 
     /**

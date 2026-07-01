@@ -48,7 +48,7 @@ public class GitHubCli {
         if (available == null) {
             available = probe();
             if (!available) {
-                logger.warn("github.useCli is enabled but the 'gh' CLI was not found on PATH; falling back to HTTP.");
+                logger.warn("github.cli.enabled is true but the 'gh' CLI was not found on PATH.");
             }
         }
         return available;

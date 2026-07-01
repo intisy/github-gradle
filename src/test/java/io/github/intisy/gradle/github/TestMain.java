@@ -13,7 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import io.github.intisy.gradle.github.extension.ArtifactEntry;
+import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.extension.PublishExtension;
 
@@ -214,5 +217,39 @@ public class TestMain {
     public void testArtifactEntryDefaultClassifierIsEmpty() {
         ArtifactEntry entry = new ArtifactEntry();
         assertEquals("", entry.getClassifier());
+    }
+
+    // -------------------------------------------------------------------------
+    // CliExtension — nested cli { } block
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testCliExtensionDefaults() {
+        CliExtension cli = new GithubExtension().getCli();
+        assertNotNull(cli, "cli extension should be available");
+        assertFalse(cli.isEnabled(), "cli.enabled should default to false");
+        assertTrue(cli.isFallback(), "cli.fallback should default to true");
+    }
+
+    @Test
+    public void testCliBlockViaAction() {
+        GithubExtension github = new GithubExtension();
+        github.cli(cli -> {
+            cli.setEnabled(true);
+            cli.setFallback(false);
+        });
+        assertTrue(github.getCli().isEnabled());
+        assertFalse(github.getCli().isFallback());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedUseCliDelegatesToCliEnabled() {
+        GithubExtension github = new GithubExtension();
+        github.setUseCli(true);
+        assertTrue(github.getCli().isEnabled(), "setUseCli should delegate to cli.enabled");
+        assertTrue(github.isUseCli(), "isUseCli should reflect cli.enabled");
+        github.getCli().setEnabled(false);
+        assertFalse(github.isUseCli(), "isUseCli should mirror cli.enabled both ways");
     }
 }
