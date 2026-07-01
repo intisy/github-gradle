@@ -7,6 +7,7 @@ import io.github.intisy.gradle.github.extension.PublishExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.impl.Gradle;
+import io.github.intisy.gradle.github.impl.RateLimitException;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -139,18 +140,27 @@ class Main implements Plugin<Project> {
 				}
 				Configuration cfg = proj.getConfigurations().getByName(cfgName);
 				for (Dependency dependency : cfg.getDependencies()) {
-					String classifier = extractClassifier(dependency);
-					List<File> jars = new ArrayList<File>();
-					if (classifier.isEmpty()) {
-						gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
-					} else if (classifier.equals("all")) {
-						gitHub.getAllModuleAssets(dependency.getGroup(), dependency.getName(), dependency.getVersion(), jars);
-					} else {
-						File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
-						if (jar != null) jars.add(jar);
-					}
-					for (File jar : jars) {
-						proj.getDependencies().add(nativeCfg, proj.files(jar));
+					try {
+						String classifier = extractClassifier(dependency);
+						List<File> jars = new ArrayList<File>();
+						if (classifier.isEmpty()) {
+							gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
+						} else if (classifier.equals("all")) {
+							gitHub.getAllModuleAssets(dependency.getGroup(), dependency.getName(), dependency.getVersion(), jars);
+						} else {
+							File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
+							if (jar != null) jars.add(jar);
+						}
+						for (File jar : jars) {
+							proj.getDependencies().add(nativeCfg, proj.files(jar));
+						}
+					} catch (RateLimitException e) {
+						if (!githubExtension.isSkipOnRateLimit()) {
+							throw e;
+						}
+						logger.warn("Rate limited resolving " + dependency.getGroup() + ":" + dependency.getName()
+							+ ":" + dependency.getVersion() + " and no cached copy is available; skipping it "
+							+ "(github.skipOnRateLimit = true). The compile classpath may be incomplete.");
 					}
 				}
 			}
@@ -214,8 +224,21 @@ class Main implements Plugin<Project> {
 						String name = dependency.getName();
 						String version = dependency.getVersion();
 						logger.debug("Updating GitHub dependency: " + name);
-						String newVersion = gitHub.getLatestVersion(group, name);
-						if (version != null && !version.equals(newVersion)) {
+						String newVersion;
+						try {
+							newVersion = gitHub.getLatestVersion(group, name);
+						} catch (RateLimitException e) {
+							if (!githubExtension.isSkipOnRateLimit()) {
+								throw e;
+							}
+							logger.warn("Skipping update check for " + group + "/" + name
+								+ " due to a rate limit (github.skipOnRateLimit = true).");
+							continue;
+						}
+						if (newVersion == null) {
+							logger.warn("Could not determine the latest version for " + group + "/" + name
+								+ "; keeping the current version " + version + ".");
+						} else if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 							for (Project p : GradleUtils.getAllProjectsRecursive(project)) {
 								Gradle.modifyBuildFile(p, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);

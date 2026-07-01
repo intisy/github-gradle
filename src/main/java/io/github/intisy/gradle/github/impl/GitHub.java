@@ -39,7 +39,9 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -56,6 +58,7 @@ public class GitHub {
     private String resolvedApiKey;
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final GitHubCli cli;
 
     /**
      * Constructs a new GitHub helper instance.
@@ -71,6 +74,7 @@ public class GitHub {
         this.resolvedApiKey = null;
         this.httpClient = new OkHttpClient();
         this.gson = new Gson();
+        this.cli = new GitHubCli(logger);
         logger.debug("GitHub helper initialized.");
     }
 
@@ -555,6 +559,10 @@ public class GitHub {
      * @throws IOException if the request fails
      */
     private Response makeGitHubApiRequest(String url) throws IOException {
+        if (useCli()) {
+            return cli.request(url, "GET", null);
+        }
+
         Request.Builder requestBuilder = new Request.Builder()
                 .url(url)
                 .addHeader("Accept", "application/vnd.github+json")
@@ -566,6 +574,13 @@ public class GitHub {
         }
 
         return httpClient.newCall(requestBuilder.build()).execute();
+    }
+
+    /**
+     * @return true if API calls should be routed through the {@code gh} CLI (enabled and installed).
+     */
+    private boolean useCli() {
+        return githubExtension.isUseCli() && cli.isAvailable();
     }
 
     /**
@@ -642,6 +657,36 @@ public class GitHub {
     }
 
     /**
+     * Raises the appropriate exception for a failed GitHub API response. Returns a
+     * {@link RateLimitException} when the response indicates a rate limit (so callers can skip),
+     * otherwise a plain {@link RuntimeException}. The response body is consumed once.
+     *
+     * @param response the failed HTTP response.
+     * @param context  description of what was being requested.
+     * @return the exception to throw.
+     */
+    private RuntimeException apiError(Response response, String context) {
+        boolean rateLimited = isRateLimited(response);
+        String message = buildGitHubApiErrorMessage(response, context);
+        return rateLimited ? new RateLimitException(message) : new RuntimeException(message);
+    }
+
+    /**
+     * Detects a GitHub rate limit from the response status and headers without consuming the body.
+     * Primary limits set {@code X-RateLimit-Remaining: 0}; secondary limits set {@code Retry-After}.
+     *
+     * @param response the HTTP response.
+     * @return true if the response indicates a rate limit.
+     */
+    private boolean isRateLimited(Response response) {
+        int code = response.code();
+        if (code != 403 && code != 429) {
+            return false;
+        }
+        return "0".equals(response.header("X-RateLimit-Remaining")) || response.header("Retry-After") != null;
+    }
+
+    /**
      * Builds a user-friendly error message for a failed HTTP response when the body is not JSON
      * (e.g. asset download). Does not consume the response body.
      */
@@ -690,7 +735,7 @@ public class GitHub {
                 }
                 if (!response.isSuccessful()) {
                     String context = "release " + repoOwner + "/" + repoName + " tag " + tag;
-                    throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                    throw apiError(response, context);
                 }
                 if (response.body() == null) {
                     throw new RuntimeException("GitHub API returned empty body for release "
@@ -747,6 +792,105 @@ public class GitHub {
     }
 
     /**
+     * Returns a cached (possibly outdated) JAR to fall back to when the requested version cannot be
+     * fetched because of a rate limit. Only applies when {@code github.skipOnRateLimit} is enabled;
+     * otherwise returns null so the caller rethrows and the build fails as before.
+     *
+     * @param direction  the owner cache directory
+     * @param prefix     the file-name prefix identifying the coordinate (e.g. {@code "repo-"} or {@code "repo-api-"})
+     * @param coordinate a human-readable coordinate for logging
+     * @return the newest matching cached jar, or null if skipping is disabled or nothing is cached
+     */
+    private File rateLimitFallback(File direction, String prefix, String coordinate) {
+        if (!githubExtension.isSkipOnRateLimit()) {
+            return null;
+        }
+        File cached = findNewestCachedJar(direction, prefix);
+        if (cached != null) {
+            logger.warn("Rate limited resolving " + coordinate + "; falling back to cached (possibly outdated) "
+                    + cached.getName() + " (github.skipOnRateLimit = true).");
+        } else {
+            logger.debug("No cached fallback jar found for prefix '" + prefix + "' in " + direction.getAbsolutePath());
+        }
+        return cached;
+    }
+
+    /**
+     * Finds the most recently downloaded cached JAR under {@code direction} whose name starts with
+     * {@code prefix} followed by a version-like segment (first character is a digit or {@code v}),
+     * excluding {@code -sources.jar}/{@code -javadoc.jar}. The version-like check keeps a plain-jar
+     * lookup ({@code repo-}) from matching classifier jars such as {@code repo-api-1.0.jar}.
+     *
+     * @param direction the owner cache directory
+     * @param prefix    the file-name prefix identifying the coordinate
+     * @return the newest matching cached jar, or null if none exist
+     */
+    private File findNewestCachedJar(File direction, String prefix) {
+        File[] files = direction.listFiles();
+        if (files == null) {
+            return null;
+        }
+        File newest = null;
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.startsWith(prefix) || !name.endsWith(".jar")) {
+                continue;
+            }
+            if (name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar")) {
+                continue;
+            }
+            String rest = name.substring(prefix.length());
+            char first = rest.isEmpty() ? ' ' : rest.charAt(0);
+            if (!Character.isDigit(first) && first != 'v' && first != 'V') {
+                continue;
+            }
+            if (newest == null || file.lastModified() > newest.lastModified()) {
+                newest = file;
+            }
+        }
+        return newest;
+    }
+
+    /**
+     * Collects the newest cached jar per module (keyed by the file name without its trailing
+     * {@code -<version>.jar}) as an offline fallback for a rate-limited multi-module ({@code :all})
+     * resolution. Only applies when {@code github.skipOnRateLimit} is enabled.
+     *
+     * @param direction the owner cache directory
+     * @param repoName  the repository name
+     * @param collected the list that cached module jars are added to
+     * @return true if at least one cached module jar was added
+     */
+    private boolean collectCachedModuleFallback(File direction, String repoName, List<File> collected) {
+        if (!githubExtension.isSkipOnRateLimit()) {
+            return false;
+        }
+        File[] files = direction.listFiles();
+        if (files == null) {
+            return false;
+        }
+        String prefix = repoName + "-";
+        Map<String, File> newestByModule = new HashMap<String, File>();
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.startsWith(prefix) || !name.endsWith(".jar")) {
+                continue;
+            }
+            if (name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar")) {
+                continue;
+            }
+            int lastDash = name.lastIndexOf('-');
+            String moduleKey = lastDash > 0 ? name.substring(0, lastDash) : name;
+            File current = newestByModule.get(moduleKey);
+            if (current == null || file.lastModified() > current.lastModified()) {
+                newestByModule.put(moduleKey, file);
+            }
+        }
+        collected.addAll(newestByModule.values());
+        return !newestByModule.isEmpty();
+    }
+
+    /**
      * Downloads and caches a release asset JAR file from a GitHub repository.
      *
      * @param repoOwner the repository owner
@@ -771,7 +915,14 @@ public class GitHub {
 
         if (!jar.exists()) {
             logger.debug("Asset not found in cache. Fetching from GitHub API.");
-            JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
+            JsonObject release;
+            try {
+                release = fetchReleaseByTag(repoOwner, repoName, version);
+            } catch (RateLimitException e) {
+                File cached = rateLimitFallback(direction, repoName + "-", repoOwner + "/" + repoName + ":" + version);
+                if (cached != null) return cached;
+                throw e;
+            }
             JsonArray assets = release.getAsJsonArray("assets");
 
             if (assets == null || assets.isEmpty()) {
@@ -952,7 +1103,15 @@ public class GitHub {
             logger.debug("Classifier asset already cached: " + jar.getName());
             return jar;
         }
-        JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
+        JsonObject release;
+        try {
+            release = fetchReleaseByTag(repoOwner, repoName, version);
+        } catch (RateLimitException e) {
+            File cached = rateLimitFallback(direction, repoName + "-" + classifier + "-",
+                    repoOwner + "/" + repoName + ":" + version + ":" + classifier);
+            if (cached != null) return cached;
+            throw e;
+        }
         JsonArray assets = release.getAsJsonArray("assets");
         if (assets == null || assets.isEmpty()) {
             return null;
@@ -988,14 +1147,24 @@ public class GitHub {
      */
     public void getAllModuleAssets(String repoOwner, String repoName, String version, List<File> collected) {
         logger.debug("Fetching all module assets for " + repoOwner + "/" + repoName + " " + version);
-        JsonObject release = fetchReleaseByTag(repoOwner, repoName, version);
-        JsonArray assets = release.getAsJsonArray("assets");
-        if (assets == null || assets.isEmpty()) {
-            throw new RuntimeException("No assets found for release " + version + " of " + repoOwner + "/" + repoName + ".");
-        }
         File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         if (!direction.exists() && !direction.mkdirs()) {
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
+        }
+        JsonObject release;
+        try {
+            release = fetchReleaseByTag(repoOwner, repoName, version);
+        } catch (RateLimitException e) {
+            if (collectCachedModuleFallback(direction, repoName, collected)) {
+                logger.warn("Rate limited resolving modules of " + repoOwner + "/" + repoName + ":" + version
+                        + "; using cached (possibly outdated) module jars (github.skipOnRateLimit = true).");
+                return;
+            }
+            throw e;
+        }
+        JsonArray assets = release.getAsJsonArray("assets");
+        if (assets == null || assets.isEmpty()) {
+            throw new RuntimeException("No assets found for release " + version + " of " + repoOwner + "/" + repoName + ".");
         }
         String prefix = repoName + "-";
         int count = 0;
@@ -1063,7 +1232,7 @@ public class GitHub {
 
                 if (!response.isSuccessful()) {
                     String context = String.format("latest release for %s/%s", repoOwner, repoName);
-                    throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                    throw apiError(response, context);
                 }
                 if (response.body() == null) {
                     throw new RuntimeException("GitHub API returned empty body for latest release " + repoOwner + "/" + repoName + ".");
@@ -1133,6 +1302,10 @@ public class GitHub {
      * @throws IOException if the request fails
      */
     private Response makeGitHubApiPostRequest(String url, String jsonBody) throws IOException {
+        if (useCli()) {
+            return cli.request(url, "POST", jsonBody);
+        }
+
         okhttp3.MediaType JSON = okhttp3.MediaType.parse("application/json; charset=utf-8");
         okhttp3.RequestBody body = okhttp3.RequestBody.create(jsonBody, JSON);
         Request.Builder requestBuilder = new Request.Builder()
@@ -1230,7 +1403,7 @@ public class GitHub {
         try (Response response = makeGitHubApiPostRequest(apiUrl, gson.toJson(body))) {
             if (!response.isSuccessful()) {
                 String context = "create release " + owner + "/" + repo + " tag " + tagName;
-                throw new RuntimeException(buildGitHubApiErrorMessage(response, context));
+                throw apiError(response, context);
             }
             if (response.body() == null) {
                 throw new RuntimeException("GitHub API returned empty body when creating release " + tagName + ".");

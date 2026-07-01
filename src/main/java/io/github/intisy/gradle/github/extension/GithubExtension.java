@@ -12,6 +12,8 @@ import groovy.lang.Closure;
  * github {
  *     accessToken = "ghp_..."   // or a file/path containing the token
  *     debug = true
+ *     skipOnRateLimit = true    // skip (don't fail) when a GitHub rate limit is hit
+ *     useCli = true             // route API calls through the local "gh" CLI
  *
  *     publish {
  *         owner   = "my-org"
@@ -34,6 +36,8 @@ public class GithubExtension {
 
     private String accessToken;
     private boolean debug;
+    private boolean skipOnRateLimit;
+    private boolean useCli;
 
     /**
      * @param debug Whether to enable debug logging.
@@ -47,6 +51,44 @@ public class GithubExtension {
      */
     public boolean isDebug() {
         return debug;
+    }
+
+    /**
+     * Controls how a GitHub API rate limit is handled. When enabled, the plugin degrades gracefully
+     * instead of failing the build: a rate-limited dependency resolution falls back to the cached
+     * (possibly outdated) jar when one exists, and an update check keeps the currently declared
+     * version. Only when no cached copy exists is the dependency skipped. Defaults to {@code false},
+     * which aborts the build on a rate limit.
+     *
+     * @param skipOnRateLimit whether to degrade gracefully (rather than fail) when the rate limit is hit.
+     */
+    public void setSkipOnRateLimit(boolean skipOnRateLimit) {
+        this.skipOnRateLimit = skipOnRateLimit;
+    }
+
+    /**
+     * @return whether rate-limited operations are skipped instead of failing the build.
+     */
+    public boolean isSkipOnRateLimit() {
+        return skipOnRateLimit;
+    }
+
+    /**
+     * Controls whether GitHub REST calls are routed through the local {@code gh} CLI instead of
+     * direct HTTP. When enabled, the CLI's own authentication and higher rate limits are used;
+     * if {@code gh} is not installed the plugin falls back to HTTP. Defaults to {@code false}.
+     *
+     * @param useCli whether to use the local {@code gh} CLI for API calls.
+     */
+    public void setUseCli(boolean useCli) {
+        this.useCli = useCli;
+    }
+
+    /**
+     * @return whether API calls are routed through the local {@code gh} CLI.
+     */
+    public boolean isUseCli() {
+        return useCli;
     }
 
     /**
