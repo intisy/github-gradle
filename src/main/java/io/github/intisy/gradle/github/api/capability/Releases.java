@@ -105,9 +105,9 @@ public interface Releases {
     /**
      * @param jar the jar file to inspect; not modified.
      * @return the dependencies declared by {@code jar}'s embedded
-     * {@code META-INF/github-dependencies.json}, or an empty list if the jar has no such entry.
-     * @throws RuntimeException thrown unchecked if the jar has a metadata entry but its content
-     * is corrupt or malformed; only a missing entry produces the empty list above.
+     * {@code META-INF/github-dependencies.json}, or an empty list if the jar has no such entry,
+     * or if the entry exists but is unreadable or malformed. The unreadable case logs a warning
+     * naming {@code jar} so a corrupt artifact is not silently treated as having no dependencies.
      */
     List<DeclaredDependency> declaredDependencies(File jar);
 }

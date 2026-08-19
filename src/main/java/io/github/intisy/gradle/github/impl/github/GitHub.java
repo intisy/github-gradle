@@ -1132,7 +1132,9 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * safe from obfuscation tools (ProGuard, R8, etc.) which only process class files.
      *
      * @param jar the JAR file to read metadata from
-     * @return a list of dependency entries as [group, name, version] arrays, empty if no metadata found
+     * @return a list of dependency entries as [group, name, version] arrays, empty if no metadata
+     * entry exists or if the entry is unreadable or malformed; the unreadable case logs a warning
+     * naming {@code jar}.
      */
     public List<String[]> readGithubDependencies(File jar) {
         List<String[]> dependencies = new ArrayList<>();
@@ -1159,8 +1161,8 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                     logger.debug("Found transitive dependency: " + group + ":" + name + ":" + version);
                 }
             }
-        } catch (IOException e) {
-            logger.debug("Could not read github-dependencies.json from " + jar.getName() + ": " + e.getMessage());
+        } catch (IOException | RuntimeException e) {
+            logger.warn("Corrupt github-dependencies.json in " + jar.getName() + ": " + e.getMessage());
         }
         return dependencies;
     }

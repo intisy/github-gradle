@@ -2,6 +2,8 @@ package io.github.intisy.gradle.github.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.log.GitHubLogger;
+import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.plugin.Logger;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
@@ -15,13 +17,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestGitHub {
     @Test
@@ -120,5 +129,79 @@ public class TestGitHub {
         assets.add(asset("readme.txt"));
         JsonObject result = gh.selectJarAsset(assets, "my-lib", "1.0");
         assertNull(result, "Should return null when no usable JAR found");
+    }
+
+    @Test
+    public void testDeclaredDependenciesCorruptMetadataReturnsEmptyListAndWarns(@TempDir File tempDir) throws IOException {
+        File jar = new File(tempDir, "corrupt.jar");
+        writeJarWithMetadataEntry(jar, "[{]");
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        List<DeclaredDependency> result = gh.declaredDependencies(jar);
+
+        assertEquals(0, result.size());
+        assertEquals(1, logger.warnings.size(), "corrupt metadata should log exactly one warning");
+        assertTrue(logger.warnings.get(0).contains("corrupt.jar"), "warning should name the jar");
+    }
+
+    @Test
+    public void testDeclaredDependenciesNoMetadataEntryDoesNotWarn(@TempDir File tempDir) throws IOException {
+        File jar = new File(tempDir, "plain.jar");
+        writeJarWithoutMetadataEntry(jar);
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        List<DeclaredDependency> result = gh.declaredDependencies(jar);
+
+        assertEquals(0, result.size());
+        assertEquals(0, logger.warnings.size(), "missing metadata is not corruption and must not warn");
+    }
+
+    private GitHub makeGitHub(GitHubLogger logger) {
+        GithubExtension ext = new GithubExtension();
+        ResourceSettings res = new ResourceSettings();
+        return new GitHub(logger, res, ext);
+    }
+
+    private void writeJarWithMetadataEntry(File jar, String content) throws IOException {
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(jar))) {
+            zos.putNextEntry(new ZipEntry("META-INF/github-dependencies.json"));
+            zos.write(content.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        }
+    }
+
+    private void writeJarWithoutMetadataEntry(File jar) throws IOException {
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(jar))) {
+            zos.putNextEntry(new ZipEntry("META-INF/MANIFEST.MF"));
+            zos.write("Manifest-Version: 1.0\n".getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        }
+    }
+
+    private static final class CapturingLogger implements GitHubLogger {
+        final List<String> warnings = new ArrayList<>();
+
+        @Override
+        public void log(String message) {
+        }
+
+        @Override
+        public void error(String message) {
+        }
+
+        @Override
+        public void error(String message, Throwable throwable) {
+        }
+
+        @Override
+        public void debug(String message) {
+        }
+
+        @Override
+        public void warn(String message) {
+            warnings.add(message);
+        }
     }
 }
