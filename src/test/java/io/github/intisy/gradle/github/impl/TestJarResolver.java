@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestJarResolver {
 
@@ -59,13 +61,15 @@ public class TestJarResolver {
     }
 
     @Test
-    public void releaseRequestReturnsWhateverDownloadJarReturnsWithoutInterception() throws IOException {
+    public void releaseRequestThrowsNamingTheCoordinateWhenDownloadJarReturnsEmpty() {
         RecordingReleases releases = new RecordingReleases(null);
         JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds());
 
-        File resolved = resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0"));
-
-        assertNull(resolved);
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0")));
+        assertTrue(thrown.getMessage().contains("owner"), "message should name the owner");
+        assertTrue(thrown.getMessage().contains("repo"), "message should name the repo");
+        assertTrue(thrown.getMessage().contains("1.0.0"), "message should name the version");
     }
 
     @Test
@@ -89,11 +93,11 @@ public class TestJarResolver {
         }
 
         @Override
-        public File downloadJar(String owner, String repo, String version) {
+        public Optional<File> downloadJar(String owner, String repo, String version) {
             this.capturedOwner = owner;
             this.capturedRepo = repo;
             this.capturedVersion = version;
-            return jarToReturn;
+            return Optional.ofNullable(jarToReturn);
         }
 
         @Override
@@ -112,7 +116,7 @@ public class TestJarResolver {
         }
 
         @Override
-        public File downloadJar(String owner, String repo, String version, String classifier) {
+        public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
             throw new UnsupportedOperationException();
         }
 
@@ -149,12 +153,12 @@ public class TestJarResolver {
         }
 
         @Override
-        public File downloadJar(String owner, String repo, String version) {
+        public Optional<File> downloadJar(String owner, String repo, String version) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public File downloadJar(String owner, String repo, String version, String classifier) {
+        public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
             throw new UnsupportedOperationException();
         }
 

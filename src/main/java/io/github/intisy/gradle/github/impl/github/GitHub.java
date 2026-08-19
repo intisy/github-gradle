@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -1641,13 +1642,13 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     @Override
-    public File downloadJar(String owner, String repo, String version) {
-        return getAsset(owner, repo, version);
+    public Optional<File> downloadJar(String owner, String repo, String version) {
+        return Optional.ofNullable(getAsset(owner, repo, version));
     }
 
     @Override
-    public File downloadJar(String owner, String repo, String version, String classifier) {
-        return getAssetWithClassifier(owner, repo, version, classifier);
+    public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
+        return Optional.ofNullable(getAssetWithClassifier(owner, repo, version, classifier));
     }
 
     @Override

@@ -6,6 +6,7 @@ import io.github.intisy.gradle.github.api.model.Release;
 
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Resolves and downloads GitHub release artifacts.
@@ -44,29 +45,32 @@ public interface Releases {
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
-     * @return the downloaded (or cached) jar file; never null.
+     * @return the downloaded (or cached) jar file, present whenever the call returns normally.
+     * The shipped implementation never returns an empty {@code Optional}: it reports "no release
+     * matches {@code version}" and "no matching jar asset" by throwing (see below), the same as
+     * the untouched underlying client always has. The {@code Optional} wrapper exists so this
+     * overload shares a return type with the classifier overload below.
      * @throws RuntimeException thrown unchecked by the underlying client if no release matches
      * {@code version}, if the release has no matching jar asset, or if the download itself fails.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
-    File downloadJar(String owner, String repo, String version);
+    Optional<File> downloadJar(String owner, String repo, String version);
 
     /**
      * Downloads a specific classifier asset, matching {@code repo-classifier.jar} exactly.
-     * Unlike the 3-argument overload, a missing asset here is reported as {@code null} rather
-     * than by throwing, so a caller can treat an absent classifier as optional.
      *
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
      * @param classifier the artifact classifier identifying the asset (e.g. {@code "api"}).
-     * @return the classifier asset's jar, or null if the release has no asset named
-     * {@code repo-classifier.jar}.
+     * @return the classifier asset's jar, or an empty {@code Optional} if the release has no
+     * asset named {@code repo-classifier.jar}, so a caller can treat an absent classifier as
+     * optional rather than catching an exception.
      * @throws RuntimeException thrown unchecked by the underlying client if no release matches
      * {@code version}, or if the download itself fails.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
-    File downloadJar(String owner, String repo, String version, String classifier);
+    Optional<File> downloadJar(String owner, String repo, String version, String classifier);
 
     /**
      * Downloads every module asset published under the reserved {@code :all} classifier, so a

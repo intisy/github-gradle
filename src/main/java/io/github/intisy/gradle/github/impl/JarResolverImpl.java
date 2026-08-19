@@ -36,6 +36,10 @@ public final class JarResolverImpl implements JarResolver {
         if (request.getStrategy() == ResolutionRequest.Strategy.SOURCE) {
             return sourceBuilds.buildFromSource(request.getOwner(), request.getRepo(), request.getBranch(), request.getCommitSha());
         }
-        return releases.downloadJar(request.getOwner(), request.getRepo(), request.getVersion());
+        final String owner = request.getOwner();
+        final String repo = request.getRepo();
+        final String version = request.getVersion();
+        return releases.downloadJar(owner, repo, version)
+                .orElseThrow(() -> new RuntimeException("No release jar found for " + owner + ":" + repo + ":" + version));
     }
 }

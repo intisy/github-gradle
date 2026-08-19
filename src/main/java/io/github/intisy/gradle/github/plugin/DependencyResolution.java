@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -58,8 +59,8 @@ public class DependencyResolution {
 						} else if (classifier.equals("all")) {
 							jars.addAll(releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion()));
 						} else {
-							File jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
-							if (jar != null) jars.add(jar);
+							Optional<File> jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
+							if (jar.isPresent()) jars.add(jar.get());
 						}
 						for (File jar : jars) {
 							proj.getDependencies().add(nativeCfg, proj.files(jar));
