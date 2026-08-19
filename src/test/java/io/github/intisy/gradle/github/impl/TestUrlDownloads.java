@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import com.sun.net.httpserver.HttpServer;
 import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.impl.download.UrlDownloads;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -23,8 +25,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,7 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Exercises {@link UrlDownloads} entirely offline: a canned {@link Interceptor} stands in for the
- * network, so no test here ever opens a socket.
+ * network, so no test here ever opens a socket, with one exception:
+ * {@link #a302RedirectIsNeverFollowed} needs OkHttp's real redirect machinery, which sits below
+ * where an application {@link Interceptor} can observe it (an interceptor that returns a
+ * response directly never reaches it), so it drives a real {@link HttpServer} bound to the
+ * loopback address only, torn down at the end of the test.
  *
  * <p>{@link #headerValueNeverAppearsInLogsOrExceptionMessages} is the load-bearing test in this
  * class: it supplies a header carrying a recognisable sentinel value across a success path, an
@@ -115,6 +123,70 @@ public class TestUrlDownloads {
         assertTrue(thrown.getMessage().contains("500"));
         File[] cachedEntries = cacheDir.listFiles((dir, name) -> name.endsWith(".jar"));
         assertEquals(0, cachedEntries.length);
+    }
+
+    /**
+     * Important 6's regression test. OkHttp follows a redirect by default, forwarding any header
+     * that is not {@code Authorization} to whatever host answers the 3xx, even across hosts. This
+     * test spins up a genuine local {@link HttpServer} (loopback only) whose {@code /original.jar}
+     * context returns a 302 pointing at its own {@code /redirected.jar} context, and asserts the
+     * redirect target is never reached at all, which an application {@link Interceptor} cannot
+     * demonstrate because it short-circuits OkHttp's redirect-following interceptor entirely.
+     */
+    @Test
+    public void a302RedirectIsNeverFollowed(@TempDir File cacheDir) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicInteger redirectTargetHits = new AtomicInteger();
+        int port = server.getAddress().getPort();
+        server.createContext("/original.jar", exchange -> {
+            exchange.getResponseHeaders().add("Location", "http://127.0.0.1:" + server.getAddress().getPort() + "/redirected.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        server.createContext("/redirected.jar", exchange -> {
+            redirectTargetHits.incrementAndGet();
+            byte[] body = "jar-content".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            CapturingLogger logger = new CapturingLogger();
+            Downloads downloads = new UrlDownloads(new OkHttpClient(), logger, cacheDir);
+
+            IOException thrown = assertThrows(IOException.class,
+                    () -> downloads.download("http://127.0.0.1:" + port + "/original.jar", null, null));
+
+            assertTrue(thrown.getMessage().contains("302"), "message: " + thrown.getMessage());
+            assertEquals(0, redirectTargetHits.get(), "the redirect target must never be reached");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void plainHttpUrlWithHeadersLogsAWarning(@TempDir File cacheDir) {
+        CapturingLogger logger = new CapturingLogger();
+        OkHttpClient client = clientReturning(new RecordingInterceptor(), 200, "jar-content".getBytes(StandardCharsets.UTF_8));
+        Downloads downloads = new UrlDownloads(client, logger, cacheDir);
+        Map<String, String> headers = Collections.singletonMap("X-Api-Key", "some-token");
+
+        assertDoesNotThrow(() -> downloads.download("http://example.com/foo.jar", headers, null));
+
+        assertTrue(logger.warnings.stream().anyMatch(message -> message.contains("http://")),
+                "expected a warning naming the plain-http URL; got: " + logger.warnings);
+    }
+
+    @Test
+    public void plainHttpUrlWithoutHeadersLogsNoWarning(@TempDir File cacheDir) {
+        CapturingLogger logger = new CapturingLogger();
+        OkHttpClient client = clientReturning(new RecordingInterceptor(), 200, "jar-content".getBytes(StandardCharsets.UTF_8));
+        Downloads downloads = new UrlDownloads(client, logger, cacheDir);
+
+        assertDoesNotThrow(() -> downloads.download("http://example.com/foo.jar", null, null));
+
+        assertTrue(logger.warnings.isEmpty());
     }
 
     @Test
@@ -302,6 +374,7 @@ public class TestUrlDownloads {
 
     private static final class CapturingLogger implements GitHubLogger {
         private final List<String> messages = new ArrayList<>();
+        private final List<String> warnings = new ArrayList<>();
 
         @Override
         public void log(String message) {
@@ -327,6 +400,7 @@ public class TestUrlDownloads {
         @Override
         public void warn(String message) {
             messages.add(message);
+            warnings.add(message);
         }
     }
 }

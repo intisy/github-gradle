@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -36,20 +37,37 @@ public final class UrlDownloads implements Downloads {
 
     /**
      * @param httpClient issues the download request; injected so tests can intercept it without a
-     *                    real network call.
+     *                    real network call. Redirect-following is always disabled on top of
+     *                    whatever {@code httpClient} was configured with (see {@link
+     *                    #download}'s implementation note), so the caller's client need not
+     *                    already disable it.
      * @param logger receives diagnostic output.
      * @param cacheDir the directory downloaded jars are cached under, keyed by a hash of the URL.
      */
     public UrlDownloads(OkHttpClient httpClient, GitHubLogger logger, File cacheDir) {
-        this.httpClient = httpClient;
+        this.httpClient = httpClient.newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build();
         this.logger = logger;
         this.cacheDir = cacheDir;
     }
 
+    /**
+     * @implNote Redirects are never followed. OkHttp strips the {@code Authorization} header on a
+     * cross-host redirect but forwards any other header (such as {@code X-Api-Key} or {@code
+     * PRIVATE-TOKEN}) to whatever host answers a 3xx, including a plain-http host if {@code
+     * followSslRedirects} were left on; refusing to follow at all is the only policy that cannot
+     * leak a caller-supplied header to a host the caller never named. A 3xx response therefore
+     * surfaces as an ordinary HTTP-error failure below, exactly like a 4xx or 5xx.
+     */
     @Override
     public File download(String jarUrl, Map<String, String> headers, String sha256) throws IOException {
         if (!cacheDir.exists() && !cacheDir.mkdirs()) {
             throw new IOException("Failed to create cache directory: " + cacheDir.getAbsolutePath());
+        }
+        if (headers != null && !headers.isEmpty() && jarUrl != null && jarUrl.toLowerCase(Locale.ROOT).startsWith("http://")) {
+            logger.warn("Sending request headers to a plain http:// URL; they will be visible to anything on the network path.");
         }
         String redactedUrl = UrlRedaction.redact(jarUrl);
 
