@@ -19,7 +19,7 @@ import io.github.intisy.gradle.github.api.Releases;
 import io.github.intisy.gradle.github.extension.AuthExtension;
 import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
-import io.github.intisy.gradle.github.utils.GradleUtils;
+import io.github.intisy.gradle.github.utils.FileUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -50,6 +50,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1015,7 +1016,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public File getAsset(String repoOwner, String repoName, String version) {
         logger.debug("Attempting to get asset for " + repoOwner + "/" + repoName + " version " + version);
-        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+        File direction = new File(FileUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         logger.debug("Asset cache directory: " + direction.getAbsolutePath());
 
         if (!direction.exists()) {
@@ -1208,7 +1209,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public File getAssetWithClassifier(String repoOwner, String repoName, String version, String classifier) {
         logger.debug("Fetching classifier asset '" + classifier + "' for " + repoOwner + "/" + repoName + " " + version);
-        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+        File direction = new File(FileUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         if (!direction.exists() && !direction.mkdirs()) {
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
         }
@@ -1262,7 +1263,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public void getAllModuleAssets(String repoOwner, String repoName, String version, List<File> collected) {
         logger.debug("Fetching all module assets for " + repoOwner + "/" + repoName + " " + version);
-        File direction = new File(GradleUtils.getGradleHome().resolve("github").toFile(), repoOwner);
+        File direction = new File(FileUtils.getGradleHome().resolve("github").toFile(), repoOwner);
         if (!direction.exists() && !direction.mkdirs()) {
             throw new RuntimeException("Failed to create directory: " + direction.getAbsolutePath());
         }
@@ -1606,29 +1607,58 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     @Override
+    public RemoteRepo configuredRepo() {
+        return new RemoteRepo(getResourceRepoOwner(), getResourceRepoName());
+    }
+
+    @Override
     public String latestVersion(String owner, String repo) {
         return getLatestVersion(owner, repo);
     }
 
     @Override
-    public File downloadJar(String owner, String repo, String version) throws IOException {
+    public Release releaseByTag(String owner, String repo, String tag) {
+        return toRelease(fetchReleaseByTag(owner, repo, tag));
+    }
+
+    @Override
+    public Release latestRelease(String owner, String repo) {
+        JsonObject release = getLatestRelease(owner, repo);
+        return release != null ? toRelease(release) : null;
+    }
+
+    private Release toRelease(JsonObject release) {
+        String name = release.get("name").isJsonNull() ? null : release.get("name").getAsString();
+        return new Release(
+                release.get("id").getAsString(),
+                release.get("tag_name").getAsString(),
+                name,
+                release.get("html_url").getAsString(),
+                release.get("upload_url").getAsString()
+        );
+    }
+
+    @Override
+    public File downloadJar(String owner, String repo, String version) {
         return getAsset(owner, repo, version);
     }
 
     @Override
     public File downloadJar(String owner, String repo, String version, String classifier) throws IOException {
-        File jar = getAssetWithClassifier(owner, repo, version, classifier);
-        if (jar == null) {
-            throw new IOException("No asset with classifier '" + classifier + "' found for "
-                    + owner + "/" + repo + ":" + version + ".");
-        }
-        return jar;
+        return getAssetWithClassifier(owner, repo, version, classifier);
     }
 
     @Override
     public List<File> downloadAllModuleJars(String owner, String repo, String version) throws IOException {
         List<File> collected = new ArrayList<>();
         getAllModuleAssets(owner, repo, version, collected);
+        return collected;
+    }
+
+    @Override
+    public List<File> resolveWithDependencies(String owner, String repo, String version) {
+        List<File> collected = new ArrayList<>();
+        getAssetWithTransitives(owner, repo, version, new HashSet<String>(), collected);
         return collected;
     }
 
@@ -1643,9 +1673,8 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     @Override
-    public Release publishRelease(String owner, String repo, String tag, String name) throws IOException {
-        JsonObject release = createRelease(owner, repo, tag, name);
-        return new Release(release.get("tag_name").getAsString(), release.get("upload_url").getAsString());
+    public Release ensureRelease(String owner, String repo, String tag, String name) {
+        return toRelease(createRelease(owner, repo, tag, name));
     }
 
     @Override

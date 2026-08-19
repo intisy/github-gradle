@@ -99,7 +99,7 @@ class Main implements Plugin<Project> {
 				logger.debug("Process resource event called on " + project.getName());
 				if (resourcesExtension.getRepoUrl() != null) {
 					logger.debug("Found an repository in the resource extension");
-					File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+					File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
 					for (File dir : resourceDirs) {
 						try {
 							gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());

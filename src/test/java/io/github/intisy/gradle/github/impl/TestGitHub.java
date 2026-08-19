@@ -5,7 +5,7 @@ import com.google.gson.JsonObject;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
-import io.github.intisy.gradle.github.utils.GradleUtils;
+import io.github.intisy.gradle.github.utils.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.transport.URIish;
@@ -57,7 +57,7 @@ public class TestGitHub {
         Logger logger = new Logger(githubExtension);
         GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
-        File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+        File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
         gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
     }
 

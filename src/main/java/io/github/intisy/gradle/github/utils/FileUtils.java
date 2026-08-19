@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github.utils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.stream.Stream;
@@ -11,6 +12,18 @@ import java.util.stream.Stream;
  * Author: Finn Birich
  */
 public class FileUtils {
+    /**
+     * Returns the path to the Gradle home directory.
+     *
+     * <p>The Gradle home directory is located at {@code ~/.gradle/caches/github} by default.
+     *
+     * @return the path to the Gradle home directory
+     */
+    public static Path getGradleHome() {
+        String userHome = System.getProperty("user.home");
+        return Paths.get(userHome, ".gradle", "caches");
+    }
+
     /**
      * Copies a directory from the source path to the destination path.
      *
