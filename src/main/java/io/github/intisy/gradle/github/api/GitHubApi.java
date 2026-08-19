@@ -20,10 +20,10 @@ public final class GitHubApi {
     private final GitHub gitHub;
     private final SourceBuilder sourceBuilder;
 
-    private GitHubApi(GitHub gitHub, GitHubLogger logger) {
+    private GitHubApi(GitHub gitHub, GitHubConfig config, GitHubLogger logger) {
         this.gitHub = gitHub;
         File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
-        this.sourceBuilder = new SourceBuilder(gitHub, logger, cacheDir, new BuildInvoker.Gradlew(logger));
+        this.sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
     }
 
     /**
@@ -32,7 +32,7 @@ public final class GitHubApi {
      * @param logger    receives diagnostic output.
      */
     public static GitHubApi create(GitHubConfig config, ResourcesExtension resources, GitHubLogger logger) {
-        return new GitHubApi(new GitHub(logger, resources, config), logger);
+        return new GitHubApi(new GitHub(logger, resources, config), config, logger);
     }
 
     /**

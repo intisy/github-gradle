@@ -29,7 +29,7 @@ public class TestCapabilityCoverage {
 
     @Test
     public void noCapabilityMethodMentionsAnImplementationDetailType() {
-        for (Class<?> capability : Arrays.asList(Credentials.class, Repositories.class, Releases.class, Publishing.class)) {
+        for (Class<?> capability : Arrays.asList(Credentials.class, Repositories.class, Releases.class, Publishing.class, SourceBuilds.class)) {
             for (Method method : capability.getDeclaredMethods()) {
                 assertNoForbiddenType(capability, method, method.getGenericReturnType());
                 for (Type parameterType : method.getGenericParameterTypes()) {

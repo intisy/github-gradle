@@ -1,7 +1,9 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.api.GitHubConfig;
 import io.github.intisy.gradle.github.api.GitHubLogger;
 import io.github.intisy.gradle.github.api.SourceBuilds;
+import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
@@ -16,15 +18,20 @@ import java.util.List;
 /**
  * Builds a GitHub repository from source and caches the resulting jar by commit, so a repeated
  * request for the same commit never re-runs the build.
+ *
+ * @implNote {@link GitHub} carries a single {@link ResourcesExtension}, hence a single repository
+ * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource} call, configured for
+ * the exact {@code owner}/{@code repo} requested, rather than accepting one pre-built {@link
+ * GitHub} that could only ever be correctly configured for one repository.
  */
 public class SourceBuilder implements SourceBuilds {
-    private final GitHub gitHub;
+    private final GitHubConfig config;
     private final GitHubLogger logger;
     private final File cacheDir;
     private final BuildInvoker invoker;
 
-    public SourceBuilder(GitHub gitHub, GitHubLogger logger, File cacheDir, BuildInvoker invoker) {
-        this.gitHub = gitHub;
+    public SourceBuilder(GitHubConfig config, GitHubLogger logger, File cacheDir, BuildInvoker invoker) {
+        this.config = config;
         this.logger = logger;
         this.cacheDir = cacheDir;
         this.invoker = invoker;
@@ -43,6 +50,7 @@ public class SourceBuilder implements SourceBuilds {
             throw new IOException("Failed to create cache directory: " + cacheDir.getAbsolutePath());
         }
         File checkoutDir = new File(cacheDir, owner + "-" + repo);
+        GitHub gitHub = newGitHub(owner, repo);
         gitHub.cloneOrPull(checkoutDir, owner, repo, branch);
         String sha = checkOutAndResolve(checkoutDir, commitSha);
 
@@ -57,6 +65,12 @@ public class SourceBuilder implements SourceBuilds {
         File builtJar = locateBuiltJar(checkoutDir, repo);
         Files.copy(builtJar.toPath(), cachedJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
         return cachedJar;
+    }
+
+    private GitHub newGitHub(String owner, String repo) {
+        ResourcesExtension resources = new ResourcesExtension();
+        resources.setRepoUrl("https://github.com/" + owner + "/" + repo);
+        return new GitHub(logger, resources, config);
     }
 
     private String checkOutAndResolve(File checkoutDir, String commitSha) throws IOException {
