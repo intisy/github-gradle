@@ -7,7 +7,7 @@ import io.github.intisy.gradle.github.extension.PublishExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.api.RateLimitException;
-import io.github.intisy.gradle.github.plugin.Gradle;
+import io.github.intisy.gradle.github.plugin.BuildFileEditor;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -241,14 +241,14 @@ class Main implements Plugin<Project> {
 						} else if (version != null && !version.equals(newVersion)) {
 							logger.log("Updating GitHub dependency " + group + "/" + name + " (" + version + " -> " + newVersion + ")");
 							for (Project p : GradleUtils.getAllProjectsRecursive(project)) {
-								Gradle.modifyBuildFile(p, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
+								BuildFileEditor.modifyBuildFile(p, group + ":" + name + ":" + version, group + ":" + name + ":" + newVersion);
 							}
 							refresh = true;
 						} else {
 							logger.log("Dependency " + group + "/" + name + " is already up to date");
 						}
 					}
-					if (refresh) Gradle.safeSoftRefreshGradle(project);
+					if (refresh) BuildFileEditor.safeSoftRefreshGradle(project);
 				});
 			});
 

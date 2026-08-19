@@ -8,9 +8,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 /**
- * A helper class for interacting with Gradle.
+ * A helper class for editing a project's build file.
  */
-public class Gradle {
+public class BuildFileEditor {
     /**
      * Modifies the build file of a project.
      * @param project The project.
