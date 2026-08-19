@@ -82,12 +82,19 @@ public interface GitHubConfig {
         }
 
         /**
-         * @param enabled  whether to route GitHub REST calls through the local {@code gh} CLI.
+         * @param enabled whether to route GitHub REST calls through the local {@code gh} CLI.
+         * @return this builder.
+         */
+        public Builder cliEnabled(boolean enabled) {
+            cliSettings.setEnabled(enabled);
+            return this;
+        }
+
+        /**
          * @param fallback whether to fall back to HTTP when {@code gh} is unavailable or fails.
          * @return this builder.
          */
-        public Builder cli(boolean enabled, boolean fallback) {
-            cliSettings.setEnabled(enabled);
+        public Builder cliFallback(boolean fallback) {
             cliSettings.setFallback(fallback);
             return this;
         }

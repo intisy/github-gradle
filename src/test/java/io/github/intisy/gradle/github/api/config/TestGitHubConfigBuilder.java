@@ -38,7 +38,8 @@ public class TestGitHubConfigBuilder {
                 .token("ghp_example")
                 .tokenFile(tokenFile)
                 .sshKey(sshKey)
-                .cli(true, false)
+                .cliEnabled(true)
+                .cliFallback(false)
                 .skipOnRateLimit(true)
                 .build();
 
@@ -55,7 +56,7 @@ public class TestGitHubConfigBuilder {
         GitHubConfig.Builder builder = GitHubConfig.builder().token("first");
         GitHubConfig first = builder.build();
 
-        builder.token("second").cli(true, false).skipOnRateLimit(true);
+        builder.token("second").cliEnabled(true).cliFallback(false).skipOnRateLimit(true);
         GitHubConfig second = builder.build();
 
         assertEquals("first", first.getAuth().getToken());
