@@ -50,8 +50,8 @@ public class TestResourceSync {
     }
 
     /**
-     * R4's regression test. {@code https://git.company.com/lib.git} (host/repo, no distinct owner
-     * segment, the ordinary shape for a self-hosted git instance dedicated to one team) is a
+     * {@code https://git.company.com/lib.git} (host/repo, no distinct owner segment, the ordinary
+     * shape for a self-hosted git instance dedicated to one team) is a
      * legitimately configured URL, not a misconfiguration; the fail-fast above must not reject it
      * before the verbatim {@link Repositories#cloneOrPullFrom} path is even reached. A fake {@link
      * Repositories} stands in so this stays hermetic: the real clone step is a no-op that never

@@ -172,8 +172,7 @@ public class TestUrlDownloads {
     }
 
     /**
-     * R3's same-host case: the caller's header must reach the redirect target when it stays on
-     * the same host.
+     * The caller's header must reach the redirect target when it stays on the same host.
      */
     @Test
     public void sameHostRedirectKeepsTheHeader(@TempDir File cacheDir) throws IOException {
@@ -208,11 +207,11 @@ public class TestUrlDownloads {
     }
 
     /**
-     * R3's cross-host case: the redirect is still followed (this is what makes a presigned-URL
-     * redirect from Nexus/Artifactory/S3 work), but the caller's header must not reach the new
-     * host. Two real loopback servers stand in for two hosts by using different hostnames that
-     * both resolve to the loopback address ({@code 127.0.0.1} and {@code localhost}), so the host
-     * comparison is genuinely cross-host while nothing here leaves the machine.
+     * A cross-host redirect is still followed (this is what makes a presigned-URL redirect from
+     * Nexus/Artifactory/S3 work), but the caller's header must not reach the new host. Two real
+     * loopback servers stand in for two hosts by using different hostnames that both resolve to
+     * the loopback address ({@code 127.0.0.1} and {@code localhost}), so the host comparison is
+     * genuinely cross-host while nothing here leaves the machine.
      */
     @Test
     public void crossHostRedirectStripsTheHeader(@TempDir File cacheDir) throws IOException {
@@ -253,10 +252,10 @@ public class TestUrlDownloads {
     }
 
     /**
-     * R3's https-to-http case, exercised against the real {@link RedirectPolicyInterceptor}
-     * production method via a hand-written fake {@code Interceptor.Chain} (not a mock; this
-     * project takes no mocking dependency) rather than a real server, since a genuine downgrade
-     * needs a TLS-terminating origin.
+     * An https-to-http redirect must never be followed, exercised against the real {@link
+     * RedirectPolicyInterceptor} production method via a hand-written fake {@code
+     * Interceptor.Chain} (not a mock; this project takes no mocking dependency) rather than a real
+     * server, since a genuine downgrade needs a TLS-terminating origin.
      */
     @Test
     public void httpsToHttpRedirectIsRefused() throws IOException {
@@ -289,10 +288,10 @@ public class TestUrlDownloads {
     }
 
     /**
-     * {@code isCrossHost} used to compare host only, so a redirect from {@code host:8080} to
-     * {@code host:9090} was treated as same-host and kept the caller's headers, even though a
-     * different port is a different origin. Pins both the decision function directly and the
-     * observable behaviour through a real redirect.
+     * A redirect from {@code host:8080} to {@code host:9090} must be treated as cross-host, not
+     * same-host: a different port is a different origin, so the caller's headers must not survive
+     * a port-changing redirect. Pins both the decision function directly and the observable
+     * behaviour through a real redirect.
      */
     @Test
     public void samePortSameHostIsNotCrossHost() {

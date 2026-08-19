@@ -341,7 +341,7 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // SourcesExtension — nested sources { } extension, separate from github { }
+    // SourcesExtension, the nested "sources { }" extension, separate from "github { }"
     // -------------------------------------------------------------------------
 
     @Test

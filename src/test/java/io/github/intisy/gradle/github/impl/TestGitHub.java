@@ -56,7 +56,7 @@ public class TestGitHub {
     }
 
     /**
-     * R2's regression test. GitHub Actions' {@code actions/checkout} writes {@code
+     * GitHub Actions' {@code actions/checkout} writes {@code
      * https://x-access-token:<TOKEN>@github.com/o/r.git} into {@code remote.origin.url} by
      * default, and this method runs on every publish via {@code PublishTasks}' call to {@code
      * remoteOf}, so the debug log naming the remote URL must never carry the token through.
@@ -85,8 +85,8 @@ public class TestGitHub {
     }
 
     /**
-     * R2's regression test for the sibling site, the "cannot parse" exception thrown at ERROR
-     * unconditionally. A scp-like remote with no owner segment after the colon triggers it; a
+     * The "cannot parse" exception thrown when a remote has no owner segment must also never leak
+     * a credential. A scp-like remote with no owner segment after the colon triggers it; a
      * query-string-shaped fragment stands in for a credential, since scp syntax carries no
      * userinfo slot to leak a real one through.
      */
@@ -125,10 +125,10 @@ public class TestGitHub {
     }
 
     /**
-     * Important 5's regression test: the configured GitHub token must never be offered to a git
-     * host other than github.com. {@link GitHub#getCredentialsProvider} is scoped by the clone
-     * URL it is asked about, not by any global state, so a single instance correctly withholds
-     * credentials for one host while still authenticating against another.
+     * The configured GitHub token must never be offered to a git host other than github.com.
+     * {@link GitHub#getCredentialsProvider} is scoped by the clone URL it is asked about, not by
+     * any global state, so a single instance correctly withholds credentials for one host while
+     * still authenticating against another.
      */
     @Test
     public void credentialsProviderIsWithheldForANonGitHubHost() {
@@ -171,10 +171,10 @@ public class TestGitHub {
     }
 
     /**
-     * R4's direct regression test: {@code getResourceRepoOwner} used to mistake the repo segment
-     * itself for an owner on a root-level URL (owner ended up literally {@code "lib.git"}), which
-     * is non-null and so never tripped {@link TestResourceSync}'s fail-fast, just silently
-     * derived nonsense; now it falls back to the URL's own host as a stand-in owner instead.
+     * On a root-level URL (no distinct owner segment), {@code getResourceRepoOwner} must not
+     * mistake the repo segment itself for an owner (that would derive a non-null but nonsensical
+     * owner, literally {@code "lib.git"}, which would pass {@link TestResourceSync}'s fail-fast
+     * unnoticed). It falls back to the URL's own host as a stand-in owner instead.
      */
     @Test
     public void testGetResourceRepoOwnerFallsBackToTheHostForARootLevelUrl() {

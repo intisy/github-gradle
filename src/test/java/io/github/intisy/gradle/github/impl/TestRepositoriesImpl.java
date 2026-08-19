@@ -90,8 +90,8 @@ public class TestRepositoriesImpl {
     }
 
     /**
-     * Important 8's regression test. {@code Repositories.cloneOrPull(target, owner, repo, branch)}
-     * always clones from a github.com URL it reconstructs from owner/repo (the test above,
+     * {@code Repositories.cloneOrPull(target, owner, repo, branch)} always clones from a
+     * github.com URL it reconstructs from owner/repo (the test above,
      * {@code cloneOrPullSucceedsTwiceAgainstAnUnconfiguredResourceSettings}, only passes because
      * its target is pre-populated from a local origin before the call, so it never actually
      * exercises a fresh clone). {@link Repositories#cloneOrPullFrom} clones from a fresh
