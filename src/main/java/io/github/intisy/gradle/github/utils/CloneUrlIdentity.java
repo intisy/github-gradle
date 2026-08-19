@@ -25,11 +25,13 @@ public final class CloneUrlIdentity {
      */
     public static String[] derive(String cloneUrl) {
         String redacted = UrlRedaction.redact(cloneUrl);
-        String withoutSuffix = redacted.endsWith(".git") ? redacted.substring(0, redacted.length() - 4) : redacted;
-        String withoutTrailingSlash = withoutSuffix.endsWith("/") ? withoutSuffix.substring(0, withoutSuffix.length() - 1) : withoutSuffix;
-        String normalized = withoutTrailingSlash.contains("://")
-                ? withoutTrailingSlash
-                : withoutTrailingSlash.replaceFirst(":", "/");
+        String withoutTrailingSlash = redacted.endsWith("/") ? redacted.substring(0, redacted.length() - 1) : redacted;
+        String withoutSuffix = withoutTrailingSlash.endsWith(".git")
+                ? withoutTrailingSlash.substring(0, withoutTrailingSlash.length() - 4)
+                : withoutTrailingSlash;
+        String normalized = withoutSuffix.contains("://")
+                ? withoutSuffix
+                : withoutSuffix.replaceFirst(":", "/");
         String[] segments = normalized.split("/");
         String repo = sanitizeForFileName(segments[segments.length - 1]);
         String ownerSegment = segments.length > 1 ? segments[segments.length - 2] : "unknown";

@@ -17,6 +17,20 @@ public class TestCloneUrlIdentity {
     }
 
     /**
+     * A trailing slash after {@code .git} (a URL copy-pasted with a stray slash) must not defeat
+     * the {@code .git} suffix strip: stripping {@code .git} before the trailing slash leaves the
+     * suffix in place (it now sits before the slash, not at the string's end), so the derived repo
+     * ends up literally {@code "widget.git"} instead of {@code "widget"}, which then fails {@code
+     * SourceBuilder#locateBuiltJar}'s {@code name.contains(repo)} check against a jar actually
+     * named {@code widget-1.0.jar}.
+     */
+    @Test
+    public void trailingSlashAfterDotGitStillYieldsTheBareRepoName() {
+        String[] identity = CloneUrlIdentity.derive("https://gitlab.com/acme/widget.git/");
+        assertEquals("widget", identity[1]);
+    }
+
+    /**
      * A github.com checkout and a self-hosted checkout sharing the same owner/repo path must
      * never collapse into the same identity, because a directory-existence check has no way to
      * compare a checkout's remote back against the requested URL.
