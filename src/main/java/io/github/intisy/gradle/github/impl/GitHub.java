@@ -1644,12 +1644,12 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     @Override
-    public File downloadJar(String owner, String repo, String version, String classifier) throws IOException {
+    public File downloadJar(String owner, String repo, String version, String classifier) {
         return getAssetWithClassifier(owner, repo, version, classifier);
     }
 
     @Override
-    public List<File> downloadAllModuleJars(String owner, String repo, String version) throws IOException {
+    public List<File> downloadAllModuleJars(String owner, String repo, String version) {
         List<File> collected = new ArrayList<>();
         getAllModuleAssets(owner, repo, version, collected);
         return collected;

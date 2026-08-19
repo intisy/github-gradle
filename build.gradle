@@ -25,6 +25,32 @@ tasks.build {
     dependsOn shadowJar
 }
 
+// The Gradle-free client library: everything a consumer needs to drive io.github.intisy.gradle.github.api
+// outside a Gradle build, published separately from the plugin jar. See TestLibraryJarIsIndependent
+// and TestOnlyTheApiCallsImpl for the gates this task exists to satisfy.
+task libraryJar(type: Jar) {
+    archiveBaseName = "${artifact_name}-api"
+    archiveClassifier = ''
+    from(sourceSets.main.output) {
+        include 'io/github/intisy/gradle/github/api/**'
+        include 'io/github/intisy/gradle/github/impl/GitHub*'
+        include 'io/github/intisy/gradle/github/impl/GitHubCli*'
+        include 'io/github/intisy/gradle/github/utils/FileUtils*'
+        include 'io/github/intisy/gradle/github/extension/AuthExtension*'
+        include 'io/github/intisy/gradle/github/extension/CliExtension*'
+        include 'io/github/intisy/gradle/github/extension/ResilienceExtension*'
+        include 'io/github/intisy/gradle/github/extension/ResourcesExtension*'
+        exclude 'io/github/intisy/gradle/github/Main*'
+        exclude 'io/github/intisy/gradle/github/plugin/**'
+        exclude 'io/github/intisy/gradle/github/Logger*'
+        exclude 'io/github/intisy/gradle/github/impl/Gradle*'
+        exclude 'io/github/intisy/gradle/github/utils/GradleUtils*'
+        exclude 'io/github/intisy/gradle/github/extension/GithubExtension*'
+        exclude 'io/github/intisy/gradle/github/extension/PublishExtension*'
+        exclude 'io/github/intisy/gradle/github/extension/ArtifactEntry*'
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
@@ -90,12 +116,51 @@ artifacts {
 }
 
 test {
+    dependsOn libraryJar
     useJUnitPlatform()
     outputs.upToDateWhen { false }
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
         stackTraceFilters "entryPoint"
+    }
+}
+
+publishing {
+    publications {
+        libraryJar(MavenPublication) {
+            groupId = group
+            artifactId = "${artifact_name}-api"
+            version = project.version
+            artifact tasks.named('libraryJar')
+            pom {
+                name = "${display_name} API"
+                description = "Gradle-free client library exposing io.github.intisy.gradle.github.api, backed by the same GitHub REST/git client as the ${display_name} Gradle plugin."
+            }
+            // libraryJar packages plain class files with no attached component, so its
+            // runtime dependencies have to be declared by hand rather than derived from a
+            // Gradle configuration. None of these types appear on the api package's own
+            // signatures (enforced by TestCapabilityCoverage), so "runtime" is honest: a
+            // consumer never needs them on its own compile classpath, only when a GitHubApi
+            // call actually runs.
+            pom.withXml {
+                def dependenciesNode = asNode().appendNode('dependencies')
+                [
+                        ['com.google.code.gson', 'gson', '2.10.1'],
+                        ['com.squareup.okhttp3', 'okhttp', '4.12.0'],
+                        ['org.eclipse.jgit', 'org.eclipse.jgit', '5.13.3.202401111512-r'],
+                        ['org.eclipse.jgit', 'org.eclipse.jgit.ssh.jsch', '5.13.3.202401111512-r'],
+                        ['com.jcraft', 'jzlib', '1.1.3'],
+                        ['com.github.mwiede', 'jsch', '2.27.5'],
+                ].each { coordinate ->
+                    def dependencyNode = dependenciesNode.appendNode('dependency')
+                    dependencyNode.appendNode('groupId', coordinate[0])
+                    dependencyNode.appendNode('artifactId', coordinate[1])
+                    dependencyNode.appendNode('version', coordinate[2])
+                    dependencyNode.appendNode('scope', 'runtime')
+                }
+            }
+        }
     }
 }
 

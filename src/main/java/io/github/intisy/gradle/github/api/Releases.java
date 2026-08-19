@@ -1,7 +1,6 @@
 package io.github.intisy.gradle.github.api;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -29,11 +28,10 @@ public interface Releases {
     /**
      * @return the classifier asset's jar, or null if the release has no asset named
      * {@code repo-classifier.jar}.
-     * @throws IOException if the asset exists but the download fails.
      */
-    File downloadJar(String owner, String repo, String version, String classifier) throws IOException;
+    File downloadJar(String owner, String repo, String version, String classifier);
 
-    List<File> downloadAllModuleJars(String owner, String repo, String version) throws IOException;
+    List<File> downloadAllModuleJars(String owner, String repo, String version);
 
     /**
      * Resolves {@code owner:repo:version} and its full transitive closure of GitHub-hosted
