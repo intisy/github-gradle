@@ -30,6 +30,18 @@ public interface Repositories {
     void cloneOrPull(File target, String owner, String repo, String branch) throws IOException;
 
     /**
+     * Clones or pulls {@code cloneUrl} into {@code target}, using the given URL directly rather
+     * than reconstructing one from an owner and repo, so any git host is honoured exactly as
+     * configured (github.com, GitHub Enterprise, or any other host).
+     *
+     * @param target the local directory to clone into or pull within.
+     * @param cloneUrl the exact URL to clone from.
+     * @param branch the branch to clone or pull, or null for the current/default branch.
+     * @throws IOException if the clone or pull fails.
+     */
+    void cloneOrPullFrom(File target, String cloneUrl, String branch) throws IOException;
+
+    /**
      * @param path the directory to check.
      * @return true if a git repository checkout exists at {@code path}.
      */

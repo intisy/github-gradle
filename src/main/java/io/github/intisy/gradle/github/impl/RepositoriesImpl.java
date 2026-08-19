@@ -20,12 +20,15 @@ import java.io.IOException;
  * ResourceSettings}, so its own update path (which resolves the owner from that extension) is
  * only correct for repeated calls against the same repository. {@link #cloneOrPull} builds its own
  * scoped {@link GitHub} per call so a consumer can target any repository, any number of times,
- * without a previous call's target leaking into the next one. {@link #isUpToDate} takes no
- * owner/repo, so it derives the repository identity from the checkout at {@code path} itself (the
- * same way {@link #remoteOf} does) rather than from whichever repository happened to be configured
- * at construction time. {@link #exists}, {@link #remoteOf} and {@link #configuredRepo} genuinely
- * have no repository-specific behavior to scope, so they keep using the construction-time {@link
- * GitHub}.
+ * without a previous call's target leaking into the next one. {@link #cloneOrPullFrom} does the
+ * same but scopes to the caller's own {@code cloneUrl} verbatim instead of reconstructing a
+ * github.com URL from owner and repo, so a non-github.com host (self-hosted GitLab, Gitea, a
+ * GitHub Enterprise instance) is honoured rather than silently redirected to public github.com.
+ * {@link #isUpToDate} takes no owner/repo, so it derives the repository identity from the
+ * checkout at {@code path} itself (the same way {@link #remoteOf} does) rather than from
+ * whichever repository happened to be configured at construction time. {@link #exists}, {@link
+ * #remoteOf} and {@link #configuredRepo} genuinely have no repository-specific behavior to scope,
+ * so they keep using the construction-time {@link GitHub}.
  */
 public class RepositoriesImpl implements Repositories {
     private final GitHub configured;
@@ -50,9 +53,21 @@ public class RepositoriesImpl implements Repositories {
         return new GitHub(logger, resources, config);
     }
 
+    private GitHub scopedToUrl(String cloneUrl) {
+        ResourceSettings resources = new ResourceSettings();
+        resources.setRepoUrl(cloneUrl);
+        return new GitHub(logger, resources, config);
+    }
+
     @Override
     public void cloneOrPull(File target, String owner, String repo, String branch) throws IOException {
         scopedTo(owner, repo).cloneOrPull(target, owner, repo, branch);
+    }
+
+    @Override
+    public void cloneOrPullFrom(File target, String cloneUrl, String branch) throws IOException {
+        GitHub scoped = scopedToUrl(cloneUrl);
+        scoped.cloneOrPullFromUrl(target, cloneUrl, scoped.getResourceRepoOwner(), branch);
     }
 
     @Override

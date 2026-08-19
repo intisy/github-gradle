@@ -88,4 +88,25 @@ public class TestRepositoriesImpl {
 
         assertTrue(repositories.isUpToDate(clone));
     }
+
+    /**
+     * Important 8's regression test. {@code Repositories.cloneOrPull(target, owner, repo, branch)}
+     * always clones from a github.com URL it reconstructs from owner/repo (the test above,
+     * {@code cloneOrPullSucceedsTwiceAgainstAnUnconfiguredResourceSettings}, only passes because
+     * its target is pre-populated from a local origin before the call, so it never actually
+     * exercises a fresh clone). {@link Repositories#cloneOrPullFrom} clones from a fresh
+     * (non-existent) target directly against the given URL, so a self-hosted origin, not
+     * github.com, must be honoured verbatim.
+     */
+    @Test
+    public void cloneOrPullFromHonoursANonGithubHostOnAFreshClone(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = createOriginRepo(new File(tempDir, "self-hosted-origin"));
+        File target = new File(tempDir, "clone");
+
+        Repositories repositories = repositoriesWithNoConfiguredRepo();
+
+        assertDoesNotThrow(() -> repositories.cloneOrPullFrom(target, origin.toURI().toString(), null));
+
+        assertEquals("initial content", readFile(new File(target, "file.txt")));
+    }
 }

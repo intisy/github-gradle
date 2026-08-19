@@ -1698,6 +1698,29 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     @Override
+    public void cloneOrPullFrom(File target, String cloneUrl, String branch) throws IOException {
+        cloneOrPullFromUrl(target, cloneUrl, parseOwnerFromUrl(cloneUrl), branch);
+    }
+
+    /**
+     * Parses an owner from an arbitrary clone URL, independent of {@code resourcesExtension}, so
+     * {@link #cloneOrPullFrom} authenticates correctly regardless of which repository (if any)
+     * this instance was configured for.
+     */
+    private static String parseOwnerFromUrl(String repoUrl) {
+        if (repoUrl == null || repoUrl.trim().isEmpty()) {
+            return null;
+        }
+        String[] repoParts = repoUrl.split("/");
+        String repoOwner = repoParts.length > 3 ? repoParts[3] : null;
+        if (repoUrl.startsWith("git@")) {
+            String partAfterColon = repoUrl.split(":")[1];
+            repoOwner = partAfterColon.split("/")[0];
+        }
+        return repoOwner;
+    }
+
+    @Override
     public boolean exists(File path) {
         return doesRepoExist(path);
     }

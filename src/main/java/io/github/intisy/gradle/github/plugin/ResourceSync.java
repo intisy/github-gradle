@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github.plugin;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
+import io.github.intisy.gradle.github.utils.CloneUrlIdentity;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
@@ -39,16 +40,18 @@ public class ResourceSync {
 
 			Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
 				logger.debug("Process resource event called on " + project.getName());
-				if (resourcesExtension.getRepoUrl() != null) {
+				String cloneUrl = resourcesExtension.getRepoUrl();
+				if (cloneUrl != null) {
 					logger.debug("Found an repository in the resource extension");
 					RemoteRepo configuredRepo = repositories.configuredRepo();
 					if (configuredRepo.getOwner() == null || configuredRepo.getRepo() == null) {
 						throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
 					}
-					File path = FileUtils.getGradleHome().resolve("resources").resolve(configuredRepo.getOwner() + "-" + configuredRepo.getRepo()).toFile();
+					String[] identity = CloneUrlIdentity.derive(cloneUrl);
+					File path = FileUtils.getGradleHome().resolve("resources").resolve(identity[0] + "-" + identity[1]).toFile();
 					for (File dir : resourceDirs) {
 						try {
-							repositories.cloneOrPull(path, configuredRepo.getOwner(), configuredRepo.getRepo(), resourcesExtension.getBranch());
+							repositories.cloneOrPullFrom(path, cloneUrl, resourcesExtension.getBranch());
 							if (resourcesExtension.isBuildOnly()) {
 								dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
 								        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
