@@ -1,7 +1,7 @@
 package io.github.intisy.gradle.github.api.config;
 
 /**
- * Extension for configuring the local GitHub CLI ({@code gh}) transport.
+ * Configures the local GitHub CLI ({@code gh}) transport.
  *
  * <pre>
  * github {
@@ -19,7 +19,7 @@ package io.github.intisy.gradle.github.api.config;
  * {@code false} instead surfaces the failure so the misconfiguration is not silently ignored.
  */
 @SuppressWarnings("unused")
-public class CliExtension {
+public class CliSettings {
 
     private boolean enabled;
     private boolean fallback = true;

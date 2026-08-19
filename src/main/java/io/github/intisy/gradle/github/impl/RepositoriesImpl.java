@@ -4,7 +4,7 @@ import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 
@@ -17,7 +17,7 @@ import java.io.IOException;
  * was given.
  *
  * @implNote Mirrors {@link SourceBuilder#buildFromSource}: a {@link GitHub} carries one {@link
- * ResourcesExtension}, so its own update path (which resolves the owner from that extension) is
+ * ResourceSettings}, so its own update path (which resolves the owner from that extension) is
  * only correct for repeated calls against the same repository. {@link #cloneOrPull} builds its own
  * scoped {@link GitHub} per call so a consumer can target any repository, any number of times,
  * without a previous call's target leaking into the next one. {@link #isUpToDate} takes no
@@ -45,7 +45,7 @@ public class RepositoriesImpl implements Repositories {
     }
 
     private GitHub scopedTo(String owner, String repo) {
-        ResourcesExtension resources = new ResourcesExtension();
+        ResourceSettings resources = new ResourceSettings();
         resources.setRepoUrl("https://github.com/" + owner + "/" + repo);
         return new GitHub(logger, resources, config);
     }

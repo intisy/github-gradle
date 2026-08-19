@@ -16,9 +16,9 @@ import io.github.intisy.gradle.github.api.model.Release;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.api.capability.Releases;
-import io.github.intisy.gradle.github.api.config.AuthExtension;
-import io.github.intisy.gradle.github.api.config.CliExtension;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.AuthSettings;
+import io.github.intisy.gradle.github.api.config.CliSettings;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -64,7 +64,7 @@ import java.util.zip.ZipFile;
 @SuppressWarnings("unused")
 public class GitHub implements Credentials, Repositories, Releases, Publishing {
     private final GitHubLogger logger;
-    private final ResourcesExtension resourcesExtension;
+    private final ResourceSettings resourcesExtension;
     private final GitHubConfig githubExtension;
     private String resolvedApiKey;
     private String resolvedSshKey;
@@ -79,7 +79,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @param resourcesExtension the resources extension containing repository configuration
      * @param githubExtension the github extension containing access token configuration
      */
-    public GitHub(GitHubLogger logger, ResourcesExtension resourcesExtension, GitHubConfig githubExtension) {
+    public GitHub(GitHubLogger logger, ResourceSettings resourcesExtension, GitHubConfig githubExtension) {
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
@@ -176,7 +176,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     @SuppressWarnings("deprecation") // reads the deprecated accessToken as a fallback on purpose
     private String resolveToken() {
-        AuthExtension authConfig = githubExtension.getAuth();
+        AuthSettings authConfig = githubExtension.getAuth();
         if (authConfig.getToken() != null) {
             logger.debug("Using auth.token.");
             return authConfig.getToken();
@@ -215,7 +215,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     @SuppressWarnings("deprecation") // reads the deprecated accessToken as a fallback on purpose
     private String resolveSshKey() {
-        AuthExtension authConfig = githubExtension.getAuth();
+        AuthSettings authConfig = githubExtension.getAuth();
         if (authConfig.getSshKey() != null) {
             logger.debug("Reading SSH key from auth.sshKey: " + authConfig.getSshKey());
             return readFileTrimmed(authConfig.getSshKey());
@@ -671,7 +671,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @return true to route the call through the {@code gh} CLI, false to use HTTP.
      */
     private boolean useCli() {
-        CliExtension cliConfig = githubExtension.getCli();
+        CliSettings cliConfig = githubExtension.getCli();
         if (!cliConfig.isEnabled()) {
             return false;
         }

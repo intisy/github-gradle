@@ -17,9 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import io.github.intisy.gradle.github.api.config.AuthExtension;
-import io.github.intisy.gradle.github.api.config.CliExtension;
-import io.github.intisy.gradle.github.api.config.ResilienceExtension;
+import io.github.intisy.gradle.github.api.config.AuthSettings;
+import io.github.intisy.gradle.github.api.config.CliSettings;
+import io.github.intisy.gradle.github.api.config.ResilienceSettings;
 import io.github.intisy.gradle.github.plugin.extension.ArtifactEntry;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
@@ -253,12 +253,12 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // CliExtension — nested cli { } block
+    // CliSettings — nested cli { } block
     // -------------------------------------------------------------------------
 
     @Test
-    public void testCliExtensionDefaults() {
-        CliExtension cli = new GithubExtension().getCli();
+    public void testCliSettingsDefaults() {
+        CliSettings cli = new GithubExtension().getCli();
         assertNotNull(cli, "cli extension should be available");
         assertFalse(cli.isEnabled(), "cli.enabled should default to false");
         assertTrue(cli.isFallback(), "cli.fallback should default to true");
@@ -287,12 +287,12 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // AuthExtension — nested auth { } block
+    // AuthSettings — nested auth { } block
     // -------------------------------------------------------------------------
 
     @Test
-    public void testAuthExtensionDefaultsAreNull() {
-        AuthExtension auth = new GithubExtension().getAuth();
+    public void testAuthSettingsDefaultsAreNull() {
+        AuthSettings auth = new GithubExtension().getAuth();
         assertNotNull(auth, "auth extension should be available");
         assertNull(auth.getToken(),     "auth.token should default to null");
         assertNull(auth.getTokenFile(), "auth.tokenFile should default to null");
@@ -315,13 +315,13 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // ResilienceExtension — nested resilience { } block
+    // ResilienceSettings — nested resilience { } block
     // -------------------------------------------------------------------------
 
     @Test
     public void testResilienceDefaultAndBlock() {
         GithubExtension github = new GithubExtension();
-        ResilienceExtension resilience = github.getResilience();
+        ResilienceSettings resilience = github.getResilience();
         assertNotNull(resilience, "resilience extension should be available");
         assertFalse(resilience.isSkipOnRateLimit(), "skipOnRateLimit should default to false");
         github.resilience(r -> r.setSkipOnRateLimit(true));

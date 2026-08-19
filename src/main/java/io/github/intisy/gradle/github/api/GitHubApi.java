@@ -10,7 +10,7 @@ import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.JarResolverImpl;
 import io.github.intisy.gradle.github.impl.RepositoriesImpl;
 import io.github.intisy.gradle.github.impl.github.GitHub;
@@ -23,7 +23,7 @@ import java.io.File;
 /**
  * The single entry point for consuming the GitHub client outside a Gradle build.
  *
- * <p>Construct one with {@link #create(GitHubConfig, ResourcesExtension, GitHubLogger)} (or the
+ * <p>Construct one with {@link #create(GitHubConfig, ResourceSettings, GitHubLogger)} (or the
  * two-argument overload, which logs to {@code System.err}), then reach each capability through
  * its accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
  * {@link #publishing()}, {@link #sourceBuilds()}, {@link #resolver()}.
@@ -48,19 +48,19 @@ public final class GitHubApi {
      * @param logger    receives diagnostic output.
      * @return a new client wired to the given configuration and logger.
      */
-    public static GitHubApi create(GitHubConfig config, ResourcesExtension resources, GitHubLogger logger) {
+    public static GitHubApi create(GitHubConfig config, ResourceSettings resources, GitHubLogger logger) {
         return new GitHubApi(new GitHub(logger, resources, config), config, logger);
     }
 
     /**
-     * Same as {@link #create(GitHubConfig, ResourcesExtension, GitHubLogger)}, logging to
+     * Same as {@link #create(GitHubConfig, ResourceSettings, GitHubLogger)}, logging to
      * {@code System.err} via {@link ConsoleGitHubLogger}.
      *
      * @param config    the access token and auth/cli/resilience settings.
      * @param resources the configured resource repository, if any.
      * @return a new client wired to the given configuration, logging to {@code System.err}.
      */
-    public static GitHubApi create(GitHubConfig config, ResourcesExtension resources) {
+    public static GitHubApi create(GitHubConfig config, ResourceSettings resources) {
         return create(config, resources, new ConsoleGitHubLogger(false));
     }
 

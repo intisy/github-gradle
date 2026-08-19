@@ -4,7 +4,7 @@ import java.io.File;
 import java.nio.file.Path;
 
 /**
- * Extension for configuring GitHub authentication credentials.
+ * Configures GitHub authentication credentials.
  *
  * <pre>
  * github {
@@ -22,7 +22,7 @@ import java.nio.file.Path;
  * plugin operates unauthenticated (public repositories only).
  */
 @SuppressWarnings("unused")
-public class AuthExtension {
+public class AuthSettings {
 
     private String token;
     private File tokenFile;

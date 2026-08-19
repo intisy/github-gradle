@@ -1,7 +1,7 @@
 package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
@@ -26,7 +26,7 @@ public class TestResourceSync {
         project.getPluginManager().apply("java");
 
         GithubExtension githubExtension = new GithubExtension();
-        ResourcesExtension resourcesExtension = githubExtension.getResources();
+        ResourceSettings resourcesExtension = githubExtension.getResources();
         resourcesExtension.setRepoUrl("myrepo");
 
         Logger logger = new Logger(githubExtension, project);

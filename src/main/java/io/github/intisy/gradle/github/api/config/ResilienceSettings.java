@@ -1,7 +1,7 @@
 package io.github.intisy.gradle.github.api.config;
 
 /**
- * Extension for configuring how the plugin behaves when GitHub cannot be reached as expected.
+ * Configures how the plugin behaves when GitHub cannot be reached as expected.
  *
  * <pre>
  * github {
@@ -12,7 +12,7 @@ package io.github.intisy.gradle.github.api.config;
  * </pre>
  */
 @SuppressWarnings("unused")
-public class ResilienceExtension {
+public class ResilienceSettings {
 
     private boolean skipOnRateLimit;
 

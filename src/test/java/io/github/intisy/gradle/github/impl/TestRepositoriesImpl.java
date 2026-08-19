@@ -5,7 +5,7 @@ import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ public class TestRepositoriesImpl {
     private static final GitHubLogger LOGGER = new ConsoleGitHubLogger(false);
 
     private Repositories repositoriesConfiguredFor(String repoUrl) {
-        ResourcesExtension configured = new ResourcesExtension();
+        ResourceSettings configured = new ResourceSettings();
         configured.setRepoUrl(repoUrl);
         GitHub gitHub = new GitHub(LOGGER, configured, new GithubExtension());
         return new RepositoriesImpl(gitHub, new GithubExtension(), LOGGER);
@@ -47,7 +47,7 @@ public class TestRepositoriesImpl {
     }
 
     @Test
-    public void cloneOrPullSucceedsTwiceAgainstAnUnconfiguredResourcesExtension(@TempDir File tempDir) throws IOException, GitAPIException {
+    public void cloneOrPullSucceedsTwiceAgainstAnUnconfiguredResourceSettings(@TempDir File tempDir) throws IOException, GitAPIException {
         File origin = createOriginRepo(new File(tempDir, "origin"));
         File target = new File(tempDir, "clone");
         cloneLocally(origin, target);

@@ -2,7 +2,7 @@ package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
@@ -31,7 +31,7 @@ public class ResourceSync {
 	 * @param resourcesExtension the extension supplying the repository URL, branch, and sub-path to sync.
 	 * @param repositories the client used to clone/pull the configured repository.
 	 */
-	public static void apply(Project project, Logger logger, ResourcesExtension resourcesExtension, Repositories repositories) {
+	public static void apply(Project project, Logger logger, ResourceSettings resourcesExtension, Repositories repositories) {
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
 			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
 			SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);

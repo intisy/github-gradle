@@ -3,7 +3,7 @@ package io.github.intisy.gradle.github.impl.source;
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.capability.SourceBuilds;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -20,7 +20,7 @@ import java.util.List;
  * Builds a GitHub repository from source and caches the resulting jar by commit, so a repeated
  * request for the same commit never re-runs the build.
  *
- * @implNote {@link GitHub} carries a single {@link ResourcesExtension}, hence a single repository
+ * @implNote {@link GitHub} carries a single {@link ResourceSettings}, hence a single repository
  * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource} call, configured for
  * the exact {@code owner}/{@code repo} requested, rather than accepting one pre-built {@link
  * GitHub} that could only ever be correctly configured for one repository.
@@ -75,7 +75,7 @@ public class SourceBuilder implements SourceBuilds {
     }
 
     private GitHub newGitHub(String owner, String repo) {
-        ResourcesExtension resources = new ResourcesExtension();
+        ResourceSettings resources = new ResourceSettings();
         resources.setRepoUrl("https://github.com/" + owner + "/" + repo);
         return new GitHub(logger, resources, config);
     }

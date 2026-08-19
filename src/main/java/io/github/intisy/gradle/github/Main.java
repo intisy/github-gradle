@@ -3,7 +3,7 @@ package io.github.intisy.gradle.github;
 import io.github.intisy.gradle.github.api.GitHubApi;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.plugin.DependencyMetadata;
 import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.DependencyTasks;
@@ -21,7 +21,7 @@ class Main implements Plugin<Project> {
 
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
-		ResourcesExtension resourcesExtension = githubExtension.getResources();
+		ResourceSettings resourcesExtension = githubExtension.getResources();
 
 		PublishExtension publishExtension = githubExtension.getPublish();
 		project.getExtensions().add("publishGithub", publishExtension);

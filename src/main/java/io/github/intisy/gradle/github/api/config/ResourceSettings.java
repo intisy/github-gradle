@@ -1,10 +1,10 @@
 package io.github.intisy.gradle.github.api.config;
 
 /**
- * Extension for configuring external resources to be used in the project.
+ * Configures external resources to be used in the project.
  */
 @SuppressWarnings("unused")
-public class ResourcesExtension {
+public class ResourceSettings {
     String branch = "main";
     String path = "/";
     String repoUrl;

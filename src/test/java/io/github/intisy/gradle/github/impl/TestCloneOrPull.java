@@ -2,7 +2,7 @@ package io.github.intisy.gradle.github.impl;
 
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.plugin.Logger;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -25,14 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestCloneOrPull {
     private GitHub makeGitHub() {
         GithubExtension ext = new GithubExtension();
-        ResourcesExtension res = new ResourcesExtension();
+        ResourceSettings res = new ResourceSettings();
         Logger logger = new Logger(ext);
         return new GitHub(logger, res, ext);
     }
 
     private GitHub makeGitHub(String repoUrl) {
         GithubExtension ext = new GithubExtension();
-        ResourcesExtension res = new ResourcesExtension();
+        ResourceSettings res = new ResourceSettings();
         res.setRepoUrl(repoUrl);
         Logger logger = new Logger(ext);
         return new GitHub(logger, res, ext);

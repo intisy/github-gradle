@@ -13,15 +13,15 @@ public interface GitHubConfig {
     /**
      * @return the structured token/SSH key configuration, preferred over {@link #getAccessToken()}.
      */
-    AuthExtension getAuth();
+    AuthSettings getAuth();
 
     /**
      * @return the settings controlling whether API calls are routed through the {@code gh} CLI.
      */
-    CliExtension getCli();
+    CliSettings getCli();
 
     /**
      * @return the settings controlling fallback behavior when the GitHub API rate limit is hit.
      */
-    ResilienceExtension getResilience();
+    ResilienceSettings getResilience();
 }

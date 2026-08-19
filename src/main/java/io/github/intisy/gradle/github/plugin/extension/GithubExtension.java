@@ -2,11 +2,11 @@ package io.github.intisy.gradle.github.plugin.extension;
 
 import java.io.File;
 import java.nio.file.Path;
-import io.github.intisy.gradle.github.api.config.AuthExtension;
-import io.github.intisy.gradle.github.api.config.CliExtension;
+import io.github.intisy.gradle.github.api.config.AuthSettings;
+import io.github.intisy.gradle.github.api.config.CliSettings;
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
-import io.github.intisy.gradle.github.api.config.ResilienceExtension;
-import io.github.intisy.gradle.github.api.config.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResilienceSettings;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import org.gradle.api.Action;
 import groovy.lang.Closure;
 
@@ -48,11 +48,11 @@ import groovy.lang.Closure;
  */
 @SuppressWarnings("unused")
 public class GithubExtension implements GitHubConfig {
-    private final ResourcesExtension resources = new ResourcesExtension();
+    private final ResourceSettings resources = new ResourceSettings();
     private final PublishExtension publish = new PublishExtension();
-    private final CliExtension cli = new CliExtension();
-    private final AuthExtension auth = new AuthExtension();
-    private final ResilienceExtension resilience = new ResilienceExtension();
+    private final CliSettings cli = new CliSettings();
+    private final AuthSettings auth = new AuthSettings();
+    private final ResilienceSettings resilience = new ResilienceSettings();
 
     private String accessToken;
     private boolean debug;
@@ -74,7 +74,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return the nested auth extension.
      */
-    public AuthExtension getAuth() {
+    public AuthSettings getAuth() {
         return auth;
     }
 
@@ -83,7 +83,7 @@ public class GithubExtension implements GitHubConfig {
      *
      * @param action The configuration action.
      */
-    public void auth(Action<? super AuthExtension> action) {
+    public void auth(Action<? super AuthSettings> action) {
         action.execute(auth);
     }
 
@@ -103,7 +103,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return the nested resilience extension.
      */
-    public ResilienceExtension getResilience() {
+    public ResilienceSettings getResilience() {
         return resilience;
     }
 
@@ -112,7 +112,7 @@ public class GithubExtension implements GitHubConfig {
      *
      * @param action The configuration action.
      */
-    public void resilience(Action<? super ResilienceExtension> action) {
+    public void resilience(Action<? super ResilienceSettings> action) {
         action.execute(resilience);
     }
 
@@ -132,7 +132,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @param skipOnRateLimit whether to degrade gracefully (rather than fail) when the rate limit is hit.
      * @deprecated Replaced by the nested {@code resilience { skipOnRateLimit = ... }} block. This
-     *             delegates to {@link ResilienceExtension#setSkipOnRateLimit(boolean)} and will be
+     *             delegates to {@link ResilienceSettings#setSkipOnRateLimit(boolean)} and will be
      *             removed in a future release.
      */
     @Deprecated
@@ -143,7 +143,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return whether rate-limited operations degrade gracefully instead of failing the build.
      * @deprecated Replaced by the nested {@code resilience { skipOnRateLimit = ... }} block. This
-     *             delegates to {@link ResilienceExtension#isSkipOnRateLimit()} and will be removed
+     *             delegates to {@link ResilienceSettings#isSkipOnRateLimit()} and will be removed
      *             in a future release.
      */
     @Deprecated
@@ -154,7 +154,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return the nested CLI extension.
      */
-    public CliExtension getCli() {
+    public CliSettings getCli() {
         return cli;
     }
 
@@ -163,7 +163,7 @@ public class GithubExtension implements GitHubConfig {
      *
      * @param action The configuration action.
      */
-    public void cli(Action<? super CliExtension> action) {
+    public void cli(Action<? super CliSettings> action) {
         action.execute(cli);
     }
 
@@ -183,7 +183,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @param useCli whether to use the local {@code gh} CLI for API calls.
      * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
-     *             {@link CliExtension#setEnabled(boolean)} and will be removed in a future release.
+     *             {@link CliSettings#setEnabled(boolean)} and will be removed in a future release.
      */
     @Deprecated
     public void setUseCli(boolean useCli) {
@@ -193,7 +193,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return whether API calls are routed through the local {@code gh} CLI.
      * @deprecated Replaced by the nested {@code cli { enabled = ... }} block. This delegates to
-     *             {@link CliExtension#isEnabled()} and will be removed in a future release.
+     *             {@link CliSettings#isEnabled()} and will be removed in a future release.
      */
     @Deprecated
     public boolean isUseCli() {
@@ -271,7 +271,7 @@ public class GithubExtension implements GitHubConfig {
     /**
      * @return The nested resources extension.
      */
-    public ResourcesExtension getResources() {
+    public ResourceSettings getResources() {
         return resources;
     }
 
@@ -280,7 +280,7 @@ public class GithubExtension implements GitHubConfig {
      *
      * @param action The configuration action.
      */
-    public void resources(Action<? super ResourcesExtension> action) {
+    public void resources(Action<? super ResourceSettings> action) {
         action.execute(resources);
     }
 
