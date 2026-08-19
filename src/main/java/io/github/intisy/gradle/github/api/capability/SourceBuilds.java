@@ -28,5 +28,5 @@ public interface SourceBuilds {
      * @return the cached jar for the resolved ref, built only when not already cached.
      * @throws IOException if the clone, checkout, or build itself fails.
      */
-    File buildFromSource(String cloneUrl, String ref) throws IOException;
+    File buildFromGit(String cloneUrl, String ref) throws IOException;
 }

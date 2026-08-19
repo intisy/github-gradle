@@ -22,9 +22,10 @@ import java.util.List;
  * clone URL explicitly, so this class never assumes github.com or any other specific host.
  *
  * @implNote {@link GitHub} carries a single {@link ResourceSettings}, hence a single repository
- * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource} call, scoped to the
- * exact {@code cloneUrl} requested, rather than accepting one pre-built {@link GitHub} that could
- * only ever be correctly configured for one repository.
+ * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource(String, String, String,
+ * String, String) buildFromSource} call (which {@link #buildFromGit} also goes through), scoped to
+ * the exact {@code cloneUrl} requested, rather than accepting one pre-built {@link GitHub} that
+ * could only ever be correctly configured for one repository.
  */
 public class SourceBuilder {
     private final GitHubConfig config;
@@ -54,7 +55,7 @@ public class SourceBuilder {
      * because {@code git checkout <ref>} (unlike a clone's branch selection) already accepts a
      * branch, tag, or commit interchangeably, so nothing here needs to disambiguate which one it is.
      */
-    public File buildFromSource(String cloneUrl, String ref) throws IOException {
+    public File buildFromGit(String cloneUrl, String ref) throws IOException {
         String[] identity = CloneUrlIdentity.derive(cloneUrl);
         return buildFromSource(cloneUrl, identity[0], identity[1], null, ref);
     }

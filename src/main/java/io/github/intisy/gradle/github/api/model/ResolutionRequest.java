@@ -24,7 +24,7 @@ public final class ResolutionRequest {
         RELEASE,
         /** Satisfied by {@link SourceBuilds#buildFromSource(String, String, String, String)}. */
         SOURCE,
-        /** Satisfied by {@link SourceBuilds#buildFromSource(String, String)}. */
+        /** Satisfied by {@link SourceBuilds#buildFromGit(String, String)}. */
         GIT,
         /** Satisfied by a {@code Downloads} capability, given {@link ResolutionRequest#getJarUrl()} and {@link ResolutionRequest#getHeaders()}. */
         URL

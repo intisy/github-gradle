@@ -283,7 +283,7 @@ public class TestJarResolver {
         }
 
         @Override
-        public File buildFromSource(String cloneUrl, String ref) {
+        public File buildFromGit(String cloneUrl, String ref) {
             this.capturedCloneUrl = cloneUrl;
             this.capturedRef = ref;
             return jarToReturn;
@@ -297,7 +297,7 @@ public class TestJarResolver {
         }
 
         @Override
-        public File buildFromSource(String cloneUrl, String ref) {
+        public File buildFromGit(String cloneUrl, String ref) {
             throw new UnsupportedOperationException();
         }
     }

@@ -32,7 +32,7 @@ public final class GitHubSourceBuilds implements SourceBuilds {
     }
 
     @Override
-    public File buildFromSource(String cloneUrl, String ref) throws IOException {
-        return sourceBuilder.buildFromSource(cloneUrl, ref);
+    public File buildFromGit(String cloneUrl, String ref) throws IOException {
+        return sourceBuilder.buildFromGit(cloneUrl, ref);
     }
 }

@@ -221,7 +221,7 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker(origin.getName() + "-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        File jar = builder.buildFromSource(origin.toURI().toString(), firstSha);
+        File jar = builder.buildFromGit(origin.toURI().toString(), firstSha);
 
         assertTrue(jar.isFile());
         assertEquals(1, invoker.invocations);
@@ -251,8 +251,8 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        File jarA = builder.buildFromSource(originA.toURI().toString(), null);
-        File jarB = builder.buildFromSource(originB.toURI().toString(), null);
+        File jarA = builder.buildFromGit(originA.toURI().toString(), null);
+        File jarB = builder.buildFromGit(originB.toURI().toString(), null);
 
         assertEquals(2, invoker.invocations, "each distinct URL must trigger its own build");
         assertNotEquals(jarA, jarB);
