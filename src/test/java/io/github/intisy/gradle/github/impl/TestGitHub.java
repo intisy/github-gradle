@@ -2,9 +2,9 @@ package io.github.intisy.gradle.github.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
-import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import org.eclipse.jgit.api.Git;

@@ -17,12 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import io.github.intisy.gradle.github.extension.ArtifactEntry;
-import io.github.intisy.gradle.github.extension.AuthExtension;
-import io.github.intisy.gradle.github.extension.CliExtension;
-import io.github.intisy.gradle.github.extension.GithubExtension;
-import io.github.intisy.gradle.github.extension.PublishExtension;
-import io.github.intisy.gradle.github.extension.ResilienceExtension;
+import io.github.intisy.gradle.github.api.config.AuthExtension;
+import io.github.intisy.gradle.github.api.config.CliExtension;
+import io.github.intisy.gradle.github.api.config.ResilienceExtension;
+import io.github.intisy.gradle.github.plugin.extension.ArtifactEntry;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
 
 public class TestMain {
 

@@ -1,8 +1,8 @@
 package io.github.intisy.gradle.github.impl;
 
-import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
-import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;

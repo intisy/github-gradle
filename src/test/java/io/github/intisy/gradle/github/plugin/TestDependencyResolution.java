@@ -4,7 +4,7 @@ import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.model.Release;
 import io.github.intisy.gradle.github.api.capability.Releases;
-import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.internal.project.ProjectInternal;
