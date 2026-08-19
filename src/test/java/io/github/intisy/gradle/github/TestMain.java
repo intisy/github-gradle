@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -54,12 +55,14 @@ public class TestMain {
         Project project = Commons.applyPlugin();
         Task publishTask = project.getTasks().findByName("publishGithub");
         assertNotNull(publishTask, "publishGithub task should exist");
-        boolean dependsOnBuild = publishTask.getDependsOn().stream()
-                .anyMatch(dep -> {
-                    if (dep instanceof String) return dep.equals("build");
-                    if (dep instanceof Task) return ((Task) dep).getName().equals("build");
-                    return dep.toString().contains("build");
-                });
+        Set<? extends Task> resolvedDependencies = publishTask.getTaskDependencies().getDependencies(publishTask);
+        boolean dependsOnBuild = false;
+        for (Task dependency : resolvedDependencies) {
+            if (dependency.getName().equals("build")) {
+                dependsOnBuild = true;
+                break;
+            }
+        }
         assertTrue(dependsOnBuild, "publishGithub should depend on build");
     }
 
