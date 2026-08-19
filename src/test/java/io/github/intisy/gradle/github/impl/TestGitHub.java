@@ -6,22 +6,41 @@ import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.utils.GradleUtils;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.transport.URIish;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class TestGitHub {
     @Test
-    public void testGithub() throws IOException {
-//        org.kohsuke.github.GitHub github = org.kohsuke.github.GitHub.connectAnonymously();
-//        GitHub.getAsset("SimpleLogger", "Blizzity", "1.12.7", github);
+    public void testGetRemoteOwnerAndRepoParsesHttpsRemote(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("https://example.com/SomeOwner/some-repo.git"))
+                    .call();
+        }
+        GitHub gh = makeGitHub();
+        String[] result = gh.getRemoteOwnerAndRepo(projectDir);
+        assertEquals("SomeOwner", result[0]);
+        assertEquals("some-repo", result[1]);
+    }
+
+    @Test
+    public void testGetRemoteOwnerAndRepoNonGitDirectoryThrows(@TempDir File projectDir) {
+        GitHub gh = makeGitHub();
+        assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
     }
 
     @Disabled
