@@ -7,7 +7,7 @@ import io.github.intisy.gradle.github.extension.PublishExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.api.RateLimitException;
-import io.github.intisy.gradle.github.impl.Gradle;
+import io.github.intisy.gradle.github.plugin.Gradle;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
