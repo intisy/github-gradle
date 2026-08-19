@@ -6,9 +6,16 @@ import com.jcraft.jsch.Session;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.Credentials;
+import io.github.intisy.gradle.github.api.DeclaredDependency;
 import io.github.intisy.gradle.github.api.GitHubConfig;
 import io.github.intisy.gradle.github.api.GitHubLogger;
+import io.github.intisy.gradle.github.api.Publishing;
 import io.github.intisy.gradle.github.api.RateLimitException;
+import io.github.intisy.gradle.github.api.Release;
+import io.github.intisy.gradle.github.api.RemoteRepo;
+import io.github.intisy.gradle.github.api.Repositories;
+import io.github.intisy.gradle.github.api.Releases;
 import io.github.intisy.gradle.github.extension.AuthExtension;
 import io.github.intisy.gradle.github.extension.CliExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
@@ -54,7 +61,7 @@ import java.util.zip.ZipFile;
  * Provides methods for cloning, pulling, and fetching repository information.
  */
 @SuppressWarnings("unused")
-public class GitHub {
+public class GitHub implements Credentials, Repositories, Releases, Publishing {
     private final GitHubLogger logger;
     private final ResourcesExtension resourcesExtension;
     private final GitHubConfig githubExtension;
@@ -1561,5 +1568,88 @@ public class GitHub {
             }
             logger.log("Uploaded " + assetName + " (" + fileBytes.length + " bytes)");
         }
+    }
+
+    @Override
+    public String apiKey() {
+        return getApiKey();
+    }
+
+    @Override
+    public String sshKey() {
+        return getSshKey();
+    }
+
+    @Override
+    public void cloneOrPull(File target, String owner, String repo, String branch) throws IOException {
+        try {
+            cloneOrPullRepository(target, owner, repo, branch);
+        } catch (GitAPIException e) {
+            throw new IOException("Failed to clone or pull " + owner + "/" + repo + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public boolean exists(File path) {
+        return doesRepoExist(path);
+    }
+
+    @Override
+    public boolean isUpToDate(File path) {
+        return isRepoUpToDate(path);
+    }
+
+    @Override
+    public RemoteRepo remoteOf(File projectDir) {
+        String[] ownerAndRepo = getRemoteOwnerAndRepo(projectDir);
+        return new RemoteRepo(ownerAndRepo[0], ownerAndRepo[1]);
+    }
+
+    @Override
+    public String latestVersion(String owner, String repo) {
+        return getLatestVersion(owner, repo);
+    }
+
+    @Override
+    public File downloadJar(String owner, String repo, String version) throws IOException {
+        return getAsset(owner, repo, version);
+    }
+
+    @Override
+    public File downloadJar(String owner, String repo, String version, String classifier) throws IOException {
+        File jar = getAssetWithClassifier(owner, repo, version, classifier);
+        if (jar == null) {
+            throw new IOException("No asset with classifier '" + classifier + "' found for "
+                    + owner + "/" + repo + ":" + version + ".");
+        }
+        return jar;
+    }
+
+    @Override
+    public List<File> downloadAllModuleJars(String owner, String repo, String version) throws IOException {
+        List<File> collected = new ArrayList<>();
+        getAllModuleAssets(owner, repo, version, collected);
+        return collected;
+    }
+
+    @Override
+    public List<DeclaredDependency> declaredDependencies(File jar) {
+        List<String[]> raw = readGithubDependencies(jar);
+        List<DeclaredDependency> declared = new ArrayList<>(raw.size());
+        for (String[] entry : raw) {
+            declared.add(new DeclaredDependency(entry[0], entry[1], entry[2]));
+        }
+        return declared;
+    }
+
+    @Override
+    public Release publishRelease(String owner, String repo, String tag, String name) throws IOException {
+        JsonObject release = createRelease(owner, repo, tag, name);
+        return new Release(release.get("tag_name").getAsString(), release.get("upload_url").getAsString());
+    }
+
+    @Override
+    public void uploadAsset(Release release, File file, String assetName) throws IOException {
+        uploadReleaseAsset(release.getUploadUrl(), file, assetName);
     }
 }
