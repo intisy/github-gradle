@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class GithubConfigurations {
 
 	/** Names of all GitHub dependency configurations created by this plugin, in declaration order. */
-	public static final List<String> GITHUB_CONFIGS = Collections.unmodifiableList(Arrays.asList(
+	static final List<String> GITHUB_CONFIGS = Collections.unmodifiableList(Arrays.asList(
 		"githubImplementation",
 		"githubApi",
 		"githubCompileOnly",
@@ -33,7 +33,7 @@ public class GithubConfigurations {
 	 * Maps each GitHub configuration to the native Gradle configuration it feeds.
 	 * {@code api} and {@code compileOnlyApi} require the {@code java-library} plugin.
 	 */
-	public static final Map<String, String> GITHUB_TO_GRADLE;
+	static final Map<String, String> GITHUB_TO_GRADLE;
 	static {
 		Map<String, String> m = new HashMap<String, String>();
 		m.put("githubImplementation",  "implementation");
@@ -45,9 +45,9 @@ public class GithubConfigurations {
 	}
 
 	/** Gradle configurations that require the {@code java-library} plugin. */
-	public static final Set<String> JAVA_LIBRARY_CONFIGS = new HashSet<String>(Arrays.asList(
+	static final Set<String> JAVA_LIBRARY_CONFIGS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
 		"api", "compileOnlyApi"
-	));
+	)));
 
 	public static void apply(Project project) {
 		for (String cfgName : GITHUB_CONFIGS) {
@@ -65,7 +65,7 @@ public class GithubConfigurations {
 	 *
 	 * @param dependency the Gradle dependency
 	 * @return the classifier string, or {@code ""} if absent
-	 */	public static String extractClassifier(Dependency dependency) {
+	 */	static String extractClassifier(Dependency dependency) {
 		if (dependency instanceof ExternalDependency) {
 			ExternalDependency ext = (ExternalDependency) dependency;
 			if (!ext.getArtifacts().isEmpty()) {
@@ -80,7 +80,7 @@ public class GithubConfigurations {
 	 * @param project the project
 	 * @return all github dependency configurations' dependencies across all subprojects
 	 */
-	public static Set<Dependency> getAllDependencies(Project project) {
+	static Set<Dependency> getAllDependencies(Project project) {
 		return project.getAllprojects().stream().flatMap(p -> getDependencies(p).stream()).collect(Collectors.toSet());
 	}
 
@@ -88,7 +88,7 @@ public class GithubConfigurations {
 	 * @param project the project
 	 * @return all github dependency configurations' dependencies for this project only
 	 */
-	public static Set<Dependency> getDependencies(Project project) {
+	static Set<Dependency> getDependencies(Project project) {
 		Set<Dependency> all = new LinkedHashSet<Dependency>();
 		for (String cfgName : GITHUB_CONFIGS) {
 			Configuration cfg = project.getConfigurations().findByName(cfgName);

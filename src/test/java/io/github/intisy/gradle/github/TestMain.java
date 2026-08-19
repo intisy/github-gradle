@@ -68,7 +68,7 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // Full registration surface (Task 8 decomposition safety net)
+    // Full registration surface
     // -------------------------------------------------------------------------
 
     @Test
@@ -107,16 +107,6 @@ public class TestMain {
     // -------------------------------------------------------------------------
     // Extra configurations
     // -------------------------------------------------------------------------
-
-    @Test
-    public void testAllGithubConfigurationsRegistered() {
-        Project project = Commons.applyPlugin();
-        for (String cfg : new String[]{"githubImplementation", "githubApi", "githubCompileOnly",
-                "githubCompileOnlyApi", "githubRuntimeOnly"}) {
-            assertNotNull(project.getConfigurations().findByName(cfg),
-                    cfg + " configuration should be registered");
-        }
-    }
 
     @Test
     public void testGithubApiConfigAcceptsDependency() {

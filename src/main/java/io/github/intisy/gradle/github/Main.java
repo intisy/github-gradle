@@ -11,7 +11,6 @@ import io.github.intisy.gradle.github.plugin.DependencyTasks;
 import io.github.intisy.gradle.github.plugin.GithubConfigurations;
 import io.github.intisy.gradle.github.plugin.PublishTasks;
 import io.github.intisy.gradle.github.plugin.ResourceSync;
-import io.github.intisy.gradle.github.utils.FileUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
