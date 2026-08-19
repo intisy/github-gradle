@@ -6,6 +6,7 @@ import org.gradle.api.Task;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -64,6 +65,43 @@ public class TestMain {
             }
         }
         assertTrue(dependsOnBuild, "publishGithub should depend on build");
+    }
+
+    // -------------------------------------------------------------------------
+    // Full registration surface (Task 8 decomposition safety net)
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testGithubExtensionIsRegisteredAsGithubExtension() {
+        Project project = Commons.applyPlugin();
+        Object github = project.getExtensions().findByName("github");
+        assertNotNull(github, "github extension should be registered");
+        assertTrue(github instanceof GithubExtension, "github extension should be a GithubExtension");
+    }
+
+    @Test
+    public void testAllPluginTasksAreRegistered() {
+        Project project = Commons.applyPlugin();
+        for (String taskName : new String[]{"processGitHubResources", "generateGithubDependencyMetadata",
+                "printGithubDependencies", "updateGithubDependencies", "publishGithub"}) {
+            assertNotNull(project.getTasks().findByName(taskName), taskName + " task should be registered");
+        }
+    }
+
+    @Test
+    public void testProcessResourcesDependsOnGithubTasks() {
+        Project project = Commons.applyPlugin();
+        Task processResources = project.getTasks().findByName("processResources");
+        assertNotNull(processResources, "processResources task should exist");
+        Set<? extends Task> resolvedDependencies = processResources.getTaskDependencies().getDependencies(processResources);
+        Set<String> dependencyNames = new HashSet<>();
+        for (Task dependency : resolvedDependencies) {
+            dependencyNames.add(dependency.getName());
+        }
+        assertTrue(dependencyNames.contains("processGitHubResources"),
+                "processResources should depend on processGitHubResources");
+        assertTrue(dependencyNames.contains("generateGithubDependencyMetadata"),
+                "processResources should depend on generateGithubDependencyMetadata");
     }
 
     // -------------------------------------------------------------------------
