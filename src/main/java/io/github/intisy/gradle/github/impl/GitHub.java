@@ -8,7 +8,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.intisy.gradle.github.api.capability.Credentials;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
-import io.github.intisy.gradle.github.api.GitHubConfig;
+import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.capability.Publishing;
 import io.github.intisy.gradle.github.api.RateLimitException;

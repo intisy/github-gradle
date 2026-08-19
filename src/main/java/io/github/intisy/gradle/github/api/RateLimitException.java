@@ -1,5 +1,7 @@
 package io.github.intisy.gradle.github.api;
 
+import io.github.intisy.gradle.github.api.config.GitHubConfig;
+
 /**
  * Thrown when a GitHub API request fails because the rate limit has been exceeded (60
  * requests/hour unauthenticated, 5,000/hour with a token).

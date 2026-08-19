@@ -6,6 +6,7 @@ import io.github.intisy.gradle.github.api.capability.Publishing;
 import io.github.intisy.gradle.github.api.capability.Releases;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.api.capability.SourceBuilds;
+import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;

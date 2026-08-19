@@ -2,7 +2,7 @@ package io.github.intisy.gradle.github.extension;
 
 import java.io.File;
 import java.nio.file.Path;
-import io.github.intisy.gradle.github.api.GitHubConfig;
+import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import org.gradle.api.Action;
 import groovy.lang.Closure;
 
