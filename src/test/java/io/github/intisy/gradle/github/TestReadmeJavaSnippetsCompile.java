@@ -74,6 +74,11 @@ public class TestReadmeJavaSnippetsCompile {
         return snippets;
     }
 
+    /**
+     * @implNote Compiled at {@code -source 8 -target 8}, matching this project's own JDK 1.8
+     * source-compatibility rule, so a snippet using a post-8 API or syntax fails this gate instead
+     * of only failing for a reader on an older JDK than whichever one happens to run the tests.
+     */
     private static void compileSnippet(JavaCompiler compiler, File tempDir, File libraryJar, String className, String snippet) throws IOException {
         String source = wrapAsCompilationUnit(snippet, className);
 
@@ -90,8 +95,9 @@ public class TestReadmeJavaSnippetsCompile {
             fileManager.setLocation(StandardLocation.CLASS_PATH, Arrays.asList(libraryJar));
 
             JavaFileObject sourceFile = new StringSource(className, source);
+            List<String> options = Arrays.asList("-source", "8", "-target", "8");
             JavaCompiler.CompilationTask task = compiler.getTask(
-                    null, fileManager, diagnostics, null, null, Arrays.asList(sourceFile));
+                    null, fileManager, diagnostics, options, null, Arrays.asList(sourceFile));
             success = task.call();
         } finally {
             fileManager.close();
