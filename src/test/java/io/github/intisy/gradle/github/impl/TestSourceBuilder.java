@@ -8,6 +8,7 @@ import io.github.intisy.gradle.github.impl.source.BuildInvoker;
 import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -232,13 +233,13 @@ public class TestSourceBuilder {
     }
 
     /**
-     * The end-to-end regression test for Critical 2: two distinct clone URLs whose trailing
-     * {@code owner/repo}-shaped path segments happen to be identical (here, both end in {@code
-     * acme/widget}) must build from two genuinely separate checkouts, not silently share one.
-     * {@link GitHub#doesRepoExist} only checks that a git object database exists at a path; it
-     * never compares that checkout's {@code origin} remote back against the URL that was
-     * requested, so before this fix a project resolving the same owner/repo-shaped identity
-     * against two different hosts would silently reuse whichever checkout happened to exist.
+     * Two distinct clone URLs whose trailing {@code owner/repo}-shaped path segments happen to be
+     * identical (here, both end in {@code acme/widget}) must build from two genuinely separate
+     * checkouts, not silently share one. {@link GitHub#doesRepoExist} only checks that a git
+     * object database exists at a path; it never compares that checkout's {@code origin} remote
+     * back against the URL that was requested, so a project resolving the same owner/repo-shaped
+     * identity against two different hosts must not silently reuse whichever checkout happens to
+     * exist.
      */
     @Test
     public void twoDistinctUrlsWithTheSameTrailingPathGetDifferentCheckouts(@TempDir File tempDir) throws IOException, GitAPIException {
@@ -259,5 +260,57 @@ public class TestSourceBuilder {
 
         File[] checkoutDirs = cacheDir.listFiles(File::isDirectory);
         assertEquals(2, checkoutDirs.length, "two distinct URLs must resolve to two distinct checkouts");
+    }
+
+    /**
+     * Pins all four ref shapes {@code sources { git { ref = ... } } } can name: the remote's
+     * default branch (ref null), a tag, a commit sha, and a non-default branch. A fresh clone only
+     * ever creates a local branch for the default branch, so a tag or commit sha (already fetched
+     * into the object database) resolve directly, but a non-default branch exists solely as
+     * {@code refs/remotes/origin/<branch>} until a local tracking branch is created for it.
+     */
+    @Test
+    public void allFourRefShapesResolveCorrectly(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = new File(tempDir, "origin");
+        PersonIdent author = new PersonIdent("Test", "test@example.com");
+        String mainSha;
+        String developSha;
+        try (Git git = Git.init().setDirectory(origin).setInitialBranch("main").call()) {
+            Files.write(new File(origin, "file.txt").toPath(), "main content".getBytes(StandardCharsets.UTF_8));
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("main commit").setAuthor(author).setCommitter(author).call();
+            mainSha = git.getRepository().resolve("HEAD").getName();
+            git.tag().setName("v1").setMessage("v1").setTagger(author).call();
+
+            git.branchCreate().setName("develop").call();
+            git.checkout().setName("develop").call();
+            Files.write(new File(origin, "file.txt").toPath(), "develop content".getBytes(StandardCharsets.UTF_8));
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("develop commit").setAuthor(author).setCommitter(author).call();
+            developSha = git.getRepository().resolve("HEAD").getName();
+            git.checkout().setName("main").call();
+        }
+
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+        FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+        String cloneUrl = origin.toURI().toString();
+
+        builder.buildFromSource(cloneUrl, "default-owner", "widget", null, null);
+        assertEquals("main content", readFile(new File(new File(cacheDir, "default-owner-widget"), "file.txt")),
+                "ref = null must resolve the remote's default branch");
+
+        builder.buildFromSource(cloneUrl, "tag-owner", "widget", null, "v1");
+        assertEquals("main content", readFile(new File(new File(cacheDir, "tag-owner-widget"), "file.txt")),
+                "ref = a tag must resolve to the commit it points at");
+
+        builder.buildFromSource(cloneUrl, "sha-owner", "widget", null, mainSha);
+        assertEquals("main content", readFile(new File(new File(cacheDir, "sha-owner-widget"), "file.txt")),
+                "ref = a commit sha must resolve directly");
+
+        builder.buildFromSource(cloneUrl, "branch-owner", "widget", null, "develop");
+        assertEquals("develop content", readFile(new File(new File(cacheDir, "branch-owner-widget"), "file.txt")),
+                "ref = a non-default branch must resolve via its remote-tracking ref");
     }
 }

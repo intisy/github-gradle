@@ -5,9 +5,11 @@ import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.utils.CloneUrlIdentity;
+import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,9 +53,6 @@ public class SourceBuilder {
      * @param ref the branch, tag, or commit to build, or null for the remote's default branch.
      * @return the cached jar for the resolved ref, built only when not already cached.
      * @throws IOException if the clone, checkout, or build itself fails.
-     * @implNote {@code ref} is passed through as {@code commitSha} rather than {@code branch},
-     * because {@code git checkout <ref>} (unlike a clone's branch selection) already accepts a
-     * branch, tag, or commit interchangeably, so nothing here needs to disambiguate which one it is.
      */
     public File buildFromGit(String cloneUrl, String ref) throws IOException {
         String[] identity = CloneUrlIdentity.derive(cloneUrl);
@@ -99,10 +98,10 @@ public class SourceBuilder {
         return new GitHub(logger, resources, config);
     }
 
-    private String checkOutAndResolve(File checkoutDir, String commitSha) throws IOException {
+    private String checkOutAndResolve(File checkoutDir, String ref) throws IOException {
         try (Git git = Git.open(checkoutDir)) {
-            if (commitSha != null) {
-                git.checkout().setName(commitSha).call();
+            if (ref != null) {
+                checkOutRef(git, ref);
             }
             ObjectId head = git.getRepository().resolve("HEAD");
             if (head == null) {
@@ -110,9 +109,34 @@ public class SourceBuilder {
             }
             return head.getName();
         } catch (GitAPIException e) {
-            throw new IOException("Failed to check out " + (commitSha != null ? commitSha : "HEAD")
+            throw new IOException("Failed to check out " + (ref != null ? ref : "HEAD")
                     + " in " + checkoutDir.getAbsolutePath() + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * @implNote {@code checkout().setName(ref)} alone only resolves a local branch, a tag, or a
+     * commit. Unlike the real {@code git} CLI, JGit does not fall back to a remote-tracking branch
+     * when {@code ref} names neither: a fresh clone only ever creates the local branch for whatever
+     * branch it checked out by default, so any other branch name exists solely as {@code
+     * refs/remotes/origin/<ref>} until a local tracking branch is created for it explicitly.
+     */
+    private void checkOutRef(Git git, String ref) throws GitAPIException, IOException {
+        if (git.getRepository().resolve(ref) != null) {
+            git.checkout().setName(ref).call();
+            return;
+        }
+        Ref remoteBranch = git.getRepository().findRef("refs/remotes/origin/" + ref);
+        if (remoteBranch == null) {
+            throw new IOException("Ref " + ref + " cannot be resolved as a local branch, a tag, a commit, "
+                    + "or a remote branch on origin.");
+        }
+        git.checkout()
+                .setCreateBranch(true)
+                .setName(ref)
+                .setStartPoint(remoteBranch.getName())
+                .setUpstreamMode(SetupUpstreamMode.TRACK)
+                .call();
     }
 
     private File locateBuiltJar(File checkoutDir, String repo) throws IOException {
