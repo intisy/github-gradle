@@ -40,6 +40,7 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/impl/source/SourceBuilder*'
         include 'io/github/intisy/gradle/github/impl/source/BuildInvoker*'
         include 'io/github/intisy/gradle/github/impl/download/UrlDownloads*'
+        include 'io/github/intisy/gradle/github/impl/download/RedirectPolicyInterceptor*'
         include 'io/github/intisy/gradle/github/impl/JarResolverImpl*'
         include 'io/github/intisy/gradle/github/utils/FileUtils*'
         include 'io/github/intisy/gradle/github/utils/UrlRedaction*'

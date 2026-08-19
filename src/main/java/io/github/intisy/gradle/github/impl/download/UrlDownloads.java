@@ -28,7 +28,8 @@ import java.util.Map;
  * anywhere but the outgoing {@link okhttp3.Request}, and every log line and exception message
  * that names {@code jarUrl} runs it through {@link UrlRedaction#redact} first, stripping userinfo
  * and the query string. The cache file name is a hash of {@code jarUrl} alone (via {@link
- * UrlDigest}), never the URL itself.
+ * UrlDigest}), never the URL itself. A redirect is followed per {@link RedirectPolicyInterceptor}:
+ * same-host keeps the caller's headers, cross-host strips them, and https-to-http is refused.
  */
 public final class UrlDownloads implements Downloads {
     private final OkHttpClient httpClient;
@@ -37,10 +38,10 @@ public final class UrlDownloads implements Downloads {
 
     /**
      * @param httpClient issues the download request; injected so tests can intercept it without a
-     *                    real network call. Redirect-following is always disabled on top of
-     *                    whatever {@code httpClient} was configured with (see {@link
-     *                    #download}'s implementation note), so the caller's client need not
-     *                    already disable it.
+     *                    real network call. OkHttp's own redirect-following is always disabled and
+     *                    replaced with {@link RedirectPolicyInterceptor} on top of whatever {@code
+     *                    httpClient} was configured with, so the caller's client need not already
+     *                    disable it.
      * @param logger receives diagnostic output.
      * @param cacheDir the directory downloaded jars are cached under, keyed by a hash of the URL.
      */
@@ -48,28 +49,21 @@ public final class UrlDownloads implements Downloads {
         this.httpClient = httpClient.newBuilder()
                 .followRedirects(false)
                 .followSslRedirects(false)
+                .addInterceptor(new RedirectPolicyInterceptor())
                 .build();
         this.logger = logger;
         this.cacheDir = cacheDir;
     }
 
-    /**
-     * @implNote Redirects are never followed. OkHttp strips the {@code Authorization} header on a
-     * cross-host redirect but forwards any other header (such as {@code X-Api-Key} or {@code
-     * PRIVATE-TOKEN}) to whatever host answers a 3xx, including a plain-http host if {@code
-     * followSslRedirects} were left on; refusing to follow at all is the only policy that cannot
-     * leak a caller-supplied header to a host the caller never named. A 3xx response therefore
-     * surfaces as an ordinary HTTP-error failure below, exactly like a 4xx or 5xx.
-     */
     @Override
     public File download(String jarUrl, Map<String, String> headers, String sha256) throws IOException {
         if (!cacheDir.exists() && !cacheDir.mkdirs()) {
             throw new IOException("Failed to create cache directory: " + cacheDir.getAbsolutePath());
         }
-        if (headers != null && !headers.isEmpty() && jarUrl != null && jarUrl.toLowerCase(Locale.ROOT).startsWith("http://")) {
-            logger.warn("Sending request headers to a plain http:// URL; they will be visible to anything on the network path.");
-        }
         String redactedUrl = UrlRedaction.redact(jarUrl);
+        if (headers != null && !headers.isEmpty() && jarUrl != null && jarUrl.toLowerCase(Locale.ROOT).startsWith("http://")) {
+            logger.warn("Sending request headers to a plain http:// URL (" + redactedUrl + "); they will be visible to anything on the network path.");
+        }
 
         File cachedJar = new File(cacheDir, UrlDigest.sha256Hex(jarUrl) + ".jar");
         if (cachedJar.isFile()) {
@@ -124,10 +118,13 @@ public final class UrlDownloads implements Downloads {
      * naming only the header key.
      */
     private static void addHeaderOrThrow(Request.Builder requestBuilder, String key, String value) throws IOException {
+        if (key == null || value == null) {
+            throw new IOException("A header name and value must not be null.");
+        }
         try {
             requestBuilder.addHeader(key, value);
         } catch (IllegalArgumentException e) {
-            throw new IOException("Invalid value for header '" + key + "'.");
+            throw new IOException("Invalid header '" + key + "': the name or the value contains a disallowed character.");
         }
     }
 

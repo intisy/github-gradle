@@ -3,7 +3,11 @@ package io.github.intisy.gradle.github.impl;
 import com.sun.net.httpserver.HttpServer;
 import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
+import io.github.intisy.gradle.github.impl.download.RedirectPolicyInterceptor;
 import io.github.intisy.gradle.github.impl.download.UrlDownloads;
+import okhttp3.Call;
+import okhttp3.Connection;
+import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -25,22 +30,34 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Exercises {@link UrlDownloads} entirely offline: a canned {@link Interceptor} stands in for the
- * network, so no test here ever opens a socket, with one exception:
- * {@link #a302RedirectIsNeverFollowed} needs OkHttp's real redirect machinery, which sits below
- * where an application {@link Interceptor} can observe it (an interceptor that returns a
- * response directly never reaches it), so it drives a real {@link HttpServer} bound to the
- * loopback address only, torn down at the end of the test.
+ * network, so no test here ever opens a socket, with two exceptions.
+ *
+ * <p>{@link RedirectPolicyInterceptor} is appended to the client's interceptor list by {@link
+ * UrlDownloads}'s own constructor, positioned after whatever interceptors the caller's client
+ * already carries; a canned interceptor that returns a response directly (as {@link
+ * #clientReturning} does) never proceeds far enough down the chain to reach it. {@link
+ * #sameHostRedirectKeepsTheHeader} and {@link #crossHostRedirectStripsTheHeader} therefore drive a
+ * real {@link HttpServer}, bound to the loopback address only, torn down at the end of each test.
+ * {@link #httpsToHttpRedirectIsRefused} tests the same production {@link
+ * RedirectPolicyInterceptor#intercept} method directly against a hand-written fake {@code
+ * Interceptor.Chain} instead, since exercising a genuine https-to-http downgrade end to end would
+ * need a real TLS-terminating loopback server, disproportionate for one test; {@link
+ * #httpsToHttpDowngradeDecision} separately locks down the underlying decision function in
+ * isolation.
  *
  * <p>{@link #headerValueNeverAppearsInLogsOrExceptionMessages} is the load-bearing test in this
  * class: it supplies a header carrying a recognisable sentinel value across a success path, an
@@ -155,25 +172,21 @@ public class TestUrlDownloads {
     }
 
     /**
-     * Important 6's regression test. OkHttp follows a redirect by default, forwarding any header
-     * that is not {@code Authorization} to whatever host answers the 3xx, even across hosts. This
-     * test spins up a genuine local {@link HttpServer} (loopback only) whose {@code /original.jar}
-     * context returns a 302 pointing at its own {@code /redirected.jar} context, and asserts the
-     * redirect target is never reached at all, which an application {@link Interceptor} cannot
-     * demonstrate because it short-circuits OkHttp's redirect-following interceptor entirely.
+     * R3's same-host case: the caller's header must reach the redirect target when it stays on
+     * the same host.
      */
     @Test
-    public void a302RedirectIsNeverFollowed(@TempDir File cacheDir) throws IOException {
+    public void sameHostRedirectKeepsTheHeader(@TempDir File cacheDir) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        AtomicInteger redirectTargetHits = new AtomicInteger();
         int port = server.getAddress().getPort();
+        AtomicReference<String> receivedHeader = new AtomicReference<>();
         server.createContext("/original.jar", exchange -> {
-            exchange.getResponseHeaders().add("Location", "http://127.0.0.1:" + server.getAddress().getPort() + "/redirected.jar");
+            exchange.getResponseHeaders().add("Location", "http://127.0.0.1:" + port + "/redirected.jar");
             exchange.sendResponseHeaders(302, -1);
             exchange.close();
         });
         server.createContext("/redirected.jar", exchange -> {
-            redirectTargetHits.incrementAndGet();
+            receivedHeader.set(exchange.getRequestHeaders().getFirst("X-Api-Key"));
             byte[] body = "jar-content".getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body);
@@ -182,20 +195,101 @@ public class TestUrlDownloads {
         server.start();
         try {
             CapturingLogger logger = new CapturingLogger();
-            Downloads downloads = new UrlDownloads(new OkHttpClient(), logger, cacheDir);
+            Downloads downloads = new UrlDownloads(loopbackTestClient(), logger, cacheDir);
+            Map<String, String> headers = Collections.singletonMap("X-Api-Key", "same-host-token");
 
-            IOException thrown = assertThrows(IOException.class,
-                    () -> downloads.download("http://127.0.0.1:" + port + "/original.jar", null, null));
+            File jar = downloads.download("http://127.0.0.1:" + port + "/original.jar", headers, null);
 
-            assertTrue(thrown.getMessage().contains("302"), "message: " + thrown.getMessage());
-            assertEquals(0, redirectTargetHits.get(), "the redirect target must never be reached");
+            assertTrue(jar.isFile());
+            assertEquals("same-host-token", receivedHeader.get(), "a same-host redirect must keep the caller's header");
         } finally {
             server.stop(0);
         }
     }
 
+    /**
+     * R3's cross-host case: the redirect is still followed (this is what makes a presigned-URL
+     * redirect from Nexus/Artifactory/S3 work), but the caller's header must not reach the new
+     * host. Two real loopback servers stand in for two hosts by using different hostnames that
+     * both resolve to the loopback address ({@code 127.0.0.1} and {@code localhost}), so the host
+     * comparison is genuinely cross-host while nothing here leaves the machine.
+     */
     @Test
-    public void plainHttpUrlWithHeadersLogsAWarning(@TempDir File cacheDir) {
+    public void crossHostRedirectStripsTheHeader(@TempDir File cacheDir) throws IOException {
+        HttpServer originServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer targetServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        int targetPort = targetServer.getAddress().getPort();
+        AtomicReference<String> receivedHeader = new AtomicReference<>();
+        AtomicBoolean targetHit = new AtomicBoolean();
+        originServer.createContext("/original.jar", exchange -> {
+            exchange.getResponseHeaders().add("Location", "http://localhost:" + targetPort + "/redirected.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        targetServer.createContext("/redirected.jar", exchange -> {
+            targetHit.set(true);
+            receivedHeader.set(exchange.getRequestHeaders().getFirst("X-Api-Key"));
+            byte[] body = "jar-content".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        originServer.start();
+        targetServer.start();
+        try {
+            CapturingLogger logger = new CapturingLogger();
+            Downloads downloads = new UrlDownloads(loopbackTestClient(), logger, cacheDir);
+            Map<String, String> headers = Collections.singletonMap("X-Api-Key", "cross-host-token");
+
+            File jar = downloads.download("http://127.0.0.1:" + originServer.getAddress().getPort() + "/original.jar", headers, null);
+
+            assertTrue(jar.isFile());
+            assertTrue(targetHit.get(), "a cross-host redirect must still be followed");
+            assertNull(receivedHeader.get(), "a cross-host redirect must strip the caller's header");
+        } finally {
+            originServer.stop(0);
+            targetServer.stop(0);
+        }
+    }
+
+    /**
+     * R3's https-to-http case, exercised against the real {@link RedirectPolicyInterceptor}
+     * production method via a hand-written fake {@code Interceptor.Chain} (not a mock; this
+     * project takes no mocking dependency) rather than a real server, since a genuine downgrade
+     * needs a TLS-terminating origin.
+     */
+    @Test
+    public void httpsToHttpRedirectIsRefused() throws IOException {
+        Request initialRequest = new Request.Builder().url("https://example.com/original.jar").build();
+        Response redirectResponse = new Response.Builder()
+                .request(initialRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(302)
+                .message("Found")
+                .header("Location", "http://example.com/redirected.jar")
+                .body(ResponseBody.create(new byte[0], MediaType.parse("text/plain")))
+                .build();
+        FakeChain chain = new FakeChain(initialRequest, redirectResponse);
+
+        Response result = new RedirectPolicyInterceptor().intercept(chain);
+
+        assertEquals(302, result.code(), "an https-to-http redirect must be refused, surfacing the 3xx as-is");
+        assertEquals(1, chain.proceededRequests.size(), "the http:// target must never be requested");
+    }
+
+    @Test
+    public void httpsToHttpDowngradeDecision() {
+        HttpUrl https = HttpUrl.parse("https://example.com/original.jar");
+        HttpUrl http = HttpUrl.parse("http://example.com/redirected.jar");
+        HttpUrl httpsOtherHost = HttpUrl.parse("https://other.example.com/redirected.jar");
+
+        assertTrue(RedirectPolicyInterceptor.isHttpsToHttpDowngrade(https, http));
+        assertFalse(RedirectPolicyInterceptor.isHttpsToHttpDowngrade(https, httpsOtherHost));
+        assertFalse(RedirectPolicyInterceptor.isHttpsToHttpDowngrade(http, http));
+    }
+
+    @Test
+    public void plainHttpUrlWithHeadersLogsAWarningNamingTheUrl(@TempDir File cacheDir) {
         CapturingLogger logger = new CapturingLogger();
         OkHttpClient client = clientReturning(new RecordingInterceptor(), 200, "jar-content".getBytes(StandardCharsets.UTF_8));
         Downloads downloads = new UrlDownloads(client, logger, cacheDir);
@@ -203,8 +297,8 @@ public class TestUrlDownloads {
 
         assertDoesNotThrow(() -> downloads.download("http://example.com/foo.jar", headers, null));
 
-        assertTrue(logger.warnings.stream().anyMatch(message -> message.contains("http://")),
-                "expected a warning naming the plain-http URL; got: " + logger.warnings);
+        assertTrue(logger.warnings.stream().anyMatch(message -> message.contains("http://example.com/foo.jar")),
+                "expected a warning naming the specific plain-http URL that was downloaded; got: " + logger.warnings);
     }
 
     @Test
@@ -346,6 +440,83 @@ public class TestUrlDownloads {
     private static List<File> cacheDirEntries(File cacheDir) {
         File[] entries = cacheDir.listFiles();
         return entries == null ? Collections.<File>emptyList() : java.util.Arrays.asList(entries);
+    }
+
+    /**
+     * @implNote An explicit short {@code callTimeout} and {@link Proxy#NO_PROXY} keep a test that
+     * drives a real (loopback-only) {@link HttpServer} from inheriting an ambient proxy or hanging
+     * on OkHttp's default (unbounded read) timeout if something ever goes wrong.
+     */
+    private static OkHttpClient loopbackTestClient() {
+        return new OkHttpClient.Builder()
+                .proxy(Proxy.NO_PROXY)
+                .callTimeout(5, TimeUnit.SECONDS)
+                .build();
+    }
+
+    private static final class FakeChain implements Interceptor.Chain {
+        private final List<Request> proceededRequests = new ArrayList<>();
+        private final List<Response> responses = new ArrayList<>();
+        private Request currentRequest;
+        private int callIndex = 0;
+
+        FakeChain(Request initialRequest, Response... responses) {
+            this.currentRequest = initialRequest;
+            Collections.addAll(this.responses, responses);
+        }
+
+        @Override
+        public Request request() {
+            return currentRequest;
+        }
+
+        @Override
+        public Response proceed(Request request) {
+            proceededRequests.add(request);
+            currentRequest = request;
+            Response canned = responses.get(callIndex++);
+            return canned.newBuilder().request(request).build();
+        }
+
+        @Override
+        public Connection connection() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Call call() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int connectTimeoutMillis() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Interceptor.Chain withConnectTimeout(int timeout, TimeUnit unit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int readTimeoutMillis() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Interceptor.Chain withReadTimeout(int timeout, TimeUnit unit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int writeTimeoutMillis() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Interceptor.Chain withWriteTimeout(int timeout, TimeUnit unit) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static OkHttpClient clientReturning(Interceptor recorder, int status, byte[] body) {
