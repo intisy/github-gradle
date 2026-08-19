@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Releases;
 import io.github.intisy.gradle.github.api.capability.SourceBuilds;
@@ -10,7 +11,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +28,7 @@ public class TestJarResolver {
     public void releaseRequestDelegatesToDownloadJarWithExactArguments() throws IOException {
         File expected = new File("release.jar");
         RecordingReleases releases = new RecordingReleases(expected);
-        JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds());
+        JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds(), new UnusedDownloads());
 
         File resolved = resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0"));
 
@@ -39,7 +42,7 @@ public class TestJarResolver {
     public void sourceRequestDelegatesToBuildFromSourceWithExactArguments() throws IOException {
         File expected = new File("source.jar");
         RecordingSourceBuilds sourceBuilds = new RecordingSourceBuilds(expected);
-        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds);
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds, new UnusedDownloads());
 
         File resolved = resolver.resolve(ResolutionRequest.fromSource("owner", "repo", "main", "abc123"));
 
@@ -53,7 +56,7 @@ public class TestJarResolver {
     @Test
     public void sourceRequestWithNullShaPassesNullThroughRatherThanSubstitutingADefault() throws IOException {
         RecordingSourceBuilds sourceBuilds = new RecordingSourceBuilds(new File("source.jar"));
-        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds);
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds, new UnusedDownloads());
 
         resolver.resolve(ResolutionRequest.fromSource("owner", "repo", "main", null));
 
@@ -63,7 +66,7 @@ public class TestJarResolver {
     @Test
     public void releaseRequestThrowsNamingTheCoordinateWhenDownloadJarReturnsEmpty() {
         RecordingReleases releases = new RecordingReleases(null);
-        JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds());
+        JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds(), new UnusedDownloads());
 
         RuntimeException thrown = assertThrows(RuntimeException.class,
                 () -> resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0")));
@@ -86,7 +89,7 @@ public class TestJarResolver {
     public void gitRequestDelegatesToTheTwoArgBuildFromSourceWithExactArguments() throws IOException {
         File expected = new File("git.jar");
         RecordingSourceBuilds sourceBuilds = new RecordingSourceBuilds(expected);
-        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds);
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds, new UnusedDownloads());
 
         File resolved = resolver.resolve(ResolutionRequest.fromGit("https://gitlab.com/me/lib.git", "v1.0"));
 
@@ -97,11 +100,18 @@ public class TestJarResolver {
     }
 
     @Test
-    public void urlRequestIsNotYetWired() {
-        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), new UnusedSourceBuilds());
+    public void urlRequestDelegatesToDownloadWithExactArguments() throws IOException {
+        File expected = new File("url.jar");
+        RecordingDownloads downloads = new RecordingDownloads(expected);
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), new UnusedSourceBuilds(), downloads);
+        Map<String, String> headers = Collections.singletonMap("Authorization", "Bearer secret");
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", null)));
+        File resolved = resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", headers));
+
+        assertSame(expected, resolved);
+        assertEquals("https://example.com/foo.jar", downloads.capturedJarUrl);
+        assertEquals(headers, downloads.capturedHeaders);
+        assertNull(downloads.capturedSha256, "the ResolutionRequest-mediated path does not carry a sha256");
     }
 
     @Test
@@ -260,6 +270,32 @@ public class TestJarResolver {
 
         @Override
         public File buildFromSource(String cloneUrl, String ref) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class RecordingDownloads implements Downloads {
+        private final File jarToReturn;
+        private String capturedJarUrl;
+        private Map<String, String> capturedHeaders;
+        private String capturedSha256;
+
+        RecordingDownloads(File jarToReturn) {
+            this.jarToReturn = jarToReturn;
+        }
+
+        @Override
+        public File download(String jarUrl, Map<String, String> headers, String sha256) {
+            this.capturedJarUrl = jarUrl;
+            this.capturedHeaders = headers;
+            this.capturedSha256 = sha256;
+            return jarToReturn;
+        }
+    }
+
+    private static final class UnusedDownloads implements Downloads {
+        @Override
+        public File download(String jarUrl, Map<String, String> headers, String sha256) {
             throw new UnsupportedOperationException();
         }
     }

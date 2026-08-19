@@ -1,6 +1,7 @@
 package io.github.intisy.gradle.github.api;
 
 import io.github.intisy.gradle.github.api.capability.Credentials;
+import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Publishing;
 import io.github.intisy.gradle.github.api.capability.Releases;
@@ -13,11 +14,13 @@ import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.JarResolverImpl;
 import io.github.intisy.gradle.github.impl.RepositoriesImpl;
+import io.github.intisy.gradle.github.impl.download.UrlDownloads;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.impl.github.GitHubSourceBuilds;
 import io.github.intisy.gradle.github.impl.source.BuildInvoker;
 import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 import io.github.intisy.gradle.github.utils.FileUtils;
+import okhttp3.OkHttpClient;
 
 import java.io.File;
 
@@ -28,21 +31,24 @@ import java.io.File;
  * two-argument overload, which logs to {@code System.err}, or the no-argument overload, which
  * additionally defaults to fully anonymous access), then reach each capability through its
  * accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
- * {@link #publishing()}, {@link #sourceBuilds()}, {@link #resolver()}.
+ * {@link #publishing()}, {@link #sourceBuilds()}, {@link #downloads()}, {@link #resolver()}.
  */
 public final class GitHubApi {
     private final GitHub gitHub;
     private final Repositories repositories;
     private final SourceBuilds sourceBuilds;
+    private final Downloads downloads;
     private final JarResolver resolver;
 
     private GitHubApi(GitHub gitHub, GitHubConfig config, GitHubLogger logger) {
         this.gitHub = gitHub;
         this.repositories = new RepositoriesImpl(gitHub, config, logger);
-        File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
-        SourceBuilder sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
+        File sourceCacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
+        SourceBuilder sourceBuilder = new SourceBuilder(config, logger, sourceCacheDir, new BuildInvoker.Gradlew(logger));
         this.sourceBuilds = new GitHubSourceBuilds(gitHub, sourceBuilder);
-        this.resolver = new JarResolverImpl(gitHub, sourceBuilds);
+        File downloadCacheDir = FileUtils.getGradleHome().resolve("url-downloads").toFile();
+        this.downloads = new UrlDownloads(new OkHttpClient(), logger, downloadCacheDir);
+        this.resolver = new JarResolverImpl(gitHub, sourceBuilds, downloads);
     }
 
     /**
@@ -108,15 +114,24 @@ public final class GitHubApi {
 
     /**
      * @return the client's build-from-source capability, backed by a shared cache directory whose
-     * entries are keyed by owner, repo, and resolved commit.
+     * entries are keyed by owner, repo, and resolved commit (or, for an arbitrary clone URL, a
+     * derived identity and resolved ref).
      */
     public SourceBuilds sourceBuilds() {
         return sourceBuilds;
     }
 
     /**
-     * @return the client's {@link ResolutionRequest}-based resolver, dispatching to {@link #releases()}
-     * or {@link #sourceBuilds()} by the request's own strategy.
+     * @return the client's jar-download capability, for a URL with no repository or git host
+     * involved, backed by a shared cache directory whose entries are keyed by a hash of the URL.
+     */
+    public Downloads downloads() {
+        return downloads;
+    }
+
+    /**
+     * @return the client's {@link ResolutionRequest}-based resolver, dispatching to {@link
+     * #releases()}, {@link #sourceBuilds()}, or {@link #downloads()} by the request's own strategy.
      */
     public JarResolver resolver() {
         return resolver;
