@@ -74,7 +74,13 @@ public final class UrlDownloads implements Downloads {
         File cachedJar = new File(cacheDir, UrlDigest.sha256Hex(jarUrl) + ".jar");
         if (cachedJar.isFile()) {
             logger.debug("Using cached download: " + cachedJar.getName());
-            verifyOrThrow(cachedJar, sha256, redactedUrl);
+            try {
+                verifyOrThrow(cachedJar, sha256, redactedUrl);
+            } catch (IOException e) {
+                deleteQuietly(cachedJar);
+                logger.error("Cached download for " + redactedUrl + " failed verification and was removed: " + e.getMessage(), e);
+                throw e;
+            }
             return cachedJar;
         }
 

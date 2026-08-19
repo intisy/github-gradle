@@ -111,6 +111,35 @@ public class TestUrlDownloads {
         assertEquals(0, cachedEntries.length, "a mismatched download must not be cached");
     }
 
+    /**
+     * Minor 9's regression test. Verifying a cache hit against a sha256 that was not the one the
+     * jar was originally cached under (a poisoned or truncated entry, or simply a later call
+     * asking for a different hash) must not leave that entry behind: a build that keeps omitting
+     * {@code sha256} would otherwise keep consuming the bad file forever.
+     */
+    @Test
+    public void cacheHitFailingVerificationIsDeletedRatherThanLeftBehind(@TempDir File cacheDir) throws IOException {
+        byte[] jarBytes = "jar-content".getBytes(StandardCharsets.UTF_8);
+        CapturingLogger logger = new CapturingLogger();
+        OkHttpClient client = clientReturning(new RecordingInterceptor(), 200, jarBytes);
+        Downloads downloads = new UrlDownloads(client, logger, cacheDir);
+        String jarUrl = "https://example.com/foo.jar";
+
+        File firstJar = downloads.download(jarUrl, null, null);
+        assertTrue(firstJar.isFile());
+
+        String wrongSha256 = sha256Hex("not the jar content");
+        assertThrows(IOException.class, () -> downloads.download(jarUrl, null, wrongSha256));
+
+        assertFalse(firstJar.isFile(), "a cache entry that fails verification must be deleted, not left poisoned");
+
+        File[] jarsAfterMismatch = cacheDir.listFiles((dir, name) -> name.endsWith(".jar"));
+        assertEquals(0, jarsAfterMismatch.length);
+
+        File secondJar = downloads.download(jarUrl, null, sha256Hex(jarBytes));
+        assertTrue(secondJar.isFile(), "a later call must be able to re-download rather than stay stuck");
+    }
+
     @Test
     public void httpErrorPropagatesAndLeavesNoCachedFile(@TempDir File cacheDir) {
         CapturingLogger logger = new CapturingLogger();
