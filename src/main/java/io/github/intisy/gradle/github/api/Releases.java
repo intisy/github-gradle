@@ -9,32 +9,40 @@ import java.util.List;
 public interface Releases {
     /**
      * @return the latest release's tag, or null if the repository has no releases.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     String latestVersion(String owner, String repo);
 
     /**
      * @return the release identified by {@code tag}.
      * @throws RuntimeException if no release matches {@code tag} (unchecked; the tag is looked up, not I/O).
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     Release releaseByTag(String owner, String repo, String tag);
 
     /**
      * @return the latest release, or null if the repository has no releases.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     Release latestRelease(String owner, String repo);
 
     /**
      * @throws RuntimeException thrown unchecked by the underlying client if no release matches
      * {@code version}, if the release has no matching jar asset, or if the download itself fails.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     File downloadJar(String owner, String repo, String version);
 
     /**
      * @return the classifier asset's jar, or null if the release has no asset named
      * {@code repo-classifier.jar}.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     File downloadJar(String owner, String repo, String version, String classifier);
 
+    /**
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
+     */
     List<File> downloadAllModuleJars(String owner, String repo, String version);
 
     /**
@@ -48,6 +56,7 @@ public interface Releases {
      * itself if it wants each distinct jar added only once.
      *
      * @return the root jar followed by every transitively resolved jar, each appearing once.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     List<File> resolveWithDependencies(String owner, String repo, String version);
 

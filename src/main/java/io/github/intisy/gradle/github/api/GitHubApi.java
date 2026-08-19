@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github.api;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.BuildInvoker;
 import io.github.intisy.gradle.github.impl.GitHub;
+import io.github.intisy.gradle.github.impl.RepositoriesImpl;
 import io.github.intisy.gradle.github.impl.SourceBuilder;
 import io.github.intisy.gradle.github.utils.FileUtils;
 
@@ -18,11 +19,13 @@ import java.io.File;
  */
 public final class GitHubApi {
     private final GitHub gitHub;
+    private final Repositories repositories;
     private final SourceBuilder sourceBuilder;
     private final JarResolver resolver;
 
     private GitHubApi(GitHub gitHub, GitHubConfig config, GitHubLogger logger) {
         this.gitHub = gitHub;
+        this.repositories = new RepositoriesImpl(gitHub, config, logger);
         File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
         this.sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
         this.resolver = new JarResolverImpl(gitHub, sourceBuilder);
@@ -50,7 +53,7 @@ public final class GitHubApi {
     }
 
     public Repositories repositories() {
-        return gitHub;
+        return repositories;
     }
 
     public Releases releases() {

@@ -13,11 +13,12 @@ import java.util.stream.Stream;
  */
 public class FileUtils {
     /**
-     * Returns the path to the Gradle home directory.
+     * Returns the path to the Gradle caches directory, {@code ~/.gradle/caches}.
      *
-     * <p>The Gradle home directory is located at {@code ~/.gradle/caches/github} by default.
+     * <p>Callers append their own subdirectory beneath it, for example {@code github} for
+     * downloaded release assets or {@code github-source} for source builds.
      *
-     * @return the path to the Gradle home directory
+     * @return the path to the Gradle caches directory
      */
     public static Path getGradleHome() {
         String userHome = System.getProperty("user.home");

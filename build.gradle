@@ -35,6 +35,7 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/api/**'
         include 'io/github/intisy/gradle/github/impl/GitHub*'
         include 'io/github/intisy/gradle/github/impl/GitHubCli*'
+        include 'io/github/intisy/gradle/github/impl/RepositoriesImpl*'
         include 'io/github/intisy/gradle/github/impl/SourceBuilder*'
         include 'io/github/intisy/gradle/github/impl/BuildInvoker*'
         include 'io/github/intisy/gradle/github/utils/FileUtils*'

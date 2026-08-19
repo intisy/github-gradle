@@ -110,6 +110,49 @@ github {
 }
 ```
 
+## Using the library without Gradle
+
+Cloning repositories, resolving releases and downloading assets are also published as a small,
+Gradle-free library, separate from the plugin jar:
+
+```groovy
+dependencies {
+    implementation "io.github.intisy:github-gradle-api:1.3.8"
+}
+```
+
+The entry point is `GitHubApi.create(...)`. It needs a `GitHubConfig` (the access token and
+auth/cli/resilience settings), and the library ships no default implementation of it, so a
+consumer supplies one itself:
+
+```java
+import io.github.intisy.gradle.github.api.*;
+import io.github.intisy.gradle.github.extension.*;
+
+import java.io.File;
+
+GitHubConfig config = new GitHubConfig() {
+    private final AuthExtension auth = new AuthExtension();
+    private final CliExtension cli = new CliExtension();
+    private final ResilienceExtension resilience = new ResilienceExtension();
+    {
+        auth.setToken(System.getenv("GITHUB_TOKEN"));
+    }
+
+    @Override public String getAccessToken() { return null; }
+    @Override public AuthExtension getAuth() { return auth; }
+    @Override public CliExtension getCli() { return cli; }
+    @Override public ResilienceExtension getResilience() { return resilience; }
+};
+
+GitHubApi api = GitHubApi.create(config, new ResourcesExtension());
+File jar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7");
+```
+
+`api.repositories()`, `api.publishing()`, `api.sourceBuilds()` and `api.resolver()` reach the
+same capabilities the plugin's own tasks use. `GitHubApi.create` also accepts a `GitHubLogger`
+argument if you want diagnostics sent somewhere other than `System.err`.
+
 ## License
 
 [![Apache License 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
