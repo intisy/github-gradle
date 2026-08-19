@@ -6,10 +6,11 @@ import com.jcraft.jsch.Session;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.GitHubConfig;
+import io.github.intisy.gradle.github.api.GitHubLogger;
+import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.extension.AuthExtension;
 import io.github.intisy.gradle.github.extension.CliExtension;
-import io.github.intisy.gradle.github.extension.GithubExtension;
-import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import okhttp3.OkHttpClient;
@@ -54,9 +55,9 @@ import java.util.zip.ZipFile;
  */
 @SuppressWarnings("unused")
 public class GitHub {
-    private final Logger logger;
+    private final GitHubLogger logger;
     private final ResourcesExtension resourcesExtension;
-    private final GithubExtension githubExtension;
+    private final GitHubConfig githubExtension;
     private String resolvedApiKey;
     private String resolvedSshKey;
     private final OkHttpClient httpClient;
@@ -70,7 +71,7 @@ public class GitHub {
      * @param resourcesExtension the resources extension containing repository configuration
      * @param githubExtension the github extension containing access token configuration
      */
-    public GitHub(Logger logger, ResourcesExtension resourcesExtension, GithubExtension githubExtension) {
+    public GitHub(GitHubLogger logger, ResourcesExtension resourcesExtension, GitHubConfig githubExtension) {
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;

@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github;
 
+import io.github.intisy.gradle.github.api.GitHubLogger;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import org.gradle.api.Project;
 import org.gradle.api.logging.LogLevel;
@@ -8,7 +9,7 @@ import org.gradle.api.logging.Logging;
 /**
  * A logger for the GitHub plugin.
  */
-public class Logger {
+public class Logger implements GitHubLogger {
     private final GithubExtension extension;
     private final org.gradle.api.logging.Logger logger;
     private Project project;

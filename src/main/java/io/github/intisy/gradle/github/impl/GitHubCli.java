@@ -1,6 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
-import io.github.intisy.gradle.github.Logger;
+import io.github.intisy.gradle.github.api.GitHubLogger;
 import okhttp3.MediaType;
 import okhttp3.Protocol;
 import okhttp3.Request;
@@ -29,13 +29,13 @@ public class GitHubCli {
     /** Extracts the HTTP status code from a {@code gh} error line such as "gh: Not Found (HTTP 404)". */
     private static final Pattern HTTP_CODE = Pattern.compile("\\(HTTP (\\d{3})\\)");
 
-    private final Logger logger;
+    private final GitHubLogger logger;
     private Boolean available;
 
     /**
      * @param logger the logger for diagnostics.
      */
-    public GitHubCli(Logger logger) {
+    public GitHubCli(GitHubLogger logger) {
         this.logger = logger;
     }
 

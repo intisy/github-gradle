@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.impl;
+package io.github.intisy.gradle.github.api;
 
 /**
  * Thrown when a GitHub API request fails because the rate limit has been exceeded.

@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github.extension;
 
 import java.io.File;
 import java.nio.file.Path;
+import io.github.intisy.gradle.github.api.GitHubConfig;
 import org.gradle.api.Action;
 import groovy.lang.Closure;
 
@@ -42,7 +43,7 @@ import groovy.lang.Closure;
  * </pre>
  */
 @SuppressWarnings("unused")
-public class GithubExtension {
+public class GithubExtension implements GitHubConfig {
     private final ResourcesExtension resources = new ResourcesExtension();
     private final PublishExtension publish = new PublishExtension();
     private final CliExtension cli = new CliExtension();
