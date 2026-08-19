@@ -48,6 +48,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -316,14 +318,51 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         return isPAT;
     }
 
+    private static final String GITHUB_HOST = "github.com";
+
     /**
-     * Creates a credentials provider for Git operations.
+     * @param url the clone URL an operation targets.
+     * @return true if {@code url}'s host is exactly {@code github.com}, case-insensitively.
+     * @implNote The configured GitHub token and SSH key must never reach a git host other than
+     * github.com: this plugin has no concept of a configurable GitHub Enterprise host today, so
+     * "github.com" is the only host these credentials are ever correct for. A URL this method
+     * cannot parse a host from (a malformed value) is treated as non-GitHub, the safer default.
+     */
+    private static boolean isGitHubHost(String url) {
+        return GITHUB_HOST.equalsIgnoreCase(extractHost(url));
+    }
+
+    private static String extractHost(String url) {
+        if (url == null) {
+            return null;
+        }
+        if (url.startsWith("git@")) {
+            String afterAt = url.substring(4);
+            int colon = afterAt.indexOf(':');
+            return colon >= 0 ? afterAt.substring(0, colon) : afterAt;
+        }
+        try {
+            return new URI(url).getHost();
+        } catch (URISyntaxException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Creates a credentials provider for Git operations, scoped to github.com only.
      *
      * @param repoOwner the repository owner for authentication
-     * @return the credentials provider, or null if SSH authentication is used
+     * @param cloneUrl the clone URL this credentials provider is for; the configured GitHub token
+     *                 is offered only when this is a github.com URL, never to any other host
+     * @return the credentials provider, or null if SSH authentication is used, no token is
+     * configured, or {@code cloneUrl} does not target github.com
      */
-    public CredentialsProvider getCredentialsProvider(String repoOwner) {
+    public CredentialsProvider getCredentialsProvider(String repoOwner, String cloneUrl) {
         logger.debug("Attempting to get CredentialsProvider for owner: " + repoOwner);
+        if (!isGitHubHost(cloneUrl)) {
+            logger.debug("Clone URL does not target github.com; withholding the configured GitHub token.");
+            return null;
+        }
         String token = getApiKey();
         if (token != null) {
             logger.debug("Token present. Creating UsernamePasswordCredentialsProvider.");
@@ -334,12 +373,19 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     /**
-     * Creates a transport configuration callback for SSH authentication.
+     * Creates a transport configuration callback for SSH authentication, scoped to github.com only.
      *
-     * @return the transport configuration callback, or null if SSH is not used
+     * @param cloneUrl the clone URL this callback is for; the configured SSH key is installed only
+     *                 when this is a github.com URL, never for any other host
+     * @return the transport configuration callback, or null if SSH is not used or {@code cloneUrl}
+     * does not target github.com
      */
-    private TransportConfigCallback getTransportConfigCallback() {
+    private TransportConfigCallback getTransportConfigCallback(String cloneUrl) {
         logger.debug("Attempting to get TransportConfigCallback.");
+        if (!isGitHubHost(cloneUrl)) {
+            logger.debug("Clone URL does not target github.com; withholding the configured GitHub SSH key.");
+            return null;
+        }
         final String sshKey = getSshKey();
         if (sshKey != null) {
             logger.debug("SSH key present. Creating SshTransportConfigCallback.");
@@ -418,8 +464,8 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         logger.log("Cloning repository... (" + UrlRedaction.redact(cloneUrl) + ") into " + path.getAbsolutePath());
         try (Git ignored = Git.cloneRepository()
                 .setURI(cloneUrl)
-                .setCredentialsProvider(getCredentialsProvider(authUsername))
-                .setTransportConfigCallback(getTransportConfigCallback())
+                .setCredentialsProvider(getCredentialsProvider(authUsername, cloneUrl))
+                .setTransportConfigCallback(getTransportConfigCallback(cloneUrl))
                 .setDirectory(path)
                 .call()) {
             logger.log("Repository cloned successfully.");
@@ -479,6 +525,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         if (repoOwner == null) {
             throw new IllegalStateException("Cannot determine repository owner because resourcesExtension.repoUrl is not configured.");
         }
+        String cloneUrl = resourcesExtension.getRepoUrl();
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         try (
                 Repository repository = builder.setGitDir(path.toPath().resolve(".git").toFile())
@@ -488,7 +535,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 Git git = new Git(repository)
         ) {
             logger.debug("Performing git fetch...");
-            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner)).setTransportConfigCallback(getTransportConfigCallback()).call();
+            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner, cloneUrl)).setTransportConfigCallback(getTransportConfigCallback(cloneUrl)).call();
             logger.debug("Fetch completed.");
             String branch = repository.getBranch();
             ObjectId localCommit = repository.resolve("refs/heads/" + branch);
@@ -518,11 +565,12 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         if (repoOwner == null) {
             throw new IllegalStateException("Cannot determine repository owner because resourcesExtension.repoUrl is not configured.");
         }
+        String cloneUrl = resourcesExtension.getRepoUrl();
         try (Git repo = Git.open(path)) {
             Repository repository = repo.getRepository();
             Git git = new Git(repository);
             logger.debug("Performing git fetch before pull...");
-            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner)).setTransportConfigCallback(getTransportConfigCallback()).call();
+            git.fetch().setCredentialsProvider(getCredentialsProvider(repoOwner, cloneUrl)).setTransportConfigCallback(getTransportConfigCallback(cloneUrl)).call();
             logger.debug("Fetch completed.");
 
             if (branch == null) {
@@ -531,8 +579,8 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
             }
 
             PullCommand pullCmd = git.pull()
-                    .setCredentialsProvider(getCredentialsProvider(repoOwner))
-                    .setTransportConfigCallback(getTransportConfigCallback())
+                    .setCredentialsProvider(getCredentialsProvider(repoOwner, cloneUrl))
+                    .setTransportConfigCallback(getTransportConfigCallback(cloneUrl))
                     .setRemoteBranchName(branch);
 
             logger.log("Pulling Repository branch " + branch);

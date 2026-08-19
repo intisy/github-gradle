@@ -72,6 +72,34 @@ public class TestGitHub {
         assertEquals("git@github.com:acme/widget.git", gh.getRepositoryURL("acme", "widget"));
     }
 
+    /**
+     * Important 5's regression test: the configured GitHub token must never be offered to a git
+     * host other than github.com. {@link GitHub#getCredentialsProvider} is scoped by the clone
+     * URL it is asked about, not by any global state, so a single instance correctly withholds
+     * credentials for one host while still authenticating against another.
+     */
+    @Test
+    public void credentialsProviderIsWithheldForANonGitHubHost() {
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setToken("ghp_test-token");
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertNull(gh.getCredentialsProvider("acme", "https://gitlab.com/acme/widget.git"),
+                "the configured GitHub token must not be offered to gitlab.com");
+        assertNotNull(gh.getCredentialsProvider("acme", "https://github.com/acme/widget"),
+                "the configured GitHub token must still be offered to github.com");
+    }
+
+    @Test
+    public void credentialsProviderIsWithheldWhenTheCloneUrlIsAnUnrelatedSshHost() {
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setToken("ghp_test-token");
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertNull(gh.getCredentialsProvider("acme", "git@bitbucket.org:acme/widget.git"));
+        assertNotNull(gh.getCredentialsProvider("acme", "git@github.com:acme/widget.git"));
+    }
+
     @Disabled
     @Test
     public void testAccessToken() throws IOException, GitAPIException {
