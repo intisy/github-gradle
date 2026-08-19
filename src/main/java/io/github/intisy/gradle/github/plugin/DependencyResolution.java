@@ -20,6 +20,19 @@ import java.util.Set;
 public class DependencyResolution {
 
 	/**
+	 * Same as {@link #apply(Project, Logger, GithubExtension, Releases, Set)}, with a fresh,
+	 * private dedup set: nothing outside the GitHub branches shares it.
+	 *
+	 * @param project the project whose GitHub dependency configurations are resolved.
+	 * @param logger receives diagnostic output.
+	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
+	 * @param releases the client used to resolve each dependency to a jar.
+	 */
+	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
+		apply(project, logger, githubExtension, releases, new HashSet<File>());
+	}
+
+	/**
 	 * Resolves every {@code githubImplementation}/{@code githubApi}/etc. dependency into a local
 	 * jar and adds it to the matching native Gradle configuration, after the project is evaluated.
 	 *
@@ -27,17 +40,24 @@ public class DependencyResolution {
 	 * @param logger receives diagnostic output.
 	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
 	 * @param releases the client used to resolve each dependency to a jar.
+	 * @param addedJars the dedup filter, keyed by resolved {@link File}; pass the same set given to
+	 * {@link SourcesResolution#apply} so a jar reachable from both a {@code github*} coordinate and
+	 * a {@code sources { }} entry is added to a native configuration only once.
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
-	 * call. {@code addedJars} extends that dedup across every configuration and every branch: the
-	 * no-classifier branch ({@link Releases#resolveWithDependencies}), the {@code :all} branch
-	 * ({@link Releases#downloadAllModuleJars}), and the explicit-classifier branch
-	 * ({@link Releases#downloadJar(String, String, String, String)}) all consult it, keyed by the
-	 * resolved {@link File}. Each distinct jar is therefore added to a native configuration at most
-	 * once across the whole configuration loop, no matter which branch reaches it.
+	 * call. {@code addedJars} extends that dedup across every configuration, every branch, and
+	 * every {@code sources { }} entry: the no-classifier branch
+	 * ({@link Releases#resolveWithDependencies}), the {@code :all} branch
+	 * ({@link Releases#downloadAllModuleJars}), the explicit-classifier branch
+	 * ({@link Releases#downloadJar(String, String, String, String)}), and {@link SourcesResolution}
+	 * all consult it, keyed by the resolved {@link File}. The guarantee is only as strong as the
+	 * cache-naming scheme behind that {@link File}: both the release cache and the source-build
+	 * cache key a jar by unescaped {@code "-"}-joined string concatenation (owner, repo, version or
+	 * commit), so two logically distinct artifacts could in principle collide on the same path and
+	 * be treated as one jar. The url-download cache sidesteps this by keying on a hash of the URL
+	 * instead.
 	 */
-	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
+	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases, Set<File> addedJars) {
 		project.afterEvaluate(proj -> {
-			Set<File> addedJars = new HashSet<File>();
 			for (String cfgName : GithubConfigurations.GITHUB_CONFIGS) {
 				String nativeCfg = GithubConfigurations.GITHUB_TO_GRADLE.get(cfgName);
 				boolean needsJavaLibrary = GithubConfigurations.JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
