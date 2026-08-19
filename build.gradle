@@ -38,6 +38,7 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/impl/RepositoriesImpl*'
         include 'io/github/intisy/gradle/github/impl/SourceBuilder*'
         include 'io/github/intisy/gradle/github/impl/BuildInvoker*'
+        include 'io/github/intisy/gradle/github/impl/JarResolverImpl*'
         include 'io/github/intisy/gradle/github/utils/FileUtils*'
         include 'io/github/intisy/gradle/github/extension/AuthExtension*'
         include 'io/github/intisy/gradle/github/extension/CliExtension*'

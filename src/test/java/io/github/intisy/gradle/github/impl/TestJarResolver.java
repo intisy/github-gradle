@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.impl;
 
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Releases;

@@ -13,6 +13,7 @@ import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.BuildInvoker;
 import io.github.intisy.gradle.github.impl.GitHub;
+import io.github.intisy.gradle.github.impl.JarResolverImpl;
 import io.github.intisy.gradle.github.impl.RepositoriesImpl;
 import io.github.intisy.gradle.github.impl.SourceBuilder;
 import io.github.intisy.gradle.github.utils.FileUtils;
