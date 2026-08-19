@@ -8,6 +8,7 @@ import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.plugin.BuildFileEditor;
+import io.github.intisy.gradle.github.plugin.GithubConfigurations;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -17,7 +18,6 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ExternalDependency;
 import org.gradle.api.artifacts.ModuleDependencyCapabilitiesHandler;
 import org.gradle.api.artifacts.dsl.ArtifactHandler;
 import org.gradle.api.plugins.JavaPlugin;
@@ -30,50 +30,15 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 /**
  * Main plugin class.
  */
 class Main implements Plugin<Project> {
-
-	/** Names of all GitHub dependency configurations created by this plugin, in declaration order. */
-	private static final List<String> GITHUB_CONFIGS = Collections.unmodifiableList(Arrays.asList(
-		"githubImplementation",
-		"githubApi",
-		"githubCompileOnly",
-		"githubCompileOnlyApi",
-		"githubRuntimeOnly"
-	));
-
-	/**
-	 * Maps each GitHub configuration to the native Gradle configuration it feeds.
-	 * {@code api} and {@code compileOnlyApi} require the {@code java-library} plugin.
-	 */
-	private static final Map<String, String> GITHUB_TO_GRADLE;
-	static {
-		Map<String, String> m = new HashMap<String, String>();
-		m.put("githubImplementation",  "implementation");
-		m.put("githubApi",             "api");
-		m.put("githubCompileOnly",     "compileOnly");
-		m.put("githubCompileOnlyApi",  "compileOnlyApi");
-		m.put("githubRuntimeOnly",     "runtimeOnly");
-		GITHUB_TO_GRADLE = Collections.unmodifiableMap(m);
-	}
-
-	/** Gradle configurations that require the {@code java-library} plugin. */
-	private static final Set<String> JAVA_LIBRARY_CONFIGS = new HashSet<String>(Arrays.asList(
-		"api", "compileOnlyApi"
-	));
 
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
@@ -84,9 +49,7 @@ class Main implements Plugin<Project> {
 
 		Logger logger = new Logger(githubExtension, project);
 
-		for (String cfgName : GITHUB_CONFIGS) {
-			project.getConfigurations().create(cfgName);
-		}
+		GithubConfigurations.apply(project);
 
 		GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
@@ -132,16 +95,16 @@ class Main implements Plugin<Project> {
 		project.afterEvaluate(proj -> {
 			Set<String> resolved = new HashSet<String>();
 			List<File> allJars = new ArrayList<File>();
-			for (String cfgName : GITHUB_CONFIGS) {
-				String nativeCfg = GITHUB_TO_GRADLE.get(cfgName);
-				boolean needsJavaLibrary = JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
+			for (String cfgName : GithubConfigurations.GITHUB_CONFIGS) {
+				String nativeCfg = GithubConfigurations.GITHUB_TO_GRADLE.get(cfgName);
+				boolean needsJavaLibrary = GithubConfigurations.JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
 				if (needsJavaLibrary && !proj.getPlugins().hasPlugin("java-library")) {
 					continue;
 				}
 				Configuration cfg = proj.getConfigurations().getByName(cfgName);
 				for (Dependency dependency : cfg.getDependencies()) {
 					try {
-						String classifier = extractClassifier(dependency);
+						String classifier = GithubConfigurations.extractClassifier(dependency);
 						List<File> jars = new ArrayList<File>();
 						if (classifier.isEmpty()) {
 							gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
@@ -173,7 +136,7 @@ class Main implements Plugin<Project> {
 				task.setGroup("github");
 				task.setDescription("Generates META-INF/github-dependencies.json from githubImplementation dependencies");
 				task.doLast(t -> {
-					Set<Dependency> deps = getDependencies(project);
+					Set<Dependency> deps = GithubConfigurations.getDependencies(project);
 					if (deps.isEmpty()) { logger.debug("No githubImplementation dependencies to write metadata for."); return; }
 					StringBuilder json = new StringBuilder("[\n");
 					boolean first = true;
@@ -205,7 +168,7 @@ class Main implements Plugin<Project> {
 			task.setGroup("github");
 			task.setDescription("Prints all GitHub dependencies across all configurations");
 			task.doLast(t -> {
-				for (Dependency dependency : getAllDependencies(project)) {
+				for (Dependency dependency : GithubConfigurations.getAllDependencies(project)) {
 					logger.log("Github Dependency named " + dependency.getName() + " version " + dependency.getVersion() + " from user" + dependency.getGroup());
 				}
 			});
@@ -217,7 +180,7 @@ class Main implements Plugin<Project> {
 				task.setDescription("Updates all GitHub dependencies");
 				task.doLast(t -> {
 					boolean refresh = false;
-					Set<Dependency> dependencyList = getAllDependencies(project);
+					Set<Dependency> dependencyList = GithubConfigurations.getAllDependencies(project);
 					logger.debug("Updating GitHub dependencies: " + dependencyList);
 					for (Dependency dependency : dependencyList) {
 						String group = dependency.getGroup();
@@ -459,49 +422,5 @@ class Main implements Plugin<Project> {
 		}
 		logger.log("Selected artifact: " + result.getName());
 		return result;
-	}
-
-	/**
-	 * Extracts the classifier from a dependency declared as
-	 * {@code "OWNER:REPO:VERSION:CLASSIFIER"}.
-	 *
-	 * <p>Gradle parses the 4th colon-segment as an artifact classifier accessible via
-	 * {@code ExternalDependency.getArtifacts()}. Returns an empty string when no classifier
-	 * is present (the common case).
-	 *
-	 * @param dependency the Gradle dependency
-	 * @return the classifier string, or {@code ""} if absent
-	 */	private String extractClassifier(Dependency dependency) {
-		if (dependency instanceof ExternalDependency) {
-			ExternalDependency ext = (ExternalDependency) dependency;
-			if (!ext.getArtifacts().isEmpty()) {
-				String classifier = ext.getArtifacts().iterator().next().getClassifier();
-				return classifier != null ? classifier : "";
-			}
-		}
-		return "";
-	}
-
-	/**
-	 * @param project the project
-	 * @return all github dependency configurations' dependencies across all subprojects
-	 */
-	public Set<Dependency> getAllDependencies(Project project) {
-		return project.getAllprojects().stream().flatMap(p -> getDependencies(p).stream()).collect(Collectors.toSet());
-	}
-
-	/**
-	 * @param project the project
-	 * @return all github dependency configurations' dependencies for this project only
-	 */
-	public Set<Dependency> getDependencies(Project project) {
-		Set<Dependency> all = new LinkedHashSet<Dependency>();
-		for (String cfgName : GITHUB_CONFIGS) {
-			Configuration cfg = project.getConfigurations().findByName(cfgName);
-			if (cfg != null) {
-				all.addAll(cfg.getDependencies());
-			}
-		}
-		return all;
 	}
 }
