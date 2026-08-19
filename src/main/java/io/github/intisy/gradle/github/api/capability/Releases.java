@@ -22,7 +22,7 @@ public interface Releases {
     /**
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
-     * @param tag the exact release tag to look up (not resolved against a "v" prefix variant).
+     * @param tag the release tag to resolve (a "v" prefix is tried both with and without).
      * @return the release identified by {@code tag}.
      * @throws RuntimeException if no release matches {@code tag} (unchecked; the tag is looked up, not I/O).
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
@@ -105,9 +105,9 @@ public interface Releases {
     /**
      * @param jar the jar file to inspect; not modified.
      * @return the dependencies declared by {@code jar}'s embedded
-     * {@code META-INF/github-dependencies.json}, or an empty list if the jar has none. A jar
-     * whose metadata entry is present but corrupt is indistinguishable from one with no metadata;
-     * both return an empty list.
+     * {@code META-INF/github-dependencies.json}, or an empty list if the jar has no such entry.
+     * @throws RuntimeException thrown unchecked if the jar has a metadata entry but its content
+     * is corrupt or malformed; only a missing entry produces the empty list above.
      */
     List<DeclaredDependency> declaredDependencies(File jar);
 }

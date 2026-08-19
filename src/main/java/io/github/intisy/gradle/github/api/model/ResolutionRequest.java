@@ -53,7 +53,7 @@ public final class ResolutionRequest {
     /**
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
-     * @param branch the branch to clone or pull, or null for the current/default branch.
+     * @param branch the branch to clone or pull.
      * @param commitSha the commit to build, or null to use the branch's latest commit.
      * @return a request that {@link JarResolver#resolve} satisfies by building from source.
      * @throws IllegalArgumentException if {@code owner}, {@code repo}, or {@code branch} is null.
