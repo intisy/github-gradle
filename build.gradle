@@ -33,8 +33,8 @@ task libraryJar(type: Jar) {
     archiveClassifier = ''
     from(sourceSets.main.output) {
         include 'io/github/intisy/gradle/github/api/**'
-        include 'io/github/intisy/gradle/github/impl/GitHub*'
-        include 'io/github/intisy/gradle/github/impl/GitHubCli*'
+        include 'io/github/intisy/gradle/github/impl/github/GitHub*'
+        include 'io/github/intisy/gradle/github/impl/github/GitHubCli*'
         include 'io/github/intisy/gradle/github/impl/RepositoriesImpl*'
         include 'io/github/intisy/gradle/github/impl/SourceBuilder*'
         include 'io/github/intisy/gradle/github/impl/BuildInvoker*'

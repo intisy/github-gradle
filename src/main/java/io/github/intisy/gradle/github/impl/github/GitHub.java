@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.impl;
+package io.github.intisy.gradle.github.impl.github;
 
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;

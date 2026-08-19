@@ -7,7 +7,7 @@ import io.github.intisy.gradle.github.api.capability.Releases;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
-import io.github.intisy.gradle.github.impl.GitHub;
+import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.GenericArrayType;

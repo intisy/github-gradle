@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.impl;
+package io.github.intisy.gradle.github.impl.github;
 
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import okhttp3.MediaType;

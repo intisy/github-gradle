@@ -5,6 +5,7 @@ import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.impl.github.GitHub;
 
 import java.io.File;
 import java.io.IOException;
