@@ -8,6 +8,7 @@ import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.plugin.BuildFileEditor;
+import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.GithubConfigurations;
 import io.github.intisy.gradle.github.plugin.ResourceSync;
 import io.github.intisy.gradle.github.utils.FileUtils;
@@ -16,7 +17,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
-import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleDependencyCapabilitiesHandler;
 import org.gradle.api.artifacts.dsl.ArtifactHandler;
@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -65,40 +64,15 @@ class Main implements Plugin<Project> {
 			}
 		});
 
-		project.afterEvaluate(proj -> {
-			Set<String> resolved = new HashSet<String>();
-			List<File> allJars = new ArrayList<File>();
-			for (String cfgName : GithubConfigurations.GITHUB_CONFIGS) {
-				String nativeCfg = GithubConfigurations.GITHUB_TO_GRADLE.get(cfgName);
-				boolean needsJavaLibrary = GithubConfigurations.JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
-				if (needsJavaLibrary && !proj.getPlugins().hasPlugin("java-library")) {
-					continue;
-				}
-				Configuration cfg = proj.getConfigurations().getByName(cfgName);
-				for (Dependency dependency : cfg.getDependencies()) {
-					try {
-						String classifier = GithubConfigurations.extractClassifier(dependency);
-						List<File> jars = new ArrayList<File>();
-						if (classifier.isEmpty()) {
-							gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
-						} else if (classifier.equals("all")) {
-							gitHub.getAllModuleAssets(dependency.getGroup(), dependency.getName(), dependency.getVersion(), jars);
-						} else {
-							File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
-							if (jar != null) jars.add(jar);
-						}
-						for (File jar : jars) {
-							proj.getDependencies().add(nativeCfg, proj.files(jar));
-						}
-					} catch (RateLimitException e) {
-						if (!githubExtension.getResilience().isSkipOnRateLimit()) {
-							throw e;
-						}
-						logger.warn("Rate limited resolving " + dependency.getGroup() + ":" + dependency.getName()
-							+ ":" + dependency.getVersion() + " and no cached copy is available; skipping it "
-							+ "(github.skipOnRateLimit = true). The compile classpath may be incomplete.");
-					}
-				}
+		DependencyResolution.apply(project, logger, githubExtension, new DependencyResolution.DependencyAssetResolver() {
+			public void getAssetWithTransitives(String repoOwner, String repoName, String version, Set<String> resolved, List<File> collected) {
+				gitHub.getAssetWithTransitives(repoOwner, repoName, version, resolved, collected);
+			}
+			public void getAllModuleAssets(String repoOwner, String repoName, String version, List<File> collected) {
+				gitHub.getAllModuleAssets(repoOwner, repoName, version, collected);
+			}
+			public File getAssetWithClassifier(String repoOwner, String repoName, String version, String classifier) {
+				return gitHub.getAssetWithClassifier(repoOwner, repoName, version, classifier);
 			}
 		});
 
