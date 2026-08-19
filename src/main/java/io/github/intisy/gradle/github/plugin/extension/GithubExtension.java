@@ -43,6 +43,16 @@ import groovy.lang.Closure;
  *         repoUrl = "https://github.com/my-org/my-resources"
  *         branch  = "main"
  *     }
+ *
+ *     sources {
+ *         git {
+ *             url = "https://gitlab.com/me/lib.git"
+ *             ref = "main"
+ *         }
+ *         jar {
+ *             url = "https://nexus.internal/libs/foo-1.0.jar"
+ *         }
+ *     }
  * }
  * </pre>
  */
@@ -53,6 +63,7 @@ public class GithubExtension implements GitHubConfig {
     private final CliSettings cli = new CliSettings();
     private final AuthSettings auth = new AuthSettings();
     private final ResilienceSettings resilience = new ResilienceSettings();
+    private final SourcesExtension sources = new SourcesExtension();
 
     private String accessToken;
     private boolean debug;
@@ -295,5 +306,34 @@ public class GithubExtension implements GitHubConfig {
         closure.setResolveStrategy(Closure.DELEGATE_FIRST);
         closure.setDelegate(resources);
         closure.call(resources);
+    }
+
+    /**
+     * @return The nested sources extension.
+     */
+    public SourcesExtension getSources() {
+        return sources;
+    }
+
+    /**
+     * Configures the nested sources extension using a Gradle action.
+     *
+     * @param action The configuration action.
+     */
+    public void sources(Action<? super SourcesExtension> action) {
+        action.execute(sources);
+    }
+
+    /**
+     * Configures the nested sources extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code sources { git { } jar { } } }
+     *
+     * @param closure The configuration closure.
+     */
+    public void sources(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(sources);
+        closure.call(sources);
     }
 }

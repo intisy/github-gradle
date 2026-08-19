@@ -79,22 +79,23 @@ dependencies {
 ### Sources: git repositories and direct jars
 
 Beyond a GitHub release, a dependency can also be resolved by cloning and building an arbitrary
-git repository, or by downloading a jar directly over HTTP(S). Both are declared in a separate
-`sources { }` extension, independent of `github { }`, and both `git { }` and `jar { }` are
-repeatable:
+git repository, or by downloading a jar directly over HTTP(S). Both are declared in a nested
+`sources { }` block inside `github { }`, and both `git { }` and `jar { }` are repeatable:
 
 ```groovy
-sources {
-    git {
-        url = "https://gitlab.com/me/lib.git"
-        ref = "main"                 // branch, tag or commit; optional, default the remote's default branch
-        into = "implementation"      // native configuration; optional, default "implementation"
-    }
-    jar {
-        url = "https://nexus.internal/libs/foo-1.0.jar"
-        header "Authorization", "Bearer ${myToken}"
-        sha256 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d" // optional; verified after download
-        into = "implementation"
+github {
+    sources {
+        git {
+            url = "https://gitlab.com/me/lib.git"
+            ref = "main"                 // branch, tag or commit; optional, default the remote's default branch
+            into = "implementation"      // native configuration; optional, default "implementation"
+        }
+        jar {
+            url = "https://nexus.internal/libs/foo-1.0.jar"
+            header "Authorization", "Bearer ${myToken}"
+            sha256 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d" // optional; verified after download
+            into = "implementation"
+        }
     }
 }
 ```
@@ -103,8 +104,8 @@ sources {
 Gradle wrapper, and caches the result by resolved commit. `jar { }` downloads a jar with optional
 request headers (for a private Nexus/Artifactory/S3-backed host) and an optional expected
 `sha256`; a mismatch fails the build instead of silently using the wrong jar. A jar reachable
-through more than one of `github { }`, `sources { git { } }`, or `sources { jar { } }` is only
-ever added to the native configuration once.
+through more than one of the `github*` coordinates, `sources { git { } }`, or `sources { jar { } }`
+is only ever added to the native configuration once.
 
 ### Publishing a release
 

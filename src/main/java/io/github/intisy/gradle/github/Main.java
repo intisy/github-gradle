@@ -27,7 +27,7 @@ class Main implements Plugin<Project> {
 
 	public void apply(Project project) {
 		GithubExtension githubExtension = project.getExtensions().create("github", GithubExtension.class);
-		SourcesExtension sourcesExtension = project.getExtensions().create("sources", SourcesExtension.class);
+		SourcesExtension sourcesExtension = githubExtension.getSources();
 		ResourceSettings resourcesExtension = githubExtension.getResources();
 
 		PublishExtension publishExtension = githubExtension.getPublish();

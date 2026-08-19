@@ -345,21 +345,22 @@ public class TestMain {
     // -------------------------------------------------------------------------
 
     @Test
-    public void testSourcesExtensionIsRegisteredAsSourcesExtension() {
+    public void testSourcesExtensionIsNestedUnderGithubExtension() {
         Project project = Commons.applyPlugin();
-        Object sources = project.getExtensions().findByName("sources");
-        assertNotNull(sources, "sources extension should be registered");
-        assertTrue(sources instanceof SourcesExtension, "sources extension should be a SourcesExtension");
+        GithubExtension github = project.getExtensions().getByType(GithubExtension.class);
+
+        assertNotNull(github.getSources(), "github.sources should be reachable");
+        assertTrue(github.getSources() instanceof SourcesExtension, "github.sources should be a SourcesExtension");
     }
 
     @Test
-    public void testSourcesExtensionIsSeparateFromGithubExtension() {
+    public void testSourcesIsNotRegisteredAsATopLevelExtension() {
         Project project = Commons.applyPlugin();
-        Object github = project.getExtensions().findByName("github");
-        Object sources = project.getExtensions().findByName("sources");
-        assertNotNull(github);
-        assertNotNull(sources);
-        assertFalse(github == sources, "github and sources must be independent extensions");
+
+        assertNull(project.getExtensions().findByName("sources"),
+                "sources must not be a bare top-level extension name; a bare, generic name on a "
+                        + "public plugin risks colliding with another applied plugin or the user's own "
+                        + "extensions.create(\"sources\", ...)");
     }
 
     @Test
@@ -367,6 +368,22 @@ public class TestMain {
         SourcesExtension sources = new SourcesExtension();
         assertTrue(sources.getGitSources().isEmpty());
         assertTrue(sources.getJarSources().isEmpty());
+    }
+
+    /**
+     * The real DSL shape a build script writes: {@code github { sources { git { } jar { } } } }.
+     */
+    @Test
+    public void testGithubSourcesBlockViaActionConfiguresTheNestedExtension() {
+        GithubExtension github = new GithubExtension();
+        github.sources(sources -> {
+            sources.git(entry -> entry.setUrl("https://gitlab.com/me/lib.git"));
+            sources.jar(entry -> entry.setUrl("https://nexus.internal/libs/foo-1.0.jar"));
+        });
+
+        assertEquals(1, github.getSources().getGitSources().size());
+        assertEquals(1, github.getSources().getJarSources().size());
+        assertEquals("https://gitlab.com/me/lib.git", github.getSources().getGitSources().get(0).getUrl());
     }
 
     @Test
