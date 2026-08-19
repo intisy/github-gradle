@@ -14,16 +14,18 @@ import java.io.File;
  * <p>Construct one with {@link #create(GitHubConfig, ResourcesExtension, GitHubLogger)} (or the
  * two-argument overload, which logs to {@code System.err}), then reach each capability through
  * its accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
- * {@link #publishing()}, {@link #sourceBuilds()}.
+ * {@link #publishing()}, {@link #sourceBuilds()}, {@link #resolver()}.
  */
 public final class GitHubApi {
     private final GitHub gitHub;
     private final SourceBuilder sourceBuilder;
+    private final JarResolver resolver;
 
     private GitHubApi(GitHub gitHub, GitHubConfig config, GitHubLogger logger) {
         this.gitHub = gitHub;
         File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
         this.sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
+        this.resolver = new JarResolverImpl(gitHub, sourceBuilder);
     }
 
     /**
@@ -61,5 +63,9 @@ public final class GitHubApi {
 
     public SourceBuilds sourceBuilds() {
         return sourceBuilder;
+    }
+
+    public JarResolver resolver() {
+        return resolver;
     }
 }
