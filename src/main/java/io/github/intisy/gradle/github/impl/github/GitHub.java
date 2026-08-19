@@ -275,7 +275,10 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     /**
      * Extracts the repository owner from the configured repository URL.
      *
-     * @return the repository owner, or null if not configured
+     * @return the repository owner, or null if not configured; a root-level repo URL (host/repo,
+     * no distinct owner segment, the ordinary shape for a self-hosted git instance dedicated to
+     * one team) falls back to the URL's own redacted host rather than null, so a caller's
+     * fail-fast "is this configured" check does not reject a legitimately root-level URL
      */
     public String getResourceRepoOwner() {
         String repoUrl = resourcesExtension.getRepoUrl();
@@ -284,11 +287,23 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
             logger.debug("repoUrl is null or empty.");
             return null;
         }
-        String[] repoParts = repoUrl.split("/");
-        String repoOwner = repoParts.length > 3 ? repoParts[3] : null;
         if (repoUrl.startsWith("git@")) {
             String partAfterColon = repoUrl.split(":")[1];
-            repoOwner = partAfterColon.split("/")[0];
+            String repoOwner = partAfterColon.split("/")[0];
+            logger.debug("Parsed repository owner: '" + repoOwner + "'");
+            return repoOwner;
+        }
+        String[] repoParts = repoUrl.split("/");
+        String repoOwner;
+        if (repoParts.length > 4) {
+            repoOwner = repoParts[3];
+        } else if (repoParts.length == 4) {
+            // Root-level repo (host/repo, no owner segment): fall back to the redacted host as a
+            // stand-in identity, rather than treating repoParts[3] (the repo itself) as an owner.
+            String[] redactedParts = UrlRedaction.redact(repoUrl).split("/");
+            repoOwner = redactedParts.length > 2 ? redactedParts[2] : null;
+        } else {
+            repoOwner = null;
         }
         logger.debug("Parsed repository owner: '" + repoOwner + "'");
         return repoOwner;
@@ -1571,7 +1586,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                         "No git remote 'origin' found in " + projectDir.getAbsolutePath() + ". "
                         + "Add a remote with: git remote add origin https://github.com/OWNER/REPO");
             }
-            logger.debug("Remote origin URL: " + remoteUrl);
+            logger.debug("Remote origin URL: " + UrlRedaction.redact(remoteUrl));
 
             String ownerAndRepo;
             if (remoteUrl.startsWith("git@")) {
@@ -1587,7 +1602,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
             }
             String[] result = ownerAndRepo.split("/");
             if (result.length < 2) {
-                throw new RuntimeException("Cannot parse owner/repo from remote URL: " + remoteUrl);
+                throw new RuntimeException("Cannot parse owner/repo from remote URL: " + UrlRedaction.redact(remoteUrl));
             }
             logger.debug("Resolved owner=" + result[0] + " repo=" + result[1]);
             return new String[]{result[0], result[1]};

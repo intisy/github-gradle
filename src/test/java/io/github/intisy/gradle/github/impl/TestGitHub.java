@@ -28,6 +28,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,6 +53,57 @@ public class TestGitHub {
     public void testGetRemoteOwnerAndRepoNonGitDirectoryThrows(@TempDir File projectDir) {
         GitHub gh = makeGitHub();
         assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
+    }
+
+    /**
+     * R2's regression test. GitHub Actions' {@code actions/checkout} writes {@code
+     * https://x-access-token:<TOKEN>@github.com/o/r.git} into {@code remote.origin.url} by
+     * default, and this method runs on every publish via {@code PublishTasks}' call to {@code
+     * remoteOf}, so the debug log naming the remote URL must never carry the token through.
+     */
+    @Test
+    public void testGetRemoteOwnerAndRepoRedactsACredentialInTheDebugLog(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("https://x-access-token:ghp_SECRET_TOKEN@github.com/o/r.git"))
+                    .call();
+        }
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        String[] result = gh.getRemoteOwnerAndRepo(projectDir);
+
+        assertEquals("o", result[0]);
+        assertEquals("r", result[1]);
+        assertTrue(logger.debugMessages.stream().anyMatch(message -> message.contains("Remote origin URL")),
+                "expected the remote URL to actually be logged, or this test would pass vacuously");
+        for (String message : logger.debugMessages) {
+            assertFalse(message.contains("ghp_SECRET_TOKEN"),
+                    "debug log must never contain the credential, but found it in: " + message);
+        }
+    }
+
+    /**
+     * R2's regression test for the sibling site, the "cannot parse" exception thrown at ERROR
+     * unconditionally. A scp-like remote with no owner segment after the colon triggers it; a
+     * query-string-shaped fragment stands in for a credential, since scp syntax carries no
+     * userinfo slot to leak a real one through.
+     */
+    @Test
+    public void testGetRemoteOwnerAndRepoRedactsTheExceptionMessage(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("git@host:reponame?token=SECRET_QUERY_VALUE"))
+                    .call();
+        }
+        GitHub gh = makeGitHub();
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
+
+        assertFalse(thrown.getMessage().contains("SECRET_QUERY_VALUE"),
+                "exception message must not contain the query-string secret, but was: " + thrown.getMessage());
     }
 
     @Test
@@ -116,6 +168,34 @@ public class TestGitHub {
 
         File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
         gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
+    }
+
+    /**
+     * R4's direct regression test: {@code getResourceRepoOwner} used to mistake the repo segment
+     * itself for an owner on a root-level URL (owner ended up literally {@code "lib.git"}), which
+     * is non-null and so never tripped {@link TestResourceSync}'s fail-fast, just silently
+     * derived nonsense; now it falls back to the URL's own host as a stand-in owner instead.
+     */
+    @Test
+    public void testGetResourceRepoOwnerFallsBackToTheHostForARootLevelUrl() {
+        ResourceSettings res = new ResourceSettings();
+        res.setRepoUrl("https://git.company.com/lib.git");
+        GitHub gh = new GitHub(new Logger(new GithubExtension()), res, new GithubExtension());
+
+        assertEquals("git.company.com", gh.getResourceRepoOwner());
+        assertEquals("lib", gh.getResourceRepoName());
+    }
+
+    @Test
+    public void testGetResourceRepoOwnerForARootLevelUrlNeverLeaksACredential() {
+        ResourceSettings res = new ResourceSettings();
+        res.setRepoUrl("https://user:secret-token@git.company.com:8443/lib.git");
+        GitHub gh = new GitHub(new Logger(new GithubExtension()), res, new GithubExtension());
+
+        String owner = gh.getResourceRepoOwner();
+
+        assertEquals("git.company.com:8443", owner);
+        assertEquals("lib", gh.getResourceRepoName());
     }
 
     private GitHub makeGitHub() {
@@ -229,6 +309,7 @@ public class TestGitHub {
 
     private static final class CapturingLogger implements GitHubLogger {
         final List<String> warnings = new ArrayList<>();
+        final List<String> debugMessages = new ArrayList<>();
 
         @Override
         public void log(String message) {
@@ -244,6 +325,7 @@ public class TestGitHub {
 
         @Override
         public void debug(String message) {
+            debugMessages.add(message);
         }
 
         @Override
