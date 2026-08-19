@@ -22,7 +22,7 @@ public class DependencyMetadata {
 	/**
 	 * Registers the {@code generateGithubDependencyMetadata} task and wires it ahead of
 	 * {@code processResources} so every jar built by this project embeds the metadata that
-	 * {@link io.github.intisy.gradle.github.api.Releases#declaredDependencies} later reads back.
+	 * {@link io.github.intisy.gradle.github.api.capability.Releases#declaredDependencies} later reads back.
 	 *
 	 * @param project the project to register the task on; a no-op unless the {@code java} plugin is applied.
 	 * @param logger receives diagnostic output.

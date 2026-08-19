@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.capability;
 
 /**
  * The authentication material resolved for GitHub API and git-transport access.

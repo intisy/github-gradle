@@ -1,8 +1,8 @@
 package io.github.intisy.gradle.github.api.model;
 
-import io.github.intisy.gradle.github.api.JarResolver;
-import io.github.intisy.gradle.github.api.Releases;
-import io.github.intisy.gradle.github.api.SourceBuilds;
+import io.github.intisy.gradle.github.api.capability.JarResolver;
+import io.github.intisy.gradle.github.api.capability.Releases;
+import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 
 /**
  * A single coordinate to resolve to a jar, naming either a release version or a source branch

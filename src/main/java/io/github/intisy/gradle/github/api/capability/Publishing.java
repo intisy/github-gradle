@@ -1,5 +1,6 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.capability;
 
+import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.api.model.Release;
 
 import java.io.File;

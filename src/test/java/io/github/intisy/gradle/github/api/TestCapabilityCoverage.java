@@ -1,5 +1,11 @@
 package io.github.intisy.gradle.github.api;
 
+import io.github.intisy.gradle.github.api.capability.Credentials;
+import io.github.intisy.gradle.github.api.capability.JarResolver;
+import io.github.intisy.gradle.github.api.capability.Publishing;
+import io.github.intisy.gradle.github.api.capability.Releases;
+import io.github.intisy.gradle.github.api.capability.Repositories;
+import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 import io.github.intisy.gradle.github.impl.GitHub;
 import org.junit.jupiter.api.Test;

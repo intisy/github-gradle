@@ -2,7 +2,7 @@ package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.api.RateLimitException;
-import io.github.intisy.gradle.github.api.Releases;
+import io.github.intisy.gradle.github.api.capability.Releases;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.gradle.api.Project;

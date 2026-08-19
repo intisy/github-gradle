@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.capability;
 
 import java.io.File;
 import java.io.IOException;

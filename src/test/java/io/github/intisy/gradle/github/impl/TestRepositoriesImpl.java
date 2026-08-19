@@ -3,7 +3,7 @@ package io.github.intisy.gradle.github.impl;
 import io.github.intisy.gradle.github.api.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
-import io.github.intisy.gradle.github.api.Repositories;
+import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import org.eclipse.jgit.api.errors.GitAPIException;

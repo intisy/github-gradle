@@ -1,5 +1,8 @@
 package io.github.intisy.gradle.github.api;
 
+import io.github.intisy.gradle.github.api.capability.JarResolver;
+import io.github.intisy.gradle.github.api.capability.Releases;
+import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.model.Release;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
