@@ -13,6 +13,7 @@ public interface SourceBuilds {
      * @param branch    the branch to clone or pull, or null for the current/default branch.
      * @param commitSha the commit to build, or null to use the branch's latest commit.
      * @return the cached jar for the resolved commit, built only when not already cached.
+     * @throws IOException if the clone/pull, checkout, or build itself fails.
      */
     File buildFromSource(String owner, String repo, String branch, String commitSha) throws IOException;
 }

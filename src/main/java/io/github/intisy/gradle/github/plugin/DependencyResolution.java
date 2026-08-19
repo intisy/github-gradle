@@ -20,6 +20,13 @@ import java.util.Set;
 public class DependencyResolution {
 
 	/**
+	 * Resolves every {@code githubImplementation}/{@code githubApi}/etc. dependency into a local
+	 * jar and adds it to the matching native Gradle configuration, after the project is evaluated.
+	 *
+	 * @param project the project whose GitHub dependency configurations are resolved.
+	 * @param logger receives diagnostic output.
+	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
+	 * @param releases the client used to resolve each dependency to a jar.
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
 	 * call. {@code addedJars} extends that dedup across every configuration and every dependency in
 	 * this method: each distinct jar, identified by its deterministic per-coordinate cache file, is

@@ -15,6 +15,12 @@ import java.util.List;
  * real build.
  */
 public interface BuildInvoker {
+    /**
+     * Runs the build against the given checkout and blocks until it completes.
+     *
+     * @param checkoutDir the checked-out repository directory to build.
+     * @throws IOException if the build cannot be started, is interrupted, or exits non-zero.
+     */
     void invoke(File checkoutDir) throws IOException;
 
     /**
@@ -24,6 +30,9 @@ public interface BuildInvoker {
     final class Gradlew implements BuildInvoker {
         private final GitHubLogger logger;
 
+        /**
+         * @param logger receives the {@code gradlew build} invocation's debug output.
+         */
         public Gradlew(GitHubLogger logger) {
             this.logger = logger;
         }

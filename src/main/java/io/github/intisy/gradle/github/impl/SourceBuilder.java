@@ -30,6 +30,12 @@ public class SourceBuilder implements SourceBuilds {
     private final File cacheDir;
     private final BuildInvoker invoker;
 
+    /**
+     * @param config the access token and auth/cli/resilience settings used to clone/pull each checkout.
+     * @param logger receives diagnostic output.
+     * @param cacheDir the directory built jars are cached under, keyed by owner, repo, and resolved commit.
+     * @param invoker runs the actual build against a checkout; injected so it can be stubbed in tests.
+     */
     public SourceBuilder(GitHubConfig config, GitHubLogger logger, File cacheDir, BuildInvoker invoker) {
         this.config = config;
         this.logger = logger;

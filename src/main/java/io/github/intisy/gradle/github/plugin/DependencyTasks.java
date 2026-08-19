@@ -15,6 +15,15 @@ import java.util.Set;
  */
 public class DependencyTasks {
 
+	/**
+	 * Registers {@code printGithubDependencies} on every project, and {@code updateGithubDependencies}
+	 * on the root project only (it rewrites every subproject's build file in one pass).
+	 *
+	 * @param project the project to register the tasks on.
+	 * @param logger receives diagnostic output.
+	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
+	 * @param releases the client used to look up each dependency's latest version.
+	 */
 	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");

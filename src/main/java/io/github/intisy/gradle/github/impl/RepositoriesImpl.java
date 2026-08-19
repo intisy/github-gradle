@@ -30,6 +30,12 @@ public class RepositoriesImpl implements Repositories {
     private final GitHubConfig config;
     private final GitHubLogger logger;
 
+    /**
+     * @param configured the construction-time {@link GitHub}, used as-is by operations that have
+     * no repository-specific behavior to scope ({@link #exists}, {@link #remoteOf}, {@link #configuredRepo}).
+     * @param config the access token and auth/cli/resilience settings, reused to build each per-call scoped {@link GitHub}.
+     * @param logger receives diagnostic output from each per-call scoped {@link GitHub}.
+     */
     public RepositoriesImpl(GitHub configured, GitHubConfig config, GitHubLogger logger) {
         this.configured = configured;
         this.config = config;

@@ -49,6 +49,12 @@ public class GithubConfigurations {
 		"api", "compileOnlyApi"
 	)));
 
+	/**
+	 * Creates each configuration named in {@link #GITHUB_CONFIGS} on {@code project}, so
+	 * {@code githubImplementation}/{@code githubApi}/etc. dependency declarations resolve.
+	 *
+	 * @param project the project to create the configurations on.
+	 */
 	public static void apply(Project project) {
 		for (String cfgName : GITHUB_CONFIGS) {
 			project.getConfigurations().create(cfgName);

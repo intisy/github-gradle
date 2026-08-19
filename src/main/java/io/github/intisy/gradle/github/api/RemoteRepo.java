@@ -9,15 +9,25 @@ public final class RemoteRepo {
     private final String owner;
     private final String repo;
 
+    /**
+     * @param owner the GitHub account or organization that owns the repository, or null if unresolved.
+     * @param repo the repository name, without the owner prefix, or null if unresolved.
+     */
     public RemoteRepo(String owner, String repo) {
         this.owner = owner;
         this.repo = repo;
     }
 
+    /**
+     * @return the GitHub account or organization that owns the repository, or null if unresolved.
+     */
     public String getOwner() {
         return owner;
     }
 
+    /**
+     * @return the repository name, without the owner prefix, or null if unresolved.
+     */
     public String getRepo() {
         return repo;
     }

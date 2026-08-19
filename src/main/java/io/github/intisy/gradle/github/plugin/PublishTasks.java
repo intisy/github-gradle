@@ -22,6 +22,16 @@ import java.util.concurrent.Callable;
  */
 public class PublishTasks {
 
+	/**
+	 * Registers the {@code publishGithub} task, which creates (or reuses) a GitHub release for the
+	 * project's version and uploads its configured jar(s) to it.
+	 *
+	 * @param project the project the task is registered on and whose version/jars are published.
+	 * @param logger receives diagnostic output.
+	 * @param publishExtension the extension supplying the release owner/repo/tag/artifacts.
+	 * @param repositories the client used to resolve the owner/repo from the git remote when not configured explicitly.
+	 * @param publishing the client used to create the release and upload assets.
+	 */
 	public static void apply(Project project, Logger logger, PublishExtension publishExtension, Repositories repositories, Publishing publishing) {
 		project.getTasks().register("publishGithub", task -> {
 			task.setGroup("github");

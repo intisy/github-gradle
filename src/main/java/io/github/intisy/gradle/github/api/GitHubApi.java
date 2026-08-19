@@ -35,6 +35,7 @@ public final class GitHubApi {
      * @param config    the access token and auth/cli/resilience settings.
      * @param resources the configured resource repository, if any.
      * @param logger    receives diagnostic output.
+     * @return a new client wired to the given configuration and logger.
      */
     public static GitHubApi create(GitHubConfig config, ResourcesExtension resources, GitHubLogger logger) {
         return new GitHubApi(new GitHub(logger, resources, config), config, logger);
@@ -43,31 +44,54 @@ public final class GitHubApi {
     /**
      * Same as {@link #create(GitHubConfig, ResourcesExtension, GitHubLogger)}, logging to
      * {@code System.err} via {@link ConsoleGitHubLogger}.
+     *
+     * @param config    the access token and auth/cli/resilience settings.
+     * @param resources the configured resource repository, if any.
+     * @return a new client wired to the given configuration, logging to {@code System.err}.
      */
     public static GitHubApi create(GitHubConfig config, ResourcesExtension resources) {
         return create(config, resources, new ConsoleGitHubLogger(false));
     }
 
+    /**
+     * @return the resolved API token and SSH key for this client's configuration.
+     */
     public Credentials credentials() {
         return gitHub;
     }
 
+    /**
+     * @return the client's checkout-cloning, pulling and inspection capability.
+     */
     public Repositories repositories() {
         return repositories;
     }
 
+    /**
+     * @return the client's release lookup and jar download capability.
+     */
     public Releases releases() {
         return gitHub;
     }
 
+    /**
+     * @return the client's release creation and asset upload capability.
+     */
     public Publishing publishing() {
         return gitHub;
     }
 
+    /**
+     * @return the client's build-from-source capability, backed by the per-owner cache configured at construction.
+     */
     public SourceBuilds sourceBuilds() {
         return sourceBuilder;
     }
 
+    /**
+     * @return the client's {@link ResolutionRequest}-based resolver, dispatching to {@link #releases()}
+     * or {@link #sourceBuilds()} by the request's own strategy.
+     */
     public JarResolver resolver() {
         return resolver;
     }

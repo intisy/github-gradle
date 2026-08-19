@@ -22,6 +22,16 @@ import java.util.Set;
  */
 public class ResourceSync {
 
+	/**
+	 * Registers the {@code processGitHubResources} task and wires it ahead of
+	 * {@code processResources}, so the configured repository is cloned/pulled and copied into
+	 * {@code src/main/resources} before Gradle bundles resources into the jar.
+	 *
+	 * @param project the project to register the sync task on; a no-op unless the {@code java} plugin is applied.
+	 * @param logger receives diagnostic output.
+	 * @param resourcesExtension the extension supplying the repository URL, branch, and sub-path to sync.
+	 * @param repositories the client used to clone/pull the configured repository.
+	 */
 	public static void apply(Project project, Logger logger, ResourcesExtension resourcesExtension, Repositories repositories) {
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
 			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);

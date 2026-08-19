@@ -9,6 +9,9 @@ import java.io.IOException;
  */
 public interface JarResolver {
     /**
+     * @param request the coordinate to resolve, naming either a release version or a source
+     * branch/commit; construct via {@link ResolutionRequest#fromRelease} or {@link ResolutionRequest#fromSource}.
+     * @return the resolved jar file; never null.
      * @throws RuntimeException if {@code request} names a release, propagated unchecked from
      * {@link Releases#downloadJar(String, String, String)} when no release matches the version,
      * the release has no matching jar asset, or the download itself fails.
