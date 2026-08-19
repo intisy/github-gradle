@@ -10,7 +10,7 @@ import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
-import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.api.config.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.JarResolverImpl;
 import io.github.intisy.gradle.github.impl.RepositoriesImpl;
 import io.github.intisy.gradle.github.impl.github.GitHub;

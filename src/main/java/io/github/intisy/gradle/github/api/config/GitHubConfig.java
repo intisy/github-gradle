@@ -1,9 +1,5 @@
 package io.github.intisy.gradle.github.api.config;
 
-import io.github.intisy.gradle.github.extension.AuthExtension;
-import io.github.intisy.gradle.github.extension.CliExtension;
-import io.github.intisy.gradle.github.extension.ResilienceExtension;
-
 /**
  * Supplies the configuration {@code GitHub} needs, without requiring a Gradle build script.
  */

@@ -1,7 +1,7 @@
 package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
-import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import org.gradle.api.Project;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.api.logging.Logging;

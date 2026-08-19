@@ -2,7 +2,11 @@ package io.github.intisy.gradle.github.plugin.extension;
 
 import java.io.File;
 import java.nio.file.Path;
+import io.github.intisy.gradle.github.api.config.AuthExtension;
+import io.github.intisy.gradle.github.api.config.CliExtension;
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
+import io.github.intisy.gradle.github.api.config.ResilienceExtension;
+import io.github.intisy.gradle.github.api.config.ResourcesExtension;
 import org.gradle.api.Action;
 import groovy.lang.Closure;
 

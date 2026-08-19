@@ -1,9 +1,9 @@
 package io.github.intisy.gradle.github;
 
 import io.github.intisy.gradle.github.api.GitHubApi;
-import io.github.intisy.gradle.github.extension.GithubExtension;
-import io.github.intisy.gradle.github.extension.PublishExtension;
-import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
+import io.github.intisy.gradle.github.api.config.ResourcesExtension;
 import io.github.intisy.gradle.github.plugin.DependencyMetadata;
 import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.DependencyTasks;
