@@ -120,7 +120,7 @@ public class TestUrlDownloads {
     @Test
     public void headerValueNeverAppearsInLogsOrExceptionMessages(@TempDir File cacheDir) throws IOException {
         String sentinel = "SENTINEL-3f9a7c21-do-not-leak-me";
-        Map<String, String> headers = Collections.singletonMap("Authorization", "Bearer " + sentinel);
+        Map<String, String> headers = Collections.singletonMap("X-Api-Key", sentinel);
         byte[] jarBytes = "jar-content".getBytes(StandardCharsets.UTF_8);
 
         CapturingLogger logger = new CapturingLogger();
@@ -131,7 +131,7 @@ public class TestUrlDownloads {
         File jar = successDownloads.download("https://example.com/secret-1.jar", headers, null);
 
         assertTrue(jar.isFile());
-        assertEquals("Bearer " + sentinel, interceptor.requests.get(0).header("Authorization"),
+        assertEquals(sentinel, interceptor.requests.get(0).header("X-Api-Key"),
                 "the header must genuinely have been sent, or this test would pass vacuously");
 
         CapturingLogger errorLogger = new CapturingLogger();
@@ -159,6 +159,39 @@ public class TestUrlDownloads {
         for (String text : allCapturedText) {
             assertFalse(text != null && text.contains(sentinel),
                     "captured text must never contain the header sentinel, but found it in: " + text);
+        }
+    }
+
+    /**
+     * OkHttp's {@code Headers.Builder} rejects a value containing a control character (a trailing
+     * newline, the ordinary shape of {@code file("token.txt").text} in Groovy) and embeds the raw
+     * value in its own {@code IllegalArgumentException} message, redacting only a fixed set of
+     * header names ({@code Authorization}, {@code Cookie}, {@code Proxy-Authorization}, {@code
+     * Set-Cookie}). {@code X-Api-Key} is deliberately not one of them, so this test can actually
+     * fail if {@link UrlDownloads} does not guard the call itself.
+     */
+    @Test
+    public void malformedHeaderValueDoesNotLeakIntoAnyExceptionMessage(@TempDir File cacheDir) {
+        String sentinel = "SENTINEL-TOKEN-do-not-leak-8f3a1c";
+        Map<String, String> headers = Collections.singletonMap("X-Api-Key", sentinel + "\n");
+        CapturingLogger logger = new CapturingLogger();
+        OkHttpClient client = clientReturning(new RecordingInterceptor(), 200, "jar-content".getBytes(StandardCharsets.UTF_8));
+        Downloads downloads = new UrlDownloads(client, logger, cacheDir);
+
+        Exception thrown = assertThrows(Exception.class,
+                () -> downloads.download("https://example.com/malformed.jar", headers, null));
+
+        assertTrue(thrown instanceof IOException,
+                "a malformed header value must surface as a clean IOException, not a raw IllegalArgumentException");
+        assertTrue(thrown.getMessage() != null && thrown.getMessage().contains("X-Api-Key"),
+                "the exception should still name which header key was invalid");
+
+        List<String> allText = new ArrayList<>();
+        allText.addAll(messagesOf(thrown));
+        allText.addAll(logger.messages);
+        for (String text : allText) {
+            assertFalse(text != null && text.contains(sentinel),
+                    "the header value must never appear in an exception message or log line, but found it in: " + text);
         }
     }
 

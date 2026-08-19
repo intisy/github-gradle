@@ -62,7 +62,7 @@ public final class UrlDownloads implements Downloads {
         Request.Builder requestBuilder = new Request.Builder().url(jarUrl);
         if (headers != null) {
             for (Map.Entry<String, String> header : headers.entrySet()) {
-                requestBuilder.addHeader(header.getKey(), header.getValue());
+                addHeaderOrThrow(requestBuilder, header.getKey(), header.getValue());
             }
         }
         logger.log("Downloading jar from " + jarUrl);
@@ -87,6 +87,23 @@ public final class UrlDownloads implements Downloads {
             throw e;
         }
         return cachedJar;
+    }
+
+    /**
+     * @implNote OkHttp's own {@code Headers.Builder} rejects a value containing a character
+     * outside {@code \t} and the printable ASCII range by throwing an {@link
+     * IllegalArgumentException} whose message embeds the raw value, unredacted for any header
+     * name other than a fixed list ({@code Authorization}, {@code Cookie}, {@code
+     * Proxy-Authorization}, {@code Set-Cookie}). This method catches that exception without
+     * touching its message or attaching it as a cause, and throws a fresh {@link IOException}
+     * naming only the header key.
+     */
+    private static void addHeaderOrThrow(Request.Builder requestBuilder, String key, String value) throws IOException {
+        try {
+            requestBuilder.addHeader(key, value);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Invalid value for header '" + key + "'.");
+        }
     }
 
     private static void streamToFile(InputStream in, File destination) throws IOException {
