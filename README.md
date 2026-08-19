@@ -76,6 +76,36 @@ dependencies {
 }
 ```
 
+### Sources: git repositories and direct jars
+
+Beyond a GitHub release, a dependency can also be resolved by cloning and building an arbitrary
+git repository, or by downloading a jar directly over HTTP(S). Both are declared in a separate
+`sources { }` extension, independent of `github { }`, and both `git { }` and `jar { }` are
+repeatable:
+
+```groovy
+sources {
+    git {
+        url = "https://gitlab.com/me/lib.git"
+        ref = "main"                 // branch, tag or commit; optional, default the remote's default branch
+        into = "implementation"      // native configuration; optional, default "implementation"
+    }
+    jar {
+        url = "https://nexus.internal/libs/foo-1.0.jar"
+        header "Authorization", "Bearer ${myToken}"
+        sha256 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d" // optional; verified after download
+        into = "implementation"
+    }
+}
+```
+
+`git { }` clones any git host, not just github.com, checks out `ref`, builds it with its own
+Gradle wrapper, and caches the result by resolved commit. `jar { }` downloads a jar with optional
+request headers (for a private Nexus/Artifactory/S3-backed host) and an optional expected
+`sha256`; a mismatch fails the build instead of silently using the wrong jar. A jar reachable
+through more than one of `github { }`, `sources { git { } }`, or `sources { jar { } }` is only
+ever added to the native configuration once.
+
 ### Publishing a release
 
 Configure the publishGithub extension and run `gradle publishGithub` to build the project and upload its JAR(s) as a GitHub release. Every field is optional:
@@ -131,20 +161,32 @@ import io.github.intisy.gradle.github.api.*;
 import io.github.intisy.gradle.github.api.config.*;
 
 import java.io.File;
+import java.util.Collections;
 
 GitHubConfig config = GitHubConfig.builder()
         .token(System.getenv("GITHUB_TOKEN"))
         .build();
 
 GitHubApi api = GitHubApi.create(config, new ResourceSettings());
-File jar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7")
+
+// A GitHub release
+File releaseJar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7")
         .orElseThrow(() -> new IllegalStateException("jar not found"));
+
+// An arbitrary git repository, cloned and built
+File gitJar = api.sourceBuilds().buildFromGit("https://gitlab.com/me/lib.git", "main");
+
+// A direct jar URL, with an optional header and sha256 check
+File urlJar = api.downloads().download("https://nexus.internal/libs/foo-1.0.jar",
+        Collections.singletonMap("Authorization", "Bearer " + System.getenv("NEXUS_TOKEN")),
+        "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d");
 ```
 
-`api.repositories()`, `api.publishing()`, `api.sourceBuilds()` and `api.resolver()` reach the
-same capabilities the plugin's own tasks use. `GitHubApi.create` also accepts a `GitHubLogger`
-argument if you want diagnostics sent somewhere other than `System.err`, and `GitHubApi.create()`
-with no arguments defaults to an anonymous config for quick, unauthenticated use.
+`api.repositories()`, `api.publishing()`, `api.sourceBuilds()`, `api.downloads()` and
+`api.resolver()` reach the same capabilities the plugin's own tasks use. `GitHubApi.create` also
+accepts a `GitHubLogger` argument if you want diagnostics sent somewhere other than `System.err`,
+and `GitHubApi.create()` with no arguments defaults to an anonymous config for quick,
+unauthenticated use.
 
 ## License
 
