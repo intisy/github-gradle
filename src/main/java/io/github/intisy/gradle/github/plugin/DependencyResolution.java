@@ -28,9 +28,13 @@ public class DependencyResolution {
 	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
 	 * @param releases the client used to resolve each dependency to a jar.
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
-	 * call. {@code addedJars} extends that dedup across every configuration and every dependency in
-	 * this method: each distinct jar, identified by its deterministic per-coordinate cache file, is
-	 * added to the classpath at most once across the whole configuration loop.
+	 * call. {@code addedJars} extends that dedup across every configuration and every dependency
+	 * resolved through the no-classifier branch (the {@link Releases#resolveWithDependencies} path):
+	 * each distinct jar reached that way is added to the classpath at most once across the whole
+	 * configuration loop. The {@code :all} branch ({@link Releases#downloadAllModuleJars}) and the
+	 * explicit-classifier branch ({@link Releases#downloadJar(String, String, String, String)}) do
+	 * not consult {@code addedJars}, so a jar reachable through more than one of the three branches
+	 * is not deduplicated against jars added by the other branches.
 	 */
 	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.afterEvaluate(proj -> {

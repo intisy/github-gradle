@@ -59,7 +59,7 @@ public interface Releases {
      * @return the classifier asset's jar, or null if the release has no asset named
      * {@code repo-classifier.jar}.
      * @throws RuntimeException thrown unchecked by the underlying client if no release matches
-     * {@code version}.
+     * {@code version}, or if the download itself fails.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     File downloadJar(String owner, String repo, String version, String classifier);

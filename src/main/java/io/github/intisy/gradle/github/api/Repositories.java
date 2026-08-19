@@ -43,6 +43,8 @@ public interface Repositories {
     /**
      * @param projectDir the checkout whose {@code origin} remote is parsed.
      * @return the owner and repository name parsed from {@code projectDir}'s {@code origin} remote URL.
+     * @throws RuntimeException if {@code projectDir} has no {@code origin} remote configured, or its
+     * URL cannot be parsed into an owner and repository name.
      */
     RemoteRepo remoteOf(File projectDir);
 

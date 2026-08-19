@@ -17,6 +17,7 @@ public interface Publishing {
      * @param name the human-readable release title; if null, defaults to {@code tag}.
      * @return the created or pre-existing release, including its asset upload URL.
      * @throws RuntimeException if authentication fails or the GitHub API returns an error.
+     * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     Release ensureRelease(String owner, String repo, String tag, String name);
 

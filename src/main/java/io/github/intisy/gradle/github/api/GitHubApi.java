@@ -82,7 +82,8 @@ public final class GitHubApi {
     }
 
     /**
-     * @return the client's build-from-source capability, backed by the per-owner cache configured at construction.
+     * @return the client's build-from-source capability, backed by a shared cache directory whose
+     * entries are keyed by owner, repo, and resolved commit.
      */
     public SourceBuilds sourceBuilds() {
         return sourceBuilder;
