@@ -33,6 +33,9 @@ public class ResourceSync {
 				if (resourcesExtension.getRepoUrl() != null) {
 					logger.debug("Found an repository in the resource extension");
 					RemoteRepo configuredRepo = repositories.configuredRepo();
+					if (configuredRepo.getOwner() == null || configuredRepo.getRepo() == null) {
+						throw new IllegalStateException("Variable resourcesExtension.repoUrl is not configured.");
+					}
 					File path = FileUtils.getGradleHome().resolve("resources").resolve(configuredRepo.getOwner() + "-" + configuredRepo.getRepo()).toFile();
 					for (File dir : resourceDirs) {
 						try {

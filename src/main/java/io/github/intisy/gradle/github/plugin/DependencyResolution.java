@@ -21,10 +21,9 @@ public class DependencyResolution {
 
 	/**
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
-	 * call. {@code addedJars} carries that dedup across every configuration and every dependency in
-	 * this method, matching the old shared-resolved-set behaviour: each distinct jar is added to
-	 * the classpath once, keyed by the file identity that {@code GitHub}'s own on-disk cache already
-	 * makes deterministic per {@code owner:name:version}.
+	 * call. {@code addedJars} extends that dedup across every configuration and every dependency in
+	 * this method: each distinct jar, identified by its deterministic per-coordinate cache file, is
+	 * added to the classpath at most once across the whole configuration loop.
 	 */
 	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.afterEvaluate(proj -> {
