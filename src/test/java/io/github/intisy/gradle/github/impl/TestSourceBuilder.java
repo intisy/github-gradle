@@ -3,6 +3,7 @@ package io.github.intisy.gradle.github.impl;
 import io.github.intisy.gradle.github.api.log.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
+import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.impl.source.BuildInvoker;
 import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 import org.eclipse.jgit.api.Git;
@@ -228,5 +229,35 @@ public class TestSourceBuilder {
         File[] checkoutDirs = cacheDir.listFiles(File::isDirectory);
         assertEquals(1, checkoutDirs.length, "exactly one checkout directory should have been created");
         assertEquals("initial content", readFile(new File(checkoutDirs[0], "file.txt")));
+    }
+
+    /**
+     * The end-to-end regression test for Critical 2: two distinct clone URLs whose trailing
+     * {@code owner/repo}-shaped path segments happen to be identical (here, both end in {@code
+     * acme/widget}) must build from two genuinely separate checkouts, not silently share one.
+     * {@link GitHub#doesRepoExist} only checks that a git object database exists at a path; it
+     * never compares that checkout's {@code origin} remote back against the URL that was
+     * requested, so before this fix a project resolving the same owner/repo-shaped identity
+     * against two different hosts would silently reuse whichever checkout happened to exist.
+     */
+    @Test
+    public void twoDistinctUrlsWithTheSameTrailingPathGetDifferentCheckouts(@TempDir File tempDir) throws IOException, GitAPIException {
+        File originA = createOriginRepo(new File(new File(tempDir, "hostA"), "acme/widget"));
+        File originB = createOriginRepo(new File(new File(tempDir, "hostB"), "acme/widget"));
+        addCommit(originB, "second.txt", "second content, only on hostB");
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+
+        FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        File jarA = builder.buildFromSource(originA.toURI().toString(), null);
+        File jarB = builder.buildFromSource(originB.toURI().toString(), null);
+
+        assertEquals(2, invoker.invocations, "each distinct URL must trigger its own build");
+        assertNotEquals(jarA, jarB);
+
+        File[] checkoutDirs = cacheDir.listFiles(File::isDirectory);
+        assertEquals(2, checkoutDirs.length, "two distinct URLs must resolve to two distinct checkouts");
     }
 }

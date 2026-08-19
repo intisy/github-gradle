@@ -44,6 +44,7 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/utils/FileUtils*'
         include 'io/github/intisy/gradle/github/utils/UrlRedaction*'
         include 'io/github/intisy/gradle/github/utils/UrlDigest*'
+        include 'io/github/intisy/gradle/github/utils/CloneUrlIdentity*'
         exclude 'io/github/intisy/gradle/github/Main*'
         exclude 'io/github/intisy/gradle/github/plugin/**'
     }
