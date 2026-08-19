@@ -8,6 +8,7 @@ import io.github.intisy.gradle.github.plugin.DependencyMetadata;
 import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.DependencyTasks;
 import io.github.intisy.gradle.github.plugin.GithubConfigurations;
+import io.github.intisy.gradle.github.plugin.Logger;
 import io.github.intisy.gradle.github.plugin.PublishTasks;
 import io.github.intisy.gradle.github.plugin.ResourceSync;
 import org.gradle.api.Plugin;

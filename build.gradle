@@ -42,7 +42,6 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/utils/FileUtils*'
         exclude 'io/github/intisy/gradle/github/Main*'
         exclude 'io/github/intisy/gradle/github/plugin/**'
-        exclude 'io/github/intisy/gradle/github/Logger*'
     }
 }
 

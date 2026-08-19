@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github;
+package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;

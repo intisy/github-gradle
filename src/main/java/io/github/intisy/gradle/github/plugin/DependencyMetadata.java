@@ -1,6 +1,5 @@
 package io.github.intisy.gradle.github.plugin;
 
-import io.github.intisy.gradle.github.Logger;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Dependency;
