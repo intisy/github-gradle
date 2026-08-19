@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.log;
 
 /**
  * Receives diagnostic output from {@code GitHub} without requiring a Gradle {@code Project}.

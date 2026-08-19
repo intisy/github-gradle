@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.log;
 
 /**
  * A {@link GitHubLogger} for use outside a Gradle build, writing every level to {@code System.err}

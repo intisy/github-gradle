@@ -1,6 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
-import io.github.intisy.gradle.github.api.GitHubLogger;
+import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import okhttp3.MediaType;
 import okhttp3.Protocol;
 import okhttp3.Request;

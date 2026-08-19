@@ -1,7 +1,7 @@
 package io.github.intisy.gradle.github.impl;
 
 import io.github.intisy.gradle.github.api.GitHubConfig;
-import io.github.intisy.gradle.github.api.GitHubLogger;
+import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import org.eclipse.jgit.api.Git;
