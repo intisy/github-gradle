@@ -106,12 +106,23 @@ public class TestJarResolver {
         JarResolver resolver = new JarResolverImpl(new UnusedReleases(), new UnusedSourceBuilds(), downloads);
         Map<String, String> headers = Collections.singletonMap("Authorization", "Bearer secret");
 
-        File resolved = resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", headers));
+        File resolved = resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", headers, "deadbeef"));
 
         assertSame(expected, resolved);
         assertEquals("https://example.com/foo.jar", downloads.capturedJarUrl);
         assertEquals(headers, downloads.capturedHeaders);
-        assertNull(downloads.capturedSha256, "the ResolutionRequest-mediated path does not carry a sha256");
+        assertEquals("deadbeef", downloads.capturedSha256,
+                "a sha256 supplied to fromUrl must reach Downloads.download, not be silently dropped");
+    }
+
+    @Test
+    public void urlRequestWithoutASha256UsesTheTwoArgOverloadAndPassesNullThrough() throws IOException {
+        RecordingDownloads downloads = new RecordingDownloads(new File("url.jar"));
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), new UnusedSourceBuilds(), downloads);
+
+        resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", null));
+
+        assertNull(downloads.capturedSha256);
     }
 
     @Test
@@ -134,6 +145,23 @@ public class TestJarResolver {
     public void fromUrlWithNullHeadersReturnsAnEmptyMapRatherThanNull() {
         ResolutionRequest request = ResolutionRequest.fromUrl("https://example.com/foo.jar", null);
         assertTrue(request.getHeaders().isEmpty());
+    }
+
+    @Test
+    public void fromUrlTwoArgOverloadLeavesSha256Null() {
+        ResolutionRequest request = ResolutionRequest.fromUrl("https://example.com/foo.jar", null);
+        assertNull(request.getSha256());
+    }
+
+    @Test
+    public void fromUrlThreeArgOverloadCarriesTheSha256() {
+        ResolutionRequest request = ResolutionRequest.fromUrl("https://example.com/foo.jar", null, "deadbeef");
+        assertEquals("deadbeef", request.getSha256());
+    }
+
+    @Test
+    public void fromUrlThreeArgOverloadRejectsNullJarUrl() {
+        assertThrows(IllegalArgumentException.class, () -> ResolutionRequest.fromUrl(null, null, "deadbeef"));
     }
 
     private static final class RecordingReleases implements Releases {

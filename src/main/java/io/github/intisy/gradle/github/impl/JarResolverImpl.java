@@ -44,7 +44,7 @@ public final class JarResolverImpl implements JarResolver {
             case GIT:
                 return sourceBuilds.buildFromSource(request.getCloneUrl(), request.getRef());
             case URL:
-                return downloads.download(request.getJarUrl(), request.getHeaders(), null);
+                return downloads.download(request.getJarUrl(), request.getHeaders(), request.getSha256());
             case RELEASE:
             default:
                 final String owner = request.getOwner();

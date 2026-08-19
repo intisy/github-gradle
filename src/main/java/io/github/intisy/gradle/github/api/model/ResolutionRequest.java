@@ -12,7 +12,7 @@ import java.util.Map;
  * A single coordinate to resolve to a jar, naming a release version, a GitHub source branch and
  * commit, an arbitrary git clone URL and ref, or a direct jar URL. Callers construct one via
  * {@link #fromRelease(String, String, String)}, {@link #fromSource(String, String, String, String)},
- * {@link #fromGit(String, String)}, or {@link #fromUrl(String, Map)} and pass it to
+ * {@link #fromGit(String, String)}, or {@link #fromUrl(String, Map, String)} and pass it to
  * {@link JarResolver#resolve}.
  */
 public final class ResolutionRequest {
@@ -40,9 +40,10 @@ public final class ResolutionRequest {
     private final String ref;
     private final String jarUrl;
     private final Map<String, String> headers;
+    private final String sha256;
 
     private ResolutionRequest(Strategy strategy, String owner, String repo, String version, String branch,
-            String commitSha, String cloneUrl, String ref, String jarUrl, Map<String, String> headers) {
+            String commitSha, String cloneUrl, String ref, String jarUrl, Map<String, String> headers, String sha256) {
         this.strategy = strategy;
         this.owner = owner;
         this.repo = repo;
@@ -53,6 +54,7 @@ public final class ResolutionRequest {
         this.ref = ref;
         this.jarUrl = jarUrl;
         this.headers = headers == null ? Collections.<String, String>emptyMap() : headers;
+        this.sha256 = sha256;
     }
 
     /**
@@ -66,7 +68,7 @@ public final class ResolutionRequest {
         requireNonNull(owner, "owner");
         requireNonNull(repo, "repo");
         requireNonNull(version, "version");
-        return new ResolutionRequest(Strategy.RELEASE, owner, repo, version, null, null, null, null, null, null);
+        return new ResolutionRequest(Strategy.RELEASE, owner, repo, version, null, null, null, null, null, null, null);
     }
 
     /**
@@ -81,7 +83,7 @@ public final class ResolutionRequest {
         requireNonNull(owner, "owner");
         requireNonNull(repo, "repo");
         requireNonNull(branch, "branch");
-        return new ResolutionRequest(Strategy.SOURCE, owner, repo, null, branch, commitSha, null, null, null, null);
+        return new ResolutionRequest(Strategy.SOURCE, owner, repo, null, branch, commitSha, null, null, null, null, null);
     }
 
     /**
@@ -92,10 +94,12 @@ public final class ResolutionRequest {
      */
     public static ResolutionRequest fromGit(String cloneUrl, String ref) {
         requireNonNull(cloneUrl, "cloneUrl");
-        return new ResolutionRequest(Strategy.GIT, null, null, null, null, null, cloneUrl, ref, null, null);
+        return new ResolutionRequest(Strategy.GIT, null, null, null, null, null, cloneUrl, ref, null, null, null);
     }
 
     /**
+     * Same as {@link #fromUrl(String, Map, String)} with no expected sha256.
+     *
      * @param jarUrl the exact URL to download a jar from.
      * @param headers request headers (for example, an auth token) to send with the download; may
      *                be null or empty.
@@ -103,11 +107,24 @@ public final class ResolutionRequest {
      * @throws IllegalArgumentException if {@code jarUrl} is null.
      */
     public static ResolutionRequest fromUrl(String jarUrl, Map<String, String> headers) {
+        return fromUrl(jarUrl, headers, null);
+    }
+
+    /**
+     * @param jarUrl the exact URL to download a jar from.
+     * @param headers request headers (for example, an auth token) to send with the download; may
+     *                be null or empty.
+     * @param sha256 the expected SHA-256 of the downloaded jar, hex-encoded, or null to skip
+     *               integrity verification.
+     * @return a request that {@link JarResolver#resolve} satisfies by downloading {@code jarUrl}.
+     * @throws IllegalArgumentException if {@code jarUrl} is null.
+     */
+    public static ResolutionRequest fromUrl(String jarUrl, Map<String, String> headers, String sha256) {
         requireNonNull(jarUrl, "jarUrl");
         Map<String, String> safeHeaders = headers == null
                 ? Collections.<String, String>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(headers));
-        return new ResolutionRequest(Strategy.URL, null, null, null, null, null, null, null, jarUrl, safeHeaders);
+        return new ResolutionRequest(Strategy.URL, null, null, null, null, null, null, null, jarUrl, safeHeaders, sha256);
     }
 
     private static void requireNonNull(String value, String name) {
@@ -187,5 +204,13 @@ public final class ResolutionRequest {
      */
     public Map<String, String> getHeaders() {
         return headers;
+    }
+
+    /**
+     * @return the expected SHA-256 of the downloaded jar, hex-encoded, or null if none was given
+     * or this is not a {@link Strategy#URL} request.
+     */
+    public String getSha256() {
+        return sha256;
     }
 }
