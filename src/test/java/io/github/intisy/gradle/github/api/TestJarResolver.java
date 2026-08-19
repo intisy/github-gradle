@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestJarResolver {
 
@@ -54,16 +53,13 @@ public class TestJarResolver {
     }
 
     @Test
-    public void releaseRequestThrowsIOExceptionNamingTheCoordinateWhenNoAssetIsFound() {
+    public void releaseRequestReturnsWhateverDownloadJarReturnsWithoutInterception() throws IOException {
         RecordingReleases releases = new RecordingReleases(null);
         JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds());
 
-        IOException thrown = assertThrows(IOException.class,
-                () -> resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0")));
+        File resolved = resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0"));
 
-        assertTrue(thrown.getMessage().contains("owner"));
-        assertTrue(thrown.getMessage().contains("repo"));
-        assertTrue(thrown.getMessage().contains("1.0.0"));
+        assertNull(resolved);
     }
 
     @Test

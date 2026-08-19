@@ -27,42 +27,49 @@ public class TestCapabilityCoverage {
         assertTrue(Publishing.class.isAssignableFrom(GitHub.class), "GitHub must implement Publishing");
     }
 
+    /**
+     * Walks every public-facing {@code api} type, not just the five capability interfaces:
+     * {@link JarResolver} and {@link ResolutionRequest} carry no implementation-detail types on
+     * their own signatures either, and belong in the same coverage as {@link Credentials},
+     * {@link Repositories}, {@link Releases}, {@link Publishing} and {@link SourceBuilds}.
+     */
     @Test
-    public void noCapabilityMethodMentionsAnImplementationDetailType() {
-        for (Class<?> capability : Arrays.asList(Credentials.class, Repositories.class, Releases.class, Publishing.class, SourceBuilds.class)) {
-            for (Method method : capability.getDeclaredMethods()) {
-                assertNoForbiddenType(capability, method, method.getGenericReturnType());
+    public void noApiMethodMentionsAnImplementationDetailType() {
+        for (Class<?> apiType : Arrays.asList(Credentials.class, Repositories.class, Releases.class, Publishing.class,
+                SourceBuilds.class, JarResolver.class, ResolutionRequest.class)) {
+            for (Method method : apiType.getDeclaredMethods()) {
+                assertNoForbiddenType(apiType, method, method.getGenericReturnType());
                 for (Type parameterType : method.getGenericParameterTypes()) {
-                    assertNoForbiddenType(capability, method, parameterType);
+                    assertNoForbiddenType(apiType, method, parameterType);
                 }
                 for (Class<?> exceptionType : method.getExceptionTypes()) {
-                    assertNoForbiddenType(capability, method, exceptionType);
+                    assertNoForbiddenType(apiType, method, exceptionType);
                 }
             }
         }
     }
 
-    private static void assertNoForbiddenType(Class<?> capability, Method method, Type type) {
+    private static void assertNoForbiddenType(Class<?> apiType, Method method, Type type) {
         if (type instanceof Class<?>) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
-                assertNoForbiddenType(capability, method, clazz.getComponentType());
+                assertNoForbiddenType(apiType, method, clazz.getComponentType());
                 return;
             }
             String packageName = clazz.getPackage() != null ? clazz.getPackage().getName() : "";
             for (String forbidden : FORBIDDEN_PACKAGES) {
                 assertTrue(!packageName.startsWith(forbidden),
-                        capability.getSimpleName() + "#" + method.getName() + " mentions " + clazz.getName()
+                        apiType.getSimpleName() + "#" + method.getName() + " mentions " + clazz.getName()
                                 + ", which belongs to the implementation-only package '" + forbidden + "'.");
             }
         } else if (type instanceof ParameterizedType) {
             ParameterizedType parameterized = (ParameterizedType) type;
-            assertNoForbiddenType(capability, method, parameterized.getRawType());
+            assertNoForbiddenType(apiType, method, parameterized.getRawType());
             for (Type argument : parameterized.getActualTypeArguments()) {
-                assertNoForbiddenType(capability, method, argument);
+                assertNoForbiddenType(apiType, method, argument);
             }
         } else if (type instanceof GenericArrayType) {
-            assertNoForbiddenType(capability, method, ((GenericArrayType) type).getGenericComponentType());
+            assertNoForbiddenType(apiType, method, ((GenericArrayType) type).getGenericComponentType());
         }
     }
 }

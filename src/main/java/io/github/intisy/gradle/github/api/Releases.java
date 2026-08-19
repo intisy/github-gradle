@@ -23,6 +23,10 @@ public interface Releases {
      */
     Release latestRelease(String owner, String repo);
 
+    /**
+     * @throws RuntimeException thrown unchecked by the underlying client if no release matches
+     * {@code version}, if the release has no matching jar asset, or if the download itself fails.
+     */
     File downloadJar(String owner, String repo, String version);
 
     /**
