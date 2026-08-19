@@ -1,4 +1,6 @@
-package io.github.intisy.gradle.github.api;
+package io.github.intisy.gradle.github.api.model;
+
+import io.github.intisy.gradle.github.api.Publishing;
 
 import java.util.Objects;
 

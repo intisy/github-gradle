@@ -1,8 +1,8 @@
 package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.Logger;
-import io.github.intisy.gradle.github.api.DeclaredDependency;
-import io.github.intisy.gradle.github.api.Release;
+import io.github.intisy.gradle.github.api.model.DeclaredDependency;
+import io.github.intisy.gradle.github.api.model.Release;
 import io.github.intisy.gradle.github.api.Releases;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import org.gradle.api.Project;

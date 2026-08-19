@@ -1,5 +1,7 @@
 package io.github.intisy.gradle.github.api;
 
+import io.github.intisy.gradle.github.api.model.Release;
+
 import java.io.File;
 import java.io.IOException;
 

@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.api;
 
+import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.impl.BuildInvoker;
 import io.github.intisy.gradle.github.impl.GitHub;
