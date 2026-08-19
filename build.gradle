@@ -47,7 +47,6 @@ task libraryJar(type: Jar) {
         exclude 'io/github/intisy/gradle/github/Main*'
         exclude 'io/github/intisy/gradle/github/plugin/**'
         exclude 'io/github/intisy/gradle/github/Logger*'
-        exclude 'io/github/intisy/gradle/github/utils/GradleUtils*'
         exclude 'io/github/intisy/gradle/github/extension/GithubExtension*'
         exclude 'io/github/intisy/gradle/github/extension/PublishExtension*'
         exclude 'io/github/intisy/gradle/github/extension/ArtifactEntry*'
