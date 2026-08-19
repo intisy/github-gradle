@@ -9,10 +9,10 @@ import io.github.intisy.gradle.github.impl.GitHub;
 import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.plugin.BuildFileEditor;
 import io.github.intisy.gradle.github.plugin.GithubConfigurations;
+import io.github.intisy.gradle.github.plugin.ResourceSync;
 import io.github.intisy.gradle.github.utils.FileUtils;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.gradle.api.Action;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -53,43 +53,16 @@ class Main implements Plugin<Project> {
 
 		GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
-		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
-			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
-			SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-			Set<File> resourceDirs = main.getResources().getSrcDirs();
-
-			Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
-				logger.debug("Process resource event called on " + project.getName());
-				if (resourcesExtension.getRepoUrl() != null) {
-					logger.debug("Found an repository in the resource extension");
-					File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
-					for (File dir : resourceDirs) {
-						try {
-							gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
-							if (resourcesExtension.isBuildOnly()) {
-								dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
-								        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
-							}
-							FileUtils.deleteDirectory(dir.toPath());
-							if (!resourcesExtension.getPath().equals("/") && !resourcesExtension.getPath().isEmpty())
-								path = path.toPath().resolve(resourcesExtension.getPath()).toFile();
-							if (dir.mkdirs()) {
-								logger.debug("Copying resources from " + path + " to: " + dir);
-								FileUtils.copyDirectory(path.toPath(), dir.toPath());
-							} else {
-								logger.error("Failed to create directory: " + dir);
-							}
-						} catch (GitAPIException | IOException e) {
-							throw new RuntimeException(e);
-						}
-					}
-				}
-			}));
-
-			project.getTasks().named("processResources", Copy.class, processResources -> {
-				logger.debug("Process resource event found on " + project.getName());
-				processResources.dependsOn(processGitHubResources);
-			});
+		ResourceSync.apply(project, logger, resourcesExtension, new ResourceSync.RepoSync() {
+			public String getResourceRepoOwner() {
+				return gitHub.getResourceRepoOwner();
+			}
+			public String getResourceRepoName() {
+				return gitHub.getResourceRepoName();
+			}
+			public void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException {
+				gitHub.cloneOrPullRepository(path, branch);
+			}
 		});
 
 		project.afterEvaluate(proj -> {

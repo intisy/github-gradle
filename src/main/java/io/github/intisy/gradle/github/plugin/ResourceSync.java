@@ -1,0 +1,74 @@
+package io.github.intisy.gradle.github.plugin;
+
+import io.github.intisy.gradle.github.Logger;
+import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.utils.FileUtils;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.gradle.api.Action;
+import org.gradle.api.Project;
+import org.gradle.api.Task;
+import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.plugins.JavaPluginExtension;
+import org.gradle.api.tasks.Copy;
+import org.gradle.api.tasks.SourceSet;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Set;
+
+/**
+ * Syncs the configured GitHub resource repository into the project's resources before they are processed.
+ */
+public class ResourceSync {
+
+	/**
+	 * The subset of the GitHub client this class needs, kept free of {@code impl} types so the
+	 * layering rule (only {@code api}/{@code impl} may name {@code impl}) still holds.
+	 */
+	public interface RepoSync {
+		String getResourceRepoOwner();
+		String getResourceRepoName();
+		void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException;
+	}
+
+	public static void apply(Project project, Logger logger, ResourcesExtension resourcesExtension, RepoSync gitHub) {
+		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
+			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
+			SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+			Set<File> resourceDirs = main.getResources().getSrcDirs();
+
+			Task processGitHubResources = project.getTasks().create("processGitHubResources", task -> task.doLast(t -> {
+				logger.debug("Process resource event called on " + project.getName());
+				if (resourcesExtension.getRepoUrl() != null) {
+					logger.debug("Found an repository in the resource extension");
+					File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+					for (File dir : resourceDirs) {
+						try {
+							gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
+							if (resourcesExtension.isBuildOnly()) {
+								dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
+								        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
+							}
+							FileUtils.deleteDirectory(dir.toPath());
+							if (!resourcesExtension.getPath().equals("/") && !resourcesExtension.getPath().isEmpty())
+								path = path.toPath().resolve(resourcesExtension.getPath()).toFile();
+							if (dir.mkdirs()) {
+								logger.debug("Copying resources from " + path + " to: " + dir);
+								FileUtils.copyDirectory(path.toPath(), dir.toPath());
+							} else {
+								logger.error("Failed to create directory: " + dir);
+							}
+						} catch (GitAPIException | IOException e) {
+							throw new RuntimeException(e);
+						}
+					}
+				}
+			}));
+
+			project.getTasks().named("processResources", Copy.class, processResources -> {
+				logger.debug("Process resource event found on " + project.getName());
+				processResources.dependsOn(processGitHubResources);
+			});
+		});
+	}
+}
