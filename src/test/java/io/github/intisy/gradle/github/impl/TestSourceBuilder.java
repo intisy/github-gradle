@@ -3,6 +3,8 @@ package io.github.intisy.gradle.github.impl;
 import io.github.intisy.gradle.github.api.log.ConsoleGitHubLogger;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.extension.GithubExtension;
+import io.github.intisy.gradle.github.impl.source.BuildInvoker;
+import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.junit.jupiter.api.Test;
