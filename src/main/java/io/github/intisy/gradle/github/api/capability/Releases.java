@@ -45,13 +45,11 @@ public interface Releases {
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
-     * @return the downloaded (or cached) jar file, present whenever the call returns normally.
-     * The shipped implementation never returns an empty {@code Optional}: it reports "no release
-     * matches {@code version}" and "no matching jar asset" by throwing (see below), the same as
-     * the untouched underlying client always has. The {@code Optional} wrapper exists so this
-     * overload shares a return type with the classifier overload below.
-     * @throws RuntimeException thrown unchecked by the underlying client if no release matches
-     * {@code version}, if the release has no matching jar asset, or if the download itself fails.
+     * @return the downloaded (or cached) jar file, or an empty {@code Optional} if no release
+     * matches {@code version} or the release has no matching jar asset. Absence is never reported
+     * by throwing; a thrown exception always means something else went wrong (see below).
+     * @throws RuntimeException thrown unchecked by the underlying client if the download itself
+     * fails or another API error occurs.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     Optional<File> downloadJar(String owner, String repo, String version);
@@ -63,11 +61,12 @@ public interface Releases {
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
      * @param classifier the artifact classifier identifying the asset (e.g. {@code "api"}).
-     * @return the classifier asset's jar, or an empty {@code Optional} if the release has no
-     * asset named {@code repo-classifier.jar}, so a caller can treat an absent classifier as
-     * optional rather than catching an exception.
-     * @throws RuntimeException thrown unchecked by the underlying client if no release matches
-     * {@code version}, or if the download itself fails.
+     * @return the classifier asset's jar, or an empty {@code Optional} if no release matches
+     * {@code version} or the release has no asset named {@code repo-classifier.jar}. Absence is
+     * never reported by throwing; a thrown exception always means something else went wrong (see
+     * below), the same as the 3-argument overload above.
+     * @throws RuntimeException thrown unchecked by the underlying client if the download itself
+     * fails or another API error occurs.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     Optional<File> downloadJar(String owner, String repo, String version, String classifier);
@@ -101,7 +100,10 @@ public interface Releases {
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
      * @return the root jar followed by every transitively resolved jar, each appearing once.
      * @throws RuntimeException thrown unchecked by the underlying client if the root or any
-     * transitive dependency fails to resolve, as described on {@link #downloadJar(String, String, String)}.
+     * transitive dependency fails to resolve: no release matches its version, the release has no
+     * matching jar asset, or the download itself fails. Unlike {@link #downloadJar(String, String, String)},
+     * this method has no way to represent one transitive dependency's absence without abandoning
+     * the whole resolution, so it always throws rather than reporting absence in its return type.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
      */
     List<File> resolveWithDependencies(String owner, String repo, String version);

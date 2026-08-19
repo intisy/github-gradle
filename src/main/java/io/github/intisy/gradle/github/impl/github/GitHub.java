@@ -6,6 +6,7 @@ import com.jcraft.jsch.Session;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.ArtifactNotFoundException;
 import io.github.intisy.gradle.github.api.capability.Credentials;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
@@ -863,8 +864,9 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 logger.debug("IOException for tag '" + tag + "': " + e.getMessage());
             }
         }
-        throw new RuntimeException("No release found for " + repoOwner + "/" + repoName
-                + " with tag '" + version + "' or '" + tagsToTry[1] + "'.");
+        throw new ArtifactNotFoundException("No release found for " + repoOwner + "/" + repoName
+                + " with tag '" + version + "' or '" + tagsToTry[1] + "'.",
+                repoOwner + "/" + repoName + ":" + version);
     }
 
     /**
@@ -1043,13 +1045,15 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
             JsonArray assets = release.getAsJsonArray("assets");
 
             if (assets == null || assets.isEmpty()) {
-                throw new RuntimeException("No assets found for release " + version);
+                throw new ArtifactNotFoundException("No assets found for release " + version,
+                        repoOwner + "/" + repoName + ":" + version);
             }
 
             JsonObject selected = selectJarAsset(assets, repoName, version);
             if (selected == null) {
-                throw new RuntimeException("No matching JAR asset found for " + repoOwner + ":" + repoName
-                        + ". Available assets don't include a .jar file (excluding -sources.jar and -javadoc.jar).");
+                throw new ArtifactNotFoundException("No matching JAR asset found for " + repoOwner + ":" + repoName
+                        + ". Available assets don't include a .jar file (excluding -sources.jar and -javadoc.jar).",
+                        repoOwner + "/" + repoName + ":" + version);
             }
 
             String downloadUrl = selected.get("browser_download_url").getAsString();
@@ -1643,12 +1647,20 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
 
     @Override
     public Optional<File> downloadJar(String owner, String repo, String version) {
-        return Optional.ofNullable(getAsset(owner, repo, version));
+        try {
+            return Optional.of(getAsset(owner, repo, version));
+        } catch (ArtifactNotFoundException e) {
+            return Optional.empty();
+        }
     }
 
     @Override
     public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
-        return Optional.ofNullable(getAssetWithClassifier(owner, repo, version, classifier));
+        try {
+            return Optional.ofNullable(getAssetWithClassifier(owner, repo, version, classifier));
+        } catch (ArtifactNotFoundException e) {
+            return Optional.empty();
+        }
     }
 
     @Override

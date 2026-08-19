@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.ArtifactNotFoundException;
 import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
@@ -26,6 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * adapters on {@link GitHub}: both are cache-hit tested (no network), and their "nothing
  * matches" and "rate limited" paths are driven through a subclass overriding the public,
  * non-final {@link GitHub#fetchReleaseByTag} seam, which lets these run fully offline.
+ *
+ * <p>Both overloads now report a genuinely absent artifact as an empty {@code Optional} (backed by
+ * {@link ArtifactNotFoundException}, thrown only at the real not-found sites and caught by the two
+ * adapters), while a download or API failure keeps propagating unconverted. The paired
+ * {@code *DownloadFailurePropagatesRatherThanBecomingEmpty} tests mutation-test that distinction:
+ * a malformed {@code browser_download_url} makes OkHttp reject the request synchronously (no
+ * network involved), and the resulting {@code IllegalArgumentException} must reach the caller
+ * rather than being swallowed into {@code Optional.empty()}.
  *
  * <p>{@code user.home} is repointed at {@code @TempDir} for the duration of each test (and
  * restored after) because {@code FileUtils.getGradleHome()} is hard-coded to
@@ -77,16 +86,30 @@ public class TestDownloadJarOptional {
     }
 
     @Test
-    public void downloadJarNoClassifierNoMatchingAssetStillThrows(@TempDir File tempHome) {
+    public void downloadJarNoClassifierNoMatchingAssetReturnsEmptyOptional(@TempDir File tempHome) {
         JsonObject release = new JsonObject();
         release.add("assets", new JsonArray());
 
         withTempHome(tempHome, () -> {
             GitHub gh = new FetchStubGitHub(makeLogger(), release, null);
-            RuntimeException thrown = assertThrows(RuntimeException.class, () -> gh.downloadJar("owner", "repo", "9.9.9"));
-            assertTrue(thrown.getMessage().contains("No assets found"),
-                    "a missing release asset is reported by throwing, not by an empty Optional, "
-                            + "because the underlying getAsset is untouched and never returns null");
+            Optional<File> result = gh.downloadJar("owner", "repo", "9.9.9");
+            assertFalse(result.isPresent(),
+                    "a release with no assets is an absent artifact, reported as an empty Optional "
+                            + "via the caught ArtifactNotFoundException, not by throwing");
+        });
+    }
+
+    @Test
+    public void downloadJarNoClassifierNoMatchingReleaseReturnsEmptyOptional(@TempDir File tempHome) {
+        ArtifactNotFoundException noRelease = new ArtifactNotFoundException(
+                "No release found for owner/repo with tag '9.9.9' or 'v9.9.9'.", "owner/repo:9.9.9");
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(makeLogger(), null, noRelease);
+            Optional<File> result = gh.downloadJar("owner", "repo", "9.9.9");
+            assertFalse(result.isPresent(),
+                    "a release that does not exist at all is also an absent artifact, reported as "
+                            + "an empty Optional");
         });
     }
 
@@ -97,6 +120,31 @@ public class TestDownloadJarOptional {
         withTempHome(tempHome, () -> {
             GitHub gh = new FetchStubGitHub(makeLogger(), null, rateLimited);
             assertThrows(RateLimitException.class, () -> gh.downloadJar("owner", "repo", "1.0.0"));
+        });
+    }
+
+    /**
+     * Mutation test: a malformed {@code browser_download_url} makes OkHttp's {@code Request.Builder}
+     * reject it synchronously with {@code IllegalArgumentException} (no socket is ever opened), a
+     * genuine download failure rather than an absent artifact. It must reach the caller, not be
+     * swallowed into an empty {@code Optional} by the {@code ArtifactNotFoundException} catch.
+     */
+    @Test
+    public void downloadJarNoClassifierDownloadFailurePropagatesRatherThanBecomingEmpty(@TempDir File tempHome) {
+        JsonObject release = new JsonObject();
+        JsonArray assets = new JsonArray();
+        JsonObject matching = new JsonObject();
+        matching.addProperty("name", "repo.jar");
+        matching.addProperty("browser_download_url", "not-a-valid-url");
+        assets.add(matching);
+        release.add("assets", assets);
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(makeLogger(), release, null);
+            RuntimeException thrown = assertThrows(RuntimeException.class, () -> gh.downloadJar("owner", "repo", "1.0.0"));
+            assertFalse(thrown instanceof ArtifactNotFoundException,
+                    "a malformed download URL is a download failure, not an absent artifact, and "
+                            + "must not be caught and turned into Optional.empty()");
         });
     }
 
@@ -133,12 +181,48 @@ public class TestDownloadJarOptional {
     }
 
     @Test
+    public void downloadJarClassifierNoMatchingReleaseReturnsEmptyOptional(@TempDir File tempHome) {
+        ArtifactNotFoundException noRelease = new ArtifactNotFoundException(
+                "No release found for owner/repo with tag '9.9.9' or 'v9.9.9'.", "owner/repo:9.9.9");
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(makeLogger(), null, noRelease);
+            Optional<File> result = gh.downloadJar("owner", "repo", "9.9.9", "api");
+            assertFalse(result.isPresent(),
+                    "before this fix, a nonexistent release propagated as a throw even for the "
+                            + "classifier overload (getAssetWithClassifier does not catch a plain "
+                            + "RuntimeException from fetchReleaseByTag); now both overloads agree "
+                            + "that a nonexistent release is an absent artifact");
+        });
+    }
+
+    @Test
     public void downloadJarClassifierRateLimitedStillThrows(@TempDir File tempHome) {
         RateLimitException rateLimited = new RateLimitException("rate limited");
 
         withTempHome(tempHome, () -> {
             GitHub gh = new FetchStubGitHub(makeLogger(), null, rateLimited);
             assertThrows(RateLimitException.class, () -> gh.downloadJar("owner", "repo", "1.0.0", "api"));
+        });
+    }
+
+    @Test
+    public void downloadJarClassifierDownloadFailurePropagatesRatherThanBecomingEmpty(@TempDir File tempHome) {
+        JsonObject release = new JsonObject();
+        JsonArray assets = new JsonArray();
+        JsonObject matching = new JsonObject();
+        matching.addProperty("name", "repo-api.jar");
+        matching.addProperty("browser_download_url", "not-a-valid-url");
+        assets.add(matching);
+        release.add("assets", assets);
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(makeLogger(), release, null);
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> gh.downloadJar("owner", "repo", "1.0.0", "api"));
+            assertFalse(thrown instanceof ArtifactNotFoundException,
+                    "a malformed download URL is a download failure, not an absent classifier, and "
+                            + "must not be caught and turned into Optional.empty()");
         });
     }
 
