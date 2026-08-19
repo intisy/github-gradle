@@ -93,7 +93,7 @@ github {
         jar {
             url = "https://nexus.internal/libs/foo-1.0.jar"
             header "Authorization", "Bearer ${myToken}"
-            sha256 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d" // optional; verified after download
+            sha256 = "80a981f3202da20cc46a0bf22e6e0ff40803e857ba6f4571496805c079162ffc" // optional; verified after download
             into = "implementation"
         }
     }
@@ -180,7 +180,7 @@ File gitJar = api.sourceBuilds().buildFromGit("https://gitlab.com/me/lib.git", "
 // A direct jar URL, with an optional header and sha256 check
 File urlJar = api.downloads().download("https://nexus.internal/libs/foo-1.0.jar",
         Collections.singletonMap("Authorization", "Bearer " + System.getenv("NEXUS_TOKEN")),
-        "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d");
+        "80a981f3202da20cc46a0bf22e6e0ff40803e857ba6f4571496805c079162ffc");
 ```
 
 `api.repositories()`, `api.publishing()`, `api.sourceBuilds()`, `api.downloads()` and
