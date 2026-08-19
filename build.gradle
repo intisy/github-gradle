@@ -40,16 +40,9 @@ task libraryJar(type: Jar) {
         include 'io/github/intisy/gradle/github/impl/source/BuildInvoker*'
         include 'io/github/intisy/gradle/github/impl/JarResolverImpl*'
         include 'io/github/intisy/gradle/github/utils/FileUtils*'
-        include 'io/github/intisy/gradle/github/extension/AuthExtension*'
-        include 'io/github/intisy/gradle/github/extension/CliExtension*'
-        include 'io/github/intisy/gradle/github/extension/ResilienceExtension*'
-        include 'io/github/intisy/gradle/github/extension/ResourcesExtension*'
         exclude 'io/github/intisy/gradle/github/Main*'
         exclude 'io/github/intisy/gradle/github/plugin/**'
         exclude 'io/github/intisy/gradle/github/Logger*'
-        exclude 'io/github/intisy/gradle/github/extension/GithubExtension*'
-        exclude 'io/github/intisy/gradle/github/extension/PublishExtension*'
-        exclude 'io/github/intisy/gradle/github/extension/ArtifactEntry*'
     }
 }
 
