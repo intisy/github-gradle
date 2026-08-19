@@ -1,17 +1,26 @@
 package io.github.intisy.gradle.github.plugin;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
+import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.model.Release;
 import io.github.intisy.gradle.github.api.capability.Releases;
+import io.github.intisy.gradle.github.impl.github.GitHub;
 import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.testfixtures.ProjectBuilder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -80,17 +89,17 @@ public class TestDependencyResolution {
     /**
      * Pins the classifier branch's absence handling: {@link Releases#downloadJar(String, String, String, String)}
      * returning an empty {@code Optional} must be skipped without failing the build, exactly like the
-     * old null return did.
+     * old null return did, but the skip must now be logged (it was previously silent).
      */
     @Test
-    public void missingClassifierArtifactIsSkippedSilently() throws IOException {
+    public void missingClassifierArtifactIsSkippedWithAWarning() throws IOException {
         Project project = ProjectBuilder.builder().withName("missing-classifier-test").build();
         project.getPluginManager().apply("java");
         GithubConfigurations.apply(project);
         project.getDependencies().add("githubImplementation", "some-owner:some-repo:1.0.0:api");
 
         GithubExtension githubExtension = new GithubExtension();
-        Logger logger = new Logger(githubExtension, project);
+        CapturingLogger logger = new CapturingLogger(githubExtension, project);
 
         DependencyResolution.apply(project, logger, githubExtension, new Releases() {
             public String latestVersion(String owner, String repo) {
@@ -124,6 +133,8 @@ public class TestDependencyResolution {
         Set<Dependency> implementationDependencies = project.getConfigurations().getByName("implementation").getDependencies();
         assertEquals(0, implementationDependencies.size(),
                 "an absent classifier artifact must be skipped, not added and not fail the build");
+        assertTrue(logger.warnings.stream().anyMatch(w -> w.contains("some-owner:some-repo:1.0.0") && w.contains("api")),
+                "the skip must be logged, naming the coordinate and the classifier, instead of vanishing silently");
     }
 
     /**
@@ -174,6 +185,64 @@ public class TestDependencyResolution {
                 "the missing-main-jar failure should propagate and fail the build");
     }
 
+    /**
+     * The two tests above stub {@link Releases} directly, which proves {@link DependencyResolution}
+     * absorbed the {@code Optional} contract correctly but never exercises the real {@link GitHub}
+     * adapter. These two drive the real adapter (via its overridable, public, non-final
+     * {@link GitHub#fetchReleaseByTag}, offline) through the classifier branch for both kinds of
+     * absence: a nonexistent release must still fail the build, and a release that exists but lacks
+     * the asset must still be skipped (now with the warning from
+     * {@link #missingClassifierArtifactIsSkippedWithAWarning}).
+     */
+    @Test
+    public void endToEndClassifierDependencyWithNonexistentReleaseFailsTheBuildThroughTheRealGitHubClient(@TempDir File tempHome) {
+        Project project = ProjectBuilder.builder().withName("e2e-missing-release-test").build();
+        project.getPluginManager().apply("java");
+        GithubConfigurations.apply(project);
+        project.getDependencies().add("githubImplementation", "some-owner:some-repo:9.9.9:api");
+
+        GithubExtension githubExtension = new GithubExtension();
+        Logger logger = new Logger(githubExtension, project);
+        ReleaseNotFoundException noRelease = new ReleaseNotFoundException(
+                "No release found for some-owner/some-repo with tag '9.9.9' or 'v9.9.9'.",
+                "some-owner/some-repo:9.9.9", Arrays.asList("9.9.9", "v9.9.9"));
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(logger, null, noRelease);
+            DependencyResolution.apply(project, logger, githubExtension, gh);
+
+            RuntimeException thrown = assertThrows(RuntimeException.class, () -> ((ProjectInternal) project).evaluate());
+            assertTrue(collectMessages(thrown).contains("No release found for some-owner/some-repo"),
+                    "a classifier dependency naming a nonexistent release must still fail the build "
+                            + "through the real GitHub client, not just a hand-written stub");
+        });
+    }
+
+    @Test
+    public void endToEndClassifierDependencyWithMissingAssetIsSkippedAndWarnedThroughTheRealGitHubClient(@TempDir File tempHome) {
+        Project project = ProjectBuilder.builder().withName("e2e-missing-asset-test").build();
+        project.getPluginManager().apply("java");
+        GithubConfigurations.apply(project);
+        project.getDependencies().add("githubImplementation", "some-owner:some-repo:1.0.0:api");
+
+        GithubExtension githubExtension = new GithubExtension();
+        CapturingLogger logger = new CapturingLogger(githubExtension, project);
+        JsonObject release = new JsonObject();
+        release.add("assets", new JsonArray());
+
+        withTempHome(tempHome, () -> {
+            GitHub gh = new FetchStubGitHub(logger, release, null);
+            DependencyResolution.apply(project, logger, githubExtension, gh);
+            ((ProjectInternal) project).evaluate();
+
+            Set<Dependency> implementationDependencies = project.getConfigurations().getByName("implementation").getDependencies();
+            assertEquals(0, implementationDependencies.size(),
+                    "an absent classifier asset must still be skipped through the real GitHub client");
+            assertTrue(logger.warnings.stream().anyMatch(w -> w.contains("some-owner:some-repo:1.0.0") && w.contains("api")),
+                    "the skip must still be logged through the real GitHub client");
+        });
+    }
+
     private static String collectMessages(Throwable t) {
         StringBuilder sb = new StringBuilder();
         for (Throwable current = t; current != null; current = current.getCause()) {
@@ -185,5 +254,52 @@ public class TestDependencyResolution {
             }
         }
         return sb.toString();
+    }
+
+    private void withTempHome(File tempHome, Runnable body) {
+        String original = System.getProperty("user.home");
+        System.setProperty("user.home", tempHome.getAbsolutePath());
+        try {
+            body.run();
+        } finally {
+            System.setProperty("user.home", original);
+        }
+    }
+
+    private static final class CapturingLogger extends Logger {
+        final List<String> warnings = new ArrayList<String>();
+
+        CapturingLogger(GithubExtension extension, Project project) {
+            super(extension, project);
+        }
+
+        @Override
+        public void warn(String message) {
+            warnings.add(message);
+        }
+    }
+
+    /**
+     * Overrides the public, non-final {@link GitHub#fetchReleaseByTag} to return canned data (or
+     * throw) instead of making a real HTTP call, mirroring the identical seam used in
+     * {@code TestDownloadJarOptional}.
+     */
+    private static final class FetchStubGitHub extends GitHub {
+        private final JsonObject canned;
+        private final RuntimeException toThrow;
+
+        FetchStubGitHub(GitHubLogger logger, JsonObject canned, RuntimeException toThrow) {
+            super(logger, new ResourceSettings(), new GithubExtension());
+            this.canned = canned;
+            this.toThrow = toThrow;
+        }
+
+        @Override
+        public JsonObject fetchReleaseByTag(String repoOwner, String repoName, String version) {
+            if (toThrow != null) {
+                throw toThrow;
+            }
+            return canned;
+        }
     }
 }

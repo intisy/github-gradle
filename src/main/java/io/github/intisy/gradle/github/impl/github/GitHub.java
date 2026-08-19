@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.intisy.gradle.github.api.ArtifactNotFoundException;
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
 import io.github.intisy.gradle.github.api.capability.Credentials;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
@@ -50,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -864,9 +866,9 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 logger.debug("IOException for tag '" + tag + "': " + e.getMessage());
             }
         }
-        throw new ArtifactNotFoundException("No release found for " + repoOwner + "/" + repoName
+        throw new ReleaseNotFoundException("No release found for " + repoOwner + "/" + repoName
                 + " with tag '" + version + "' or '" + tagsToTry[1] + "'.",
-                repoOwner + "/" + repoName + ":" + version);
+                repoOwner + "/" + repoName + ":" + version, Arrays.asList(tagsToTry));
     }
 
     /**

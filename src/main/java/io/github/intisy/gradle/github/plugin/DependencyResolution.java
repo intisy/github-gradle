@@ -60,7 +60,13 @@ public class DependencyResolution {
 							jars.addAll(releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion()));
 						} else {
 							Optional<File> jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
-							if (jar.isPresent()) jars.add(jar.get());
+							if (jar.isPresent()) {
+								jars.add(jar.get());
+							} else {
+								logger.warn("No '" + classifier + "' classifier asset found for " + dependency.getGroup()
+									+ ":" + dependency.getName() + ":" + dependency.getVersion() + "; skipping it. "
+									+ "The compile classpath may be incomplete.");
+							}
 						}
 						for (File jar : jars) {
 							proj.getDependencies().add(nativeCfg, proj.files(jar));

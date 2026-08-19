@@ -1,6 +1,7 @@
 package io.github.intisy.gradle.github.api.capability;
 
 import io.github.intisy.gradle.github.api.RateLimitException;
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
 import io.github.intisy.gradle.github.api.model.DeclaredDependency;
 import io.github.intisy.gradle.github.api.model.Release;
 
@@ -45,9 +46,13 @@ public interface Releases {
      * @param owner the GitHub account or organization that owns the repository.
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
-     * @return the downloaded (or cached) jar file, or an empty {@code Optional} if no release
-     * matches {@code version} or the release has no matching jar asset. Absence is never reported
-     * by throwing; a thrown exception always means something else went wrong (see below).
+     * @return the downloaded (or cached) jar file, or an empty {@code Optional} if the release
+     * exists but has no matching jar asset. A release that does not exist at all is a different
+     * kind of absence and is never represented this way (see {@code @throws} below): the two are
+     * not the same thing, since a missing release is almost always a caller mistake (a typo'd
+     * version, a deleted or renamed tag) while a missing asset within a release that does exist is
+     * a normal outcome.
+     * @throws ReleaseNotFoundException if no release matches {@code version}.
      * @throws RuntimeException thrown unchecked by the underlying client if the download itself
      * fails or another API error occurs.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
@@ -61,10 +66,11 @@ public interface Releases {
      * @param repo the repository name, without the owner prefix.
      * @param version the release tag to resolve (a "v" prefix is tried both with and without).
      * @param classifier the artifact classifier identifying the asset (e.g. {@code "api"}).
-     * @return the classifier asset's jar, or an empty {@code Optional} if no release matches
-     * {@code version} or the release has no asset named {@code repo-classifier.jar}. Absence is
-     * never reported by throwing; a thrown exception always means something else went wrong (see
-     * below), the same as the 3-argument overload above.
+     * @return the classifier asset's jar, or an empty {@code Optional} if the release exists but
+     * has no asset named {@code repo-classifier.jar}. As with the 3-argument overload above, a
+     * release that does not exist at all is a different kind of absence and is never represented
+     * this way.
+     * @throws ReleaseNotFoundException if no release matches {@code version}.
      * @throws RuntimeException thrown unchecked by the underlying client if the download itself
      * fails or another API error occurs.
      * @throws RateLimitException if the GitHub API rate limit has been exceeded.
