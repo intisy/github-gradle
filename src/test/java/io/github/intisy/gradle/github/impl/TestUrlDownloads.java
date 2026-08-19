@@ -288,6 +288,69 @@ public class TestUrlDownloads {
         assertFalse(RedirectPolicyInterceptor.isHttpsToHttpDowngrade(http, http));
     }
 
+    /**
+     * {@code isCrossHost} used to compare host only, so a redirect from {@code host:8080} to
+     * {@code host:9090} was treated as same-host and kept the caller's headers, even though a
+     * different port is a different origin. Pins both the decision function directly and the
+     * observable behaviour through a real redirect.
+     */
+    @Test
+    public void samePortSameHostIsNotCrossHost() {
+        HttpUrl a = HttpUrl.parse("http://127.0.0.1:8080/foo.jar");
+        HttpUrl b = HttpUrl.parse("http://127.0.0.1:8080/bar.jar");
+        assertFalse(RedirectPolicyInterceptor.isCrossHost(a, b));
+    }
+
+    @Test
+    public void sameHostDifferentPortIsCrossHost() {
+        HttpUrl a = HttpUrl.parse("http://127.0.0.1:8080/foo.jar");
+        HttpUrl b = HttpUrl.parse("http://127.0.0.1:9090/bar.jar");
+        assertTrue(RedirectPolicyInterceptor.isCrossHost(a, b));
+    }
+
+    /**
+     * The end-to-end counterpart of {@link #sameHostDifferentPortIsCrossHost}: a redirect to the
+     * same hostname but a different port must strip the caller's header, exactly like a redirect
+     * to a different hostname does in {@link #crossHostRedirectStripsTheHeader}.
+     */
+    @Test
+    public void sameHostDifferentPortRedirectStripsTheHeader(@TempDir File cacheDir) throws IOException {
+        HttpServer originServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer targetServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        int targetPort = targetServer.getAddress().getPort();
+        AtomicReference<String> receivedHeader = new AtomicReference<>();
+        AtomicBoolean targetHit = new AtomicBoolean();
+        originServer.createContext("/original.jar", exchange -> {
+            exchange.getResponseHeaders().add("Location", "http://127.0.0.1:" + targetPort + "/redirected.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        targetServer.createContext("/redirected.jar", exchange -> {
+            targetHit.set(true);
+            receivedHeader.set(exchange.getRequestHeaders().getFirst("X-Api-Key"));
+            byte[] body = "jar-content".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        originServer.start();
+        targetServer.start();
+        try {
+            CapturingLogger logger = new CapturingLogger();
+            Downloads downloads = new UrlDownloads(loopbackTestClient(), logger, cacheDir);
+            Map<String, String> headers = Collections.singletonMap("X-Api-Key", "same-host-different-port-token");
+
+            File jar = downloads.download("http://127.0.0.1:" + originServer.getAddress().getPort() + "/original.jar", headers, null);
+
+            assertTrue(jar.isFile());
+            assertTrue(targetHit.get(), "a same-host, different-port redirect must still be followed");
+            assertNull(receivedHeader.get(), "a same-host, different-port redirect must strip the caller's header");
+        } finally {
+            originServer.stop(0);
+            targetServer.stop(0);
+        }
+    }
+
     @Test
     public void plainHttpUrlWithHeadersLogsAWarningNamingTheUrl(@TempDir File cacheDir) {
         CapturingLogger logger = new CapturingLogger();

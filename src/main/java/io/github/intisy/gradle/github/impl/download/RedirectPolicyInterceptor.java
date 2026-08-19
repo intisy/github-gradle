@@ -70,9 +70,11 @@ public final class RedirectPolicyInterceptor implements Interceptor {
     /**
      * @param from the URL being redirected from.
      * @param to the URL being redirected to.
-     * @return true if {@code to} has a different host than {@code from}, case-insensitively.
+     * @return true if {@code to} has a different host (case-insensitively) or a different port
+     * than {@code from}. A different port on the same hostname is still a different origin: the
+     * caller's headers must not survive a redirect to another port any more than to another host.
      */
     public static boolean isCrossHost(HttpUrl from, HttpUrl to) {
-        return !from.host().equalsIgnoreCase(to.host());
+        return !from.host().equalsIgnoreCase(to.host()) || from.port() != to.port();
     }
 }
