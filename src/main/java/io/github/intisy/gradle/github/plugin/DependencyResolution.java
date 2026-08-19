@@ -28,13 +28,12 @@ public class DependencyResolution {
 	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
 	 * @param releases the client used to resolve each dependency to a jar.
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
-	 * call. {@code addedJars} extends that dedup across every configuration and every dependency
-	 * resolved through the no-classifier branch (the {@link Releases#resolveWithDependencies} path):
-	 * each distinct jar reached that way is added to the classpath at most once across the whole
-	 * configuration loop. The {@code :all} branch ({@link Releases#downloadAllModuleJars}) and the
-	 * explicit-classifier branch ({@link Releases#downloadJar(String, String, String, String)}) do
-	 * not consult {@code addedJars}, so a jar reachable through more than one of the three branches
-	 * is not deduplicated against jars added by the other branches.
+	 * call. {@code addedJars} extends that dedup across every configuration and every branch: the
+	 * no-classifier branch ({@link Releases#resolveWithDependencies}), the {@code :all} branch
+	 * ({@link Releases#downloadAllModuleJars}), and the explicit-classifier branch
+	 * ({@link Releases#downloadJar(String, String, String, String)}) all consult it, keyed by the
+	 * resolved {@link File}. Each distinct jar is therefore added to a native configuration at most
+	 * once across the whole configuration loop, no matter which branch reaches it.
 	 */
 	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.afterEvaluate(proj -> {
@@ -57,11 +56,17 @@ public class DependencyResolution {
 								}
 							}
 						} else if (classifier.equals("all")) {
-							jars.addAll(releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion()));
+							for (File jar : releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion())) {
+								if (addedJars.add(jar)) {
+									jars.add(jar);
+								}
+							}
 						} else {
 							Optional<File> jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
 							if (jar.isPresent()) {
-								jars.add(jar.get());
+								if (addedJars.add(jar.get())) {
+									jars.add(jar.get());
+								}
 							} else {
 								logger.warn("No '" + classifier + "' classifier asset found for " + dependency.getGroup()
 									+ ":" + dependency.getName() + ":" + dependency.getVersion() + "; skipping it. "
