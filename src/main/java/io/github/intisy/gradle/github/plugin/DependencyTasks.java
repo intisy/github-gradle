@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.api.RateLimitException;
+import io.github.intisy.gradle.github.api.Releases;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import io.github.intisy.gradle.github.utils.GradleUtils;
 import org.gradle.api.Project;
@@ -14,15 +15,7 @@ import java.util.Set;
  */
 public class DependencyTasks {
 
-	/**
-	 * The subset of the GitHub client this class needs, kept free of {@code impl} types so the
-	 * layering rule (only {@code api}/{@code impl} may name {@code impl}) still holds.
-	 */
-	public interface VersionLookup {
-		String getLatestVersion(String repoOwner, String repoName);
-	}
-
-	public static void apply(Project project, Logger logger, GithubExtension githubExtension, VersionLookup gitHub) {
+	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.getTasks().register("printGithubDependencies", task -> {
 			task.setGroup("github");
 			task.setDescription("Prints all GitHub dependencies across all configurations");
@@ -48,7 +41,7 @@ public class DependencyTasks {
 						logger.debug("Updating GitHub dependency: " + name);
 						String newVersion;
 						try {
-							newVersion = gitHub.getLatestVersion(group, name);
+							newVersion = releases.latestVersion(group, name);
 						} catch (RateLimitException e) {
 							if (!githubExtension.getResilience().isSkipOnRateLimit()) {
 								throw e;

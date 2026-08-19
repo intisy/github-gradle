@@ -1,7 +1,10 @@
 package io.github.intisy.gradle.github.plugin;
 
-import com.google.gson.JsonObject;
 import io.github.intisy.gradle.github.Logger;
+import io.github.intisy.gradle.github.api.Publishing;
+import io.github.intisy.gradle.github.api.Release;
+import io.github.intisy.gradle.github.api.RemoteRepo;
+import io.github.intisy.gradle.github.api.Repositories;
 import io.github.intisy.gradle.github.extension.ArtifactEntry;
 import io.github.intisy.gradle.github.extension.PublishExtension;
 import org.gradle.api.Project;
@@ -19,17 +22,7 @@ import java.util.concurrent.Callable;
  */
 public class PublishTasks {
 
-	/**
-	 * The subset of the GitHub client this class needs, kept free of {@code impl} types so the
-	 * layering rule (only {@code api}/{@code impl} may name {@code impl}) still holds.
-	 */
-	public interface ReleasePublisher {
-		String[] getRemoteOwnerAndRepo(File projectDir);
-		JsonObject createRelease(String owner, String repo, String tagName, String releaseName);
-		void uploadReleaseAsset(String uploadUrl, File file, String assetName) throws IOException;
-	}
-
-	public static void apply(Project project, Logger logger, PublishExtension publishExtension, ReleasePublisher gitHub) {
+	public static void apply(Project project, Logger logger, PublishExtension publishExtension, Repositories repositories, Publishing publishing) {
 		project.getTasks().register("publishGithub", task -> {
 			task.setGroup("github");
 			task.setDescription("Creates a GitHub release and uploads the project JAR(s)");
@@ -60,9 +53,9 @@ public class PublishTasks {
 					owner = publishExtension.getOwner();
 					repo  = publishExtension.getRepo();
 				} else {
-					String[] ownerRepo = gitHub.getRemoteOwnerAndRepo(project.getProjectDir());
-					owner = publishExtension.getOwner() != null ? publishExtension.getOwner() : ownerRepo[0];
-					repo  = publishExtension.getRepo()  != null ? publishExtension.getRepo()  : ownerRepo[1];
+					RemoteRepo ownerRepo = repositories.remoteOf(project.getProjectDir());
+					owner = publishExtension.getOwner() != null ? publishExtension.getOwner() : ownerRepo.getOwner();
+					repo  = publishExtension.getRepo()  != null ? publishExtension.getRepo()  : ownerRepo.getRepo();
 				}
 								String tag = publishExtension.getTag() != null
 					        ? publishExtension.getTag()
@@ -71,8 +64,7 @@ public class PublishTasks {
 
 				logger.log("Publishing " + owner + "/" + repo + " tag " + tag + " version " + version);
 
-				JsonObject release = gitHub.createRelease(owner, repo, tag, releaseName);
-				String uploadUrl = release.get("upload_url").getAsString();
+				Release release = publishing.ensureRelease(owner, repo, tag, releaseName);
 
 				List<ArtifactEntry> entries = expandArtifacts(publishExtension.getArtifacts(), project, repo, logger);
 				if (!entries.isEmpty()) {
@@ -87,7 +79,7 @@ public class PublishTasks {
 						String assetName = buildAssetName(repo, entry.getClassifier());
 						logger.log("Uploading artifact: " + jar.getName() + " as " + assetName);
 						try {
-							gitHub.uploadReleaseAsset(uploadUrl, jar, assetName);
+							publishing.uploadAsset(release, jar, assetName);
 						} catch (IOException e) {
 							throw new RuntimeException("Failed to upload asset " + assetName + ": " + e.getMessage(), e);
 						}
@@ -97,7 +89,7 @@ public class PublishTasks {
 					String assetName = repo + ".jar";
 					logger.log("Uploading: " + jarToUpload.getName() + " as " + assetName);
 					try {
-						gitHub.uploadReleaseAsset(uploadUrl, jarToUpload, assetName);
+						publishing.uploadAsset(release, jarToUpload, assetName);
 					} catch (IOException e) {
 						throw new RuntimeException("Failed to upload asset: " + e.getMessage(), e);
 					}

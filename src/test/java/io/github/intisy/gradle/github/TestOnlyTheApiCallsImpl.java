@@ -6,9 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -37,9 +35,7 @@ public class TestOnlyTheApiCallsImpl {
      * Every entry needs a one-line reason. Remove an entry only when the named class itself no
      * longer references {@code impl}; never add one without also fixing the class it would cover.
      */
-    private static final Set<String> ALLOWED_OUTSIDE_LAYERING = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "Main" // the Gradle plugin entry point; constructs impl.GitHub directly, pending a switch to the api facade.
-    )));
+    private static final Set<String> ALLOWED_OUTSIDE_LAYERING = Collections.emptySet();
 
     private static final String OWN_ROOT = "io/github/intisy/gradle/github/";
     private static final String IMPL_MARKER = "io/github/intisy/gradle/github/impl/";

@@ -2,6 +2,7 @@ package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.Logger;
 import io.github.intisy.gradle.github.api.RateLimitException;
+import io.github.intisy.gradle.github.api.Releases;
 import io.github.intisy.gradle.github.extension.GithubExtension;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
@@ -19,19 +20,15 @@ import java.util.Set;
 public class DependencyResolution {
 
 	/**
-	 * The subset of the GitHub client this class needs, kept free of {@code impl} types so the
-	 * layering rule (only {@code api}/{@code impl} may name {@code impl}) still holds.
+	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
+	 * call. {@code addedJars} carries that dedup across every configuration and every dependency in
+	 * this method, matching the old shared-resolved-set behaviour: each distinct jar is added to
+	 * the classpath once, keyed by the file identity that {@code GitHub}'s own on-disk cache already
+	 * makes deterministic per {@code owner:name:version}.
 	 */
-	public interface DependencyAssetResolver {
-		void getAssetWithTransitives(String repoOwner, String repoName, String version, Set<String> resolved, List<File> collected);
-		void getAllModuleAssets(String repoOwner, String repoName, String version, List<File> collected);
-		File getAssetWithClassifier(String repoOwner, String repoName, String version, String classifier);
-	}
-
-	public static void apply(Project project, Logger logger, GithubExtension githubExtension, DependencyAssetResolver gitHub) {
+	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
 		project.afterEvaluate(proj -> {
-			Set<String> resolved = new HashSet<String>();
-			List<File> allJars = new ArrayList<File>();
+			Set<File> addedJars = new HashSet<File>();
 			for (String cfgName : GithubConfigurations.GITHUB_CONFIGS) {
 				String nativeCfg = GithubConfigurations.GITHUB_TO_GRADLE.get(cfgName);
 				boolean needsJavaLibrary = GithubConfigurations.JAVA_LIBRARY_CONFIGS.contains(nativeCfg);
@@ -44,11 +41,15 @@ public class DependencyResolution {
 						String classifier = GithubConfigurations.extractClassifier(dependency);
 						List<File> jars = new ArrayList<File>();
 						if (classifier.isEmpty()) {
-							gitHub.getAssetWithTransitives(dependency.getGroup(), dependency.getName(), dependency.getVersion(), resolved, jars);
+							for (File jar : releases.resolveWithDependencies(dependency.getGroup(), dependency.getName(), dependency.getVersion())) {
+								if (addedJars.add(jar)) {
+									jars.add(jar);
+								}
+							}
 						} else if (classifier.equals("all")) {
-							gitHub.getAllModuleAssets(dependency.getGroup(), dependency.getName(), dependency.getVersion(), jars);
+							jars.addAll(releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion()));
 						} else {
-							File jar = gitHub.getAssetWithClassifier(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
+							File jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
 							if (jar != null) jars.add(jar);
 						}
 						for (File jar : jars) {

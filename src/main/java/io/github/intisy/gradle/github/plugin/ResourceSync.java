@@ -1,9 +1,10 @@
 package io.github.intisy.gradle.github.plugin;
 
 import io.github.intisy.gradle.github.Logger;
+import io.github.intisy.gradle.github.api.RemoteRepo;
+import io.github.intisy.gradle.github.api.Repositories;
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
 import io.github.intisy.gradle.github.utils.FileUtils;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -21,17 +22,7 @@ import java.util.Set;
  */
 public class ResourceSync {
 
-	/**
-	 * The subset of the GitHub client this class needs, kept free of {@code impl} types so the
-	 * layering rule (only {@code api}/{@code impl} may name {@code impl}) still holds.
-	 */
-	public interface RepoSync {
-		String getResourceRepoOwner();
-		String getResourceRepoName();
-		void cloneOrPullRepository(File path, String branch) throws GitAPIException, IOException;
-	}
-
-	public static void apply(Project project, Logger logger, ResourcesExtension resourcesExtension, RepoSync gitHub) {
+	public static void apply(Project project, Logger logger, ResourcesExtension resourcesExtension, Repositories repositories) {
 		project.getPlugins().withType(JavaPlugin.class, (Action<? super JavaPlugin>) javaPlugin -> {
 			JavaPluginExtension javaExtension = project.getExtensions().getByType(JavaPluginExtension.class);
 			SourceSet main = javaExtension.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
@@ -41,10 +32,11 @@ public class ResourceSync {
 				logger.debug("Process resource event called on " + project.getName());
 				if (resourcesExtension.getRepoUrl() != null) {
 					logger.debug("Found an repository in the resource extension");
-					File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+					RemoteRepo configuredRepo = repositories.configuredRepo();
+					File path = FileUtils.getGradleHome().resolve("resources").resolve(configuredRepo.getOwner() + "-" + configuredRepo.getRepo()).toFile();
 					for (File dir : resourceDirs) {
 						try {
-							gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
+							repositories.cloneOrPull(path, configuredRepo.getOwner(), configuredRepo.getRepo(), resourcesExtension.getBranch());
 							if (resourcesExtension.isBuildOnly()) {
 								dir = project.getLayout().getBuildDirectory().getAsFile().get().toPath()
 								        .resolve("resources").resolve(dir.getParentFile().getName()).toFile();
@@ -58,7 +50,7 @@ public class ResourceSync {
 							} else {
 								logger.error("Failed to create directory: " + dir);
 							}
-						} catch (GitAPIException | IOException e) {
+						} catch (IOException e) {
 							throw new RuntimeException(e);
 						}
 					}
