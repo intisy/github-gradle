@@ -127,25 +127,25 @@ consumer supplies one itself:
 
 ```java
 import io.github.intisy.gradle.github.api.*;
-import io.github.intisy.gradle.github.extension.*;
+import io.github.intisy.gradle.github.api.config.*;
 
 import java.io.File;
 
 GitHubConfig config = new GitHubConfig() {
-    private final AuthExtension auth = new AuthExtension();
-    private final CliExtension cli = new CliExtension();
-    private final ResilienceExtension resilience = new ResilienceExtension();
+    private final AuthSettings auth = new AuthSettings();
+    private final CliSettings cli = new CliSettings();
+    private final ResilienceSettings resilience = new ResilienceSettings();
     {
         auth.setToken(System.getenv("GITHUB_TOKEN"));
     }
 
     @Override public String getAccessToken() { return null; }
-    @Override public AuthExtension getAuth() { return auth; }
-    @Override public CliExtension getCli() { return cli; }
-    @Override public ResilienceExtension getResilience() { return resilience; }
+    @Override public AuthSettings getAuth() { return auth; }
+    @Override public CliSettings getCli() { return cli; }
+    @Override public ResilienceSettings getResilience() { return resilience; }
 };
 
-GitHubApi api = GitHubApi.create(config, new ResourcesExtension());
+GitHubApi api = GitHubApi.create(config, new ResourceSettings());
 File jar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7");
 ```
 
