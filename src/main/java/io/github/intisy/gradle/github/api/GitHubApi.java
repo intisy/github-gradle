@@ -24,8 +24,9 @@ import java.io.File;
  * The single entry point for consuming the GitHub client outside a Gradle build.
  *
  * <p>Construct one with {@link #create(GitHubConfig, ResourceSettings, GitHubLogger)} (or the
- * two-argument overload, which logs to {@code System.err}), then reach each capability through
- * its accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
+ * two-argument overload, which logs to {@code System.err}, or the no-argument overload, which
+ * additionally defaults to fully anonymous access), then reach each capability through its
+ * accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
  * {@link #publishing()}, {@link #sourceBuilds()}, {@link #resolver()}.
  */
 public final class GitHubApi {
@@ -62,6 +63,17 @@ public final class GitHubApi {
      */
     public static GitHubApi create(GitHubConfig config, ResourceSettings resources) {
         return create(config, resources, new ConsoleGitHubLogger(false));
+    }
+
+    /**
+     * Same as {@link #create(GitHubConfig, ResourceSettings, GitHubLogger)}, defaulting to an
+     * anonymous {@link GitHubConfig}, a default {@link ResourceSettings}, and logging to
+     * {@code System.err} via {@link ConsoleGitHubLogger}.
+     *
+     * @return a new client for fully anonymous, unauthenticated access.
+     */
+    public static GitHubApi create() {
+        return create(GitHubConfig.builder().build(), new ResourceSettings(), new ConsoleGitHubLogger(false));
     }
 
     /**

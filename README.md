@@ -122,8 +122,9 @@ dependencies {
 ```
 
 The entry point is `GitHubApi.create(...)`. It needs a `GitHubConfig` (the access token and
-auth/cli/resilience settings), and the library ships no default implementation of it, so a
-consumer supplies one itself:
+auth/cli/resilience settings); `GitHubConfig.builder()` assembles one without any Gradle DSL,
+every builder method is optional, and calling `build()` with none produces a config for fully
+anonymous, unauthenticated access:
 
 ```java
 import io.github.intisy.gradle.github.api.*;
@@ -131,27 +132,19 @@ import io.github.intisy.gradle.github.api.config.*;
 
 import java.io.File;
 
-GitHubConfig config = new GitHubConfig() {
-    private final AuthSettings auth = new AuthSettings();
-    private final CliSettings cli = new CliSettings();
-    private final ResilienceSettings resilience = new ResilienceSettings();
-    {
-        auth.setToken(System.getenv("GITHUB_TOKEN"));
-    }
-
-    @Override public String getAccessToken() { return null; }
-    @Override public AuthSettings getAuth() { return auth; }
-    @Override public CliSettings getCli() { return cli; }
-    @Override public ResilienceSettings getResilience() { return resilience; }
-};
+GitHubConfig config = GitHubConfig.builder()
+        .token(System.getenv("GITHUB_TOKEN"))
+        .build();
 
 GitHubApi api = GitHubApi.create(config, new ResourceSettings());
-File jar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7");
+File jar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7")
+        .orElseThrow(() -> new IllegalStateException("jar not found"));
 ```
 
 `api.repositories()`, `api.publishing()`, `api.sourceBuilds()` and `api.resolver()` reach the
 same capabilities the plugin's own tasks use. `GitHubApi.create` also accepts a `GitHubLogger`
-argument if you want diagnostics sent somewhere other than `System.err`.
+argument if you want diagnostics sent somewhere other than `System.err`, and `GitHubApi.create()`
+with no arguments defaults to an anonymous config for quick, unauthenticated use.
 
 ## License
 
