@@ -9,12 +9,19 @@ import java.net.URISyntaxException;
  *
  * @implNote A presigned or {@code ?token=}-style URL is the ordinary shape for a private Nexus,
  * S3, or Artifactory download, and {@code https://oauth2:TOKEN@host/repo.git} is the ordinary
- * shape for a private git clone URL; both carry a credential in a place this method removes. A
- * credential containing a character {@link URI} rejects (a raw newline, a space, a brace — the
- * ordinary shape of a token read via Groovy's {@code file("token.txt").text}, which keeps a
- * trailing newline) makes {@code new URI(url)} throw rather than parse; the exception path below
- * strips userinfo manually for exactly that reason, rather than giving up and returning the
- * credential verbatim.
+ * shape for a private git clone URL; both carry a credential in a place this method removes.
+ * Locating that credential is done textually, not via {@link URI}: a credential that contains a
+ * {@code /}, {@code ?}, {@code #}, or a character {@link URI} rejects outright (a raw newline, a
+ * space, a brace, the ordinary shape of a token read via Groovy's {@code file("token.txt").text})
+ * makes {@code URI} either throw or silently mis-parse the authority, truncating it at the
+ * credential's own {@code /}/{@code ?}/{@code #} and leaving everything from {@code "://"} up to
+ * that point, including the credential, sitting in what {@code URI} then reports as the path or
+ * query instead of the authority. So {@link #redact} checks first, on the raw text, whether the
+ * shape between {@code "://"} and the last {@code '@'} looks like {@code userinfo:secret@}, and if
+ * so removes that whole span outright before ever asking {@link URI} to parse anything. Only a URL
+ * with no such span falls through to structured {@link URI} parsing (needed to preserve a port
+ * cleanly), and only a URL that {@link URI} still cannot parse falls through further to a
+ * best-effort manual strip.
  */
 public final class UrlRedaction {
     private UrlRedaction() {
@@ -30,6 +37,16 @@ public final class UrlRedaction {
     public static String redact(String url) {
         if (url == null) {
             return null;
+        }
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return stripQuery(url);
+        }
+        int authorityStart = schemeEnd + 3;
+        int lastAt = url.lastIndexOf('@');
+        if (lastAt > authorityStart && url.substring(authorityStart, lastAt).indexOf(':') >= 0) {
+            String withoutUserinfo = url.substring(0, authorityStart) + url.substring(lastAt + 1);
+            return stripQuery(withoutUserinfo);
         }
         try {
             URI uri = new URI(url);
@@ -60,7 +77,8 @@ public final class UrlRedaction {
     }
 
     /**
-     * @implNote A best-effort textual strip for a value {@link URI} could not parse. Only the
+     * @implNote A best-effort textual strip for a value neither {@link #redact}'s own
+     * {@code userinfo:secret@} check nor {@link URI} could handle. Only the
      * {@code scheme://authority} shape has a real userinfo slot (an scp-like {@code git@host:...}
      * URL does not: its {@code user@} is a fixed SSH username, never a password), so this only
      * touches the segment between {@code "://"} and the next {@code '/'}.

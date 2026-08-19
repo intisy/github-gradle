@@ -17,10 +17,9 @@ public class TestCloneUrlIdentity {
     }
 
     /**
-     * The exact scenario Critical 2 was raised over: a github.com checkout and a self-hosted
-     * checkout sharing the same owner/repo path must never collapse into the same identity,
-     * because a directory-existence check has no way to compare a checkout's remote back against
-     * the requested URL.
+     * A github.com checkout and a self-hosted checkout sharing the same owner/repo path must
+     * never collapse into the same identity, because a directory-existence check has no way to
+     * compare a checkout's remote back against the requested URL.
      */
     @Test
     public void twoDistinctHostsWithTheSameOwnerRepoPathDeriveDifferentIdentities() {
@@ -59,9 +58,9 @@ public class TestCloneUrlIdentity {
     }
 
     /**
-     * A root-level repository on a URL that also carries a credential and a port is Important 4's
-     * exact scenario: without redaction the derived owner would have been literally
-     * {@code user:token@host:port}, and the colons would confuse {@code mkdirs} on Windows.
+     * A root-level repository on a URL that also carries a credential and a port: without
+     * redaction and sanitizing, the derived owner would be literally {@code user:token@host:port},
+     * and the colons would confuse {@code mkdirs} on Windows.
      */
     @Test
     public void rootLevelRepoWithPortAndCredentialProducesAFilesystemSafeIdentity() {
@@ -74,9 +73,8 @@ public class TestCloneUrlIdentity {
     }
 
     /**
-     * R1's regression test, reopened via the same {@link UrlRedaction} exception-path omission
-     * that reopened Important 4: a token containing a newline (the ordinary shape of {@code
-     * file("token.txt").text} in Groovy) used to survive verbatim into the derived owner, e.g.
+     * A token containing a newline (the ordinary shape of {@code file("token.txt").text} in
+     * Groovy) must never survive into the derived owner, e.g. as
      * {@code "user-ghp_SECRET\n@git.company.com-8443-<hash>"}.
      */
     @Test
@@ -101,5 +99,22 @@ public class TestCloneUrlIdentity {
         String[] identity = CloneUrlIdentity.derive("https://user:to{k}@git.company.com/lib.git");
 
         assertFalse(identity[0].contains("to{k}"));
+    }
+
+    /**
+     * The identity is what lands on disk, so every character in {@link
+     * TestUrlRedaction#SPECIAL_USERINFO_CHARACTERS} that {@link UrlRedaction#redact} must strip
+     * has to be proven gone from the derived owner too, not just from the redacted URL string.
+     */
+    @Test
+    public void everyUnusualUserinfoCharacterNeverAppearsInTheDerivedIdentity() {
+        for (String special : TestUrlRedaction.SPECIAL_USERINFO_CHARACTERS) {
+            String url = "https://user:SECRET" + special + "TOKEN@git.company.com/acme/widget.git";
+            String[] identity = CloneUrlIdentity.derive(url);
+            assertFalse(identity[0].contains("SECRET"),
+                    "owner leaked for '" + TestUrlRedaction.describe(special) + "': " + identity[0]);
+            assertFalse(identity[1].contains("SECRET"),
+                    "repo leaked for '" + TestUrlRedaction.describe(special) + "': " + identity[1]);
+        }
     }
 }

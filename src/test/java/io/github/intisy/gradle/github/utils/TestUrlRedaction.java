@@ -52,11 +52,10 @@ public class TestUrlRedaction {
     }
 
     /**
-     * R1's regression tests. A character {@link java.net.URI} rejects inside userinfo (a trailing
-     * newline, a space, a brace) makes {@code new URI(url)} throw, and the exception-path fallback
-     * used to skip {@code stripUserinfo} entirely, returning the credential verbatim: the exact
-     * shape Critical 1 fixed for headers, reopened here for the URL itself. A trailing newline is
-     * the ordinary shape of {@code file("token.txt").text} in Groovy.
+     * A character {@link java.net.URI} rejects inside userinfo (a trailing newline, a space, a
+     * brace) makes {@code new URI(url)} throw, so a fallback that gives up on an exception and
+     * returns the credential verbatim would leak it. A trailing newline is the ordinary shape of
+     * {@code file("token.txt").text} in Groovy.
      */
     @Test
     public void newlineInUserinfoIsStillStripped() {
@@ -88,5 +87,39 @@ public class TestUrlRedaction {
         assertEquals("https://host/a.jar", redacted);
         assertFalse(redacted.contains("tok"));
         assertFalse(redacted.contains("also-secret"));
+    }
+
+    /**
+     * A userinfo character that terminates {@link java.net.URI}'s authority early ({@code /},
+     * {@code ?}, {@code #}) makes {@code URI} parse the URL "successfully", but assigns everything
+     * from that character onward to the path or query instead of the authority, so a strip that
+     * only inspects the parsed authority never sees the rest of the credential and returns it
+     * verbatim. A base64-shaped token (the ordinary shape of an Azure DevOps PAT) routinely
+     * contains {@code /} and {@code +}; a tab is included alongside the already-covered newline,
+     * space, and brace as another character a hand-typed or file-read token can carry.
+     */
+    @Test
+    public void everyUnusualUserinfoCharacterIsStrippedNotJustTheOnesUriRejects() {
+        for (String special : SPECIAL_USERINFO_CHARACTERS) {
+            String url = "https://user:SECRET" + special + "TOKEN@host.example/a.jar";
+            String redacted = UrlRedaction.redact(url);
+            assertFalse(redacted.contains("SECRET"), "leaked credential for '" + describe(special) + "': " + redacted);
+            assertFalse(redacted.contains("user:"), "leaked username for '" + describe(special) + "': " + redacted);
+        }
+    }
+
+    static final String[] SPECIAL_USERINFO_CHARACTERS = {"/", "?", "#", "+", " ", "\n", "{", "\t"};
+
+    static String describe(String special) {
+        if (special.equals("\n")) {
+            return "newline";
+        }
+        if (special.equals("\t")) {
+            return "tab";
+        }
+        if (special.equals(" ")) {
+            return "space";
+        }
+        return special;
     }
 }
