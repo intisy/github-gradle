@@ -195,6 +195,42 @@ public class TestUrlDownloads {
         }
     }
 
+    /**
+     * A presigned or {@code ?token=}-style download URL, and {@code https://user:token@host/...},
+     * are both ordinary shapes that themselves carry a credential, entirely separate from any
+     * header. This test drives a success path and a failure path with such URLs and asserts the
+     * embedded token never surfaces.
+     */
+    @Test
+    public void credentialEmbeddedInTheUrlItselfNeverAppearsInLogsOrExceptionMessages(@TempDir File cacheDir) throws IOException {
+        String sentinel = "SENTINEL-URL-TOKEN-2b7e91";
+        String queryUrl = "https://example.com/secret-4.jar?token=" + sentinel;
+        String userinfoUrl = "https://user:" + sentinel + "@example.com/secret-5.jar";
+
+        CapturingLogger successLogger = new CapturingLogger();
+        OkHttpClient successClient = clientReturning(new RecordingInterceptor(), 200, "jar-content".getBytes(StandardCharsets.UTF_8));
+        Downloads successDownloads = new UrlDownloads(successClient, successLogger, cacheDir);
+        assertTrue(successDownloads.download(queryUrl, null, null).isFile());
+
+        CapturingLogger errorLogger = new CapturingLogger();
+        OkHttpClient errorClient = clientReturning(new RecordingInterceptor(), 500, "boom".getBytes(StandardCharsets.UTF_8));
+        Downloads errorDownloads = new UrlDownloads(errorClient, errorLogger, cacheDir);
+        IOException thrown = assertThrows(IOException.class, () -> errorDownloads.download(userinfoUrl, null, null));
+
+        List<String> allText = new ArrayList<>();
+        allText.addAll(successLogger.messages);
+        allText.addAll(errorLogger.messages);
+        allText.addAll(messagesOf(thrown));
+        for (File cached : cacheDirEntries(cacheDir)) {
+            allText.add(cached.getName());
+        }
+
+        for (String text : allText) {
+            assertFalse(text != null && text.contains(sentinel),
+                    "a credential embedded in the URL itself must never appear in captured text, but found it in: " + text);
+        }
+    }
+
     private static List<String> messagesOf(Throwable throwable) {
         List<String> messages = new ArrayList<>();
         Throwable current = throwable;

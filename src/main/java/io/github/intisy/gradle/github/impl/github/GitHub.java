@@ -22,6 +22,7 @@ import io.github.intisy.gradle.github.api.config.AuthSettings;
 import io.github.intisy.gradle.github.api.config.CliSettings;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.utils.FileUtils;
+import io.github.intisy.gradle.github.utils.UrlRedaction;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -257,7 +258,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public String getResourceRepoName() {
         String repoUrl = resourcesExtension.getRepoUrl();
-        logger.debug("Reading repoUrl from resourcesExtension: '" + repoUrl + "'");
+        logger.debug("Reading repoUrl from resourcesExtension: '" + UrlRedaction.redact(repoUrl) + "'");
         if (repoUrl == null || repoUrl.trim().isEmpty()) {
             logger.debug("Variable resourcesExtension.repoUrl is null or empty.");
             return null;
@@ -276,7 +277,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public String getResourceRepoOwner() {
         String repoUrl = resourcesExtension.getRepoUrl();
-        logger.debug("Reading repoUrl from resourcesExtension: '" + repoUrl + "'");
+        logger.debug("Reading repoUrl from resourcesExtension: '" + UrlRedaction.redact(repoUrl) + "'");
         if (repoUrl == null || repoUrl.trim().isEmpty()) {
             logger.debug("repoUrl is null or empty.");
             return null;
@@ -414,7 +415,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @throws GitAPIException if the clone operation fails
      */
     private void cloneRepositoryFromUrl(File path, String cloneUrl, String authUsername) throws GitAPIException {
-        logger.log("Cloning repository... (" + cloneUrl + ") into " + path.getAbsolutePath());
+        logger.log("Cloning repository... (" + UrlRedaction.redact(cloneUrl) + ") into " + path.getAbsolutePath());
         try (Git ignored = Git.cloneRepository()
                 .setURI(cloneUrl)
                 .setCredentialsProvider(getCredentialsProvider(authUsername))
@@ -601,7 +602,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      */
     public void cloneOrPullFromUrl(File target, String cloneUrl, String authUsername, String branch) throws IOException {
         try {
-            logger.debug("Executing cloneOrPull for " + cloneUrl + " at " + target.getAbsolutePath());
+            logger.debug("Executing cloneOrPull for " + UrlRedaction.redact(cloneUrl) + " at " + target.getAbsolutePath());
             if (doesRepoExist(target)) {
                 logger.debug("Repository exists, checking if it's up-to-date.");
                 if (!isRepoUpToDate(target)) {
@@ -616,7 +617,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 cloneRepositoryFromUrl(target, cloneUrl, authUsername);
             }
         } catch (GitAPIException e) {
-            throw new IOException("Failed to clone or pull " + cloneUrl + ": " + e.getMessage(), e);
+            throw new IOException("Failed to clone or pull " + UrlRedaction.redact(cloneUrl) + ": " + e.getMessage(), e);
         }
     }
 

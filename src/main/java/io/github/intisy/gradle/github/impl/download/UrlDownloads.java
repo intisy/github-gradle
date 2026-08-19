@@ -2,32 +2,32 @@ package io.github.intisy.gradle.github.impl.download;
 
 import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
+import io.github.intisy.gradle.github.utils.UrlDigest;
+import io.github.intisy.gradle.github.utils.UrlRedaction;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 
 /**
  * Downloads a jar from an arbitrary HTTP(S) URL, caching it under a directory keyed by a hash of
  * {@code jarUrl}, and verifying an optional expected SHA-256 of the downloaded content.
  *
- * @implNote Header values are user secrets. This class never writes one to a log line, an
- * exception message, or a cache path: log lines and exception messages here only ever name {@code
- * jarUrl} and content hashes, and the cache file name is a hash of {@code jarUrl} alone, so a
- * header value can reach only the outgoing {@link okhttp3.Request} itself.
+ * @implNote Header values are user secrets, and a URL can carry one too (a presigned or {@code
+ * ?token=} URL, or {@code https://user:token@host/...}). This class never writes a header value
+ * anywhere but the outgoing {@link okhttp3.Request}, and every log line and exception message
+ * that names {@code jarUrl} runs it through {@link UrlRedaction#redact} first, stripping userinfo
+ * and the query string. The cache file name is a hash of {@code jarUrl} alone (via {@link
+ * UrlDigest}), never the URL itself.
  */
 public final class UrlDownloads implements Downloads {
     private final OkHttpClient httpClient;
@@ -51,11 +51,12 @@ public final class UrlDownloads implements Downloads {
         if (!cacheDir.exists() && !cacheDir.mkdirs()) {
             throw new IOException("Failed to create cache directory: " + cacheDir.getAbsolutePath());
         }
+        String redactedUrl = UrlRedaction.redact(jarUrl);
 
-        File cachedJar = new File(cacheDir, sha256Hex(jarUrl.getBytes(StandardCharsets.UTF_8)) + ".jar");
+        File cachedJar = new File(cacheDir, UrlDigest.sha256Hex(jarUrl) + ".jar");
         if (cachedJar.isFile()) {
             logger.debug("Using cached download: " + cachedJar.getName());
-            verifyOrThrow(cachedJar, sha256, jarUrl);
+            verifyOrThrow(cachedJar, sha256, redactedUrl);
             return cachedJar;
         }
 
@@ -65,25 +66,25 @@ public final class UrlDownloads implements Downloads {
                 addHeaderOrThrow(requestBuilder, header.getKey(), header.getValue());
             }
         }
-        logger.log("Downloading jar from " + jarUrl);
+        logger.log("Downloading jar from " + redactedUrl);
 
         File tempFile = File.createTempFile("download-", ".tmp", cacheDir);
         try {
             try (Response response = httpClient.newCall(requestBuilder.build()).execute()) {
                 if (!response.isSuccessful()) {
-                    throw new IOException("Failed to download " + jarUrl + ": HTTP " + response.code());
+                    throw new IOException("Failed to download " + redactedUrl + ": HTTP " + response.code());
                 }
                 ResponseBody body = response.body();
                 if (body == null) {
-                    throw new IOException("Empty response body when downloading " + jarUrl + ".");
+                    throw new IOException("Empty response body when downloading " + redactedUrl + ".");
                 }
                 streamToFile(body.byteStream(), tempFile);
             }
-            verifyOrThrow(tempFile, sha256, jarUrl);
+            verifyOrThrow(tempFile, sha256, redactedUrl);
             Files.move(tempFile.toPath(), cachedJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             deleteQuietly(tempFile);
-            logger.error("Failed to download " + jarUrl + ": " + e.getMessage(), e);
+            logger.error("Failed to download " + redactedUrl + ": " + e.getMessage(), e);
             throw e;
         }
         return cachedJar;
@@ -116,47 +117,14 @@ public final class UrlDownloads implements Downloads {
         }
     }
 
-    private static void verifyOrThrow(File file, String expectedSha256, String jarUrl) throws IOException {
+    private static void verifyOrThrow(File file, String expectedSha256, String redactedUrl) throws IOException {
         if (expectedSha256 == null) {
             return;
         }
-        String actual = fileSha256(file);
+        String actual = UrlDigest.sha256Hex(file);
         if (!expectedSha256.equalsIgnoreCase(actual)) {
-            throw new IOException("sha256 mismatch downloading " + jarUrl + ": expected " + expectedSha256 + " but got " + actual);
+            throw new IOException("sha256 mismatch downloading " + redactedUrl + ": expected " + expectedSha256 + " but got " + actual);
         }
-    }
-
-    private static String fileSha256(File file) throws IOException {
-        MessageDigest digest = newSha256Digest();
-        try (InputStream in = new FileInputStream(file)) {
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                digest.update(buffer, 0, read);
-            }
-        }
-        return toHex(digest.digest());
-    }
-
-    private static String sha256Hex(byte[] value) {
-        return toHex(newSha256Digest().digest(value));
-    }
-
-    private static MessageDigest newSha256Digest() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
-    }
-
-    private static String toHex(byte[] bytes) {
-        StringBuilder hex = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-            hex.append(Character.forDigit(b & 0xF, 16));
-        }
-        return hex.toString();
     }
 
     private static void deleteQuietly(File file) {
