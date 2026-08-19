@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *     <li>no class in the jar references {@code org.gradle} (the jar needs no Gradle jar on the
  *     runtime classpath at all);</li>
  *     <li>no {@code api}/{@code extension}/{@code utils} class in the jar references
- *     {@code com.google.gson} (gson stays an internal detail of {@code impl.GitHub}, which talks
+ *     {@code com.google.gson} (gson stays an internal detail of {@code impl.github.GitHub}, which talks
  *     to the GitHub REST API in JSON and is declared as a runtime dependency of the published
  *     jar instead, exactly like {@code org.eclipse.jgit}, which this test does not scan for at
  *     all for the same reason);</li>
@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </ol>
  *
  * @implNote Claim 2 is scoped to non-{@code impl} classes rather than the whole jar. {@code
- * impl.GitHub} itself unavoidably references {@code com.google.gson} throughout its own
+ * impl.github.GitHub} itself unavoidably references {@code com.google.gson} throughout its own
  * GitHub-REST-API plumbing (a {@code Gson} field, several {@code JsonObject}/{@code JsonArray}
  * internals); {@code TestCapabilityCoverage} already guarantees none of that leaks onto the four
  * capability interfaces' own signatures. Scanning impl's internals for gson too would make this
