@@ -87,23 +87,58 @@ tasks.withType(Javadoc) {
     }
 }
 
+// The single source of truth for libraryJar's runtime dependencies: read by the dependencies
+// block below (implementation/api, so the plugin's own compile and test classpath stay in sync
+// with what the library jar actually needs) and by the libraryJar publication's pom.withXml, so
+// a version bump written here is the only edit either place ever needs.
+ext.libraryJarRuntimeDependencies = [
+        okhttp:  [group: 'com.squareup.okhttp3', name: 'okhttp',                    version: '4.12.0'],
+        gson:    [group: 'com.google.code.gson', name: 'gson',                      version: '2.10.1'],
+        jgit:    [group: 'org.eclipse.jgit',     name: 'org.eclipse.jgit',          version: '5.13.3.202401111512-r'],
+        jgitSsh: [group: 'org.eclipse.jgit',     name: 'org.eclipse.jgit.ssh.jsch', version: '5.13.3.202401111512-r'],
+        jzlib:   [group: 'com.jcraft',           name: 'jzlib',                     version: '1.1.3'],
+        jsch:    [group: 'com.github.mwiede',    name: 'jsch',                      version: '2.27.5'],
+]
+
+def libraryJarDependencyCoordinate(String key) {
+    def dep = libraryJarRuntimeDependencies[key]
+    "${dep.group}:${dep.name}:${dep.version}"
+}
+
 dependencies {
     implementation gradleApi()
 
-    implementation "com.squareup.okhttp3:okhttp:4.12.0"
-    implementation "com.google.code.gson:gson:2.10.1"
+    implementation libraryJarDependencyCoordinate('okhttp')
+    implementation libraryJarDependencyCoordinate('gson')
 
-    api "org.eclipse.jgit:org.eclipse.jgit:5.13.3.202401111512-r"
-    api("org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:5.13.3.202401111512-r") {
+    api libraryJarDependencyCoordinate('jgit')
+    api(libraryJarDependencyCoordinate('jgitSsh')) {
         exclude group: 'com.jcraft', module: 'jsch'
         exclude group: 'com.jcraft', module: 'jzlib'
     }
 
-    api 'com.jcraft:jzlib:1.1.3'
-    api 'com.github.mwiede:jsch:2.27.5'
+    api libraryJarDependencyCoordinate('jzlib')
+    api libraryJarDependencyCoordinate('jsch')
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation "org.junit.jupiter:junit-jupiter"
+}
+
+// Guards against the dependencies block and libraryJarRuntimeDependencies ever drifting apart
+// again: fails at configuration time (before any task runs) if what implementation/api actually
+// declare stops matching what the map (and therefore the published pom) says. gradleApi() has no
+// Maven group, so it is not a real coordinate and is excluded from the comparison.
+def declaredLibraryJarCoordinates = (configurations.implementation.dependencies + configurations.api.dependencies)
+        .findAll { it.group != null }
+        .collect { "${it.group}:${it.name}:${it.version}" }
+        .toSet()
+def publishedLibraryJarCoordinates = libraryJarRuntimeDependencies.values()
+        .collect { "${it.group}:${it.name}:${it.version}" }
+        .toSet()
+if (declaredLibraryJarCoordinates != publishedLibraryJarCoordinates) {
+    throw new GradleException("libraryJar's dependencies block and its published pom have drifted apart.\n"
+            + "Declared on implementation/api: " + declaredLibraryJarCoordinates + "\n"
+            + "Declared in libraryJarRuntimeDependencies: " + publishedLibraryJarCoordinates)
 }
 
 task javadocJar(type: Jar) {
@@ -139,24 +174,19 @@ publishing {
             }
             // libraryJar packages plain class files with no attached component, so its
             // runtime dependencies have to be declared by hand rather than derived from a
-            // Gradle configuration. None of these types appear on the api package's own
+            // Gradle component. Read from libraryJarRuntimeDependencies (the same map the
+            // dependencies block above builds its coordinates from) so there is exactly one
+            // place a version is written. None of these types appear on the api package's own
             // signatures (enforced by TestCapabilityCoverage), so "runtime" is honest: a
             // consumer never needs them on its own compile classpath, only when a GitHubApi
             // call actually runs.
             pom.withXml {
                 def dependenciesNode = asNode().appendNode('dependencies')
-                [
-                        ['com.google.code.gson', 'gson', '2.10.1'],
-                        ['com.squareup.okhttp3', 'okhttp', '4.12.0'],
-                        ['org.eclipse.jgit', 'org.eclipse.jgit', '5.13.3.202401111512-r'],
-                        ['org.eclipse.jgit', 'org.eclipse.jgit.ssh.jsch', '5.13.3.202401111512-r'],
-                        ['com.jcraft', 'jzlib', '1.1.3'],
-                        ['com.github.mwiede', 'jsch', '2.27.5'],
-                ].each { coordinate ->
+                libraryJarRuntimeDependencies.values().each { dep ->
                     def dependencyNode = dependenciesNode.appendNode('dependency')
-                    dependencyNode.appendNode('groupId', coordinate[0])
-                    dependencyNode.appendNode('artifactId', coordinate[1])
-                    dependencyNode.appendNode('version', coordinate[2])
+                    dependencyNode.appendNode('groupId', dep.group)
+                    dependencyNode.appendNode('artifactId', dep.name)
+                    dependencyNode.appendNode('version', dep.version)
                     dependencyNode.appendNode('scope', 'runtime')
                 }
             }
