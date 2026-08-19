@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
 import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Releases;
@@ -68,11 +69,12 @@ public class TestJarResolver {
         RecordingReleases releases = new RecordingReleases(null);
         JarResolver resolver = new JarResolverImpl(releases, new UnusedSourceBuilds(), new UnusedDownloads());
 
-        RuntimeException thrown = assertThrows(RuntimeException.class,
+        ReleaseNotFoundException thrown = assertThrows(ReleaseNotFoundException.class,
                 () -> resolver.resolve(ResolutionRequest.fromRelease("owner", "repo", "1.0.0")));
         assertTrue(thrown.getMessage().contains("owner"), "message should name the owner");
         assertTrue(thrown.getMessage().contains("repo"), "message should name the repo");
         assertTrue(thrown.getMessage().contains("1.0.0"), "message should name the version");
+        assertEquals("owner/repo:1.0.0", thrown.getCoordinate());
     }
 
     @Test

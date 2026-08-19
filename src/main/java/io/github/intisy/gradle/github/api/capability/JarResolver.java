@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.api.capability;
 
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
 import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 
 import java.io.File;
@@ -17,10 +18,10 @@ public interface JarResolver {
      * ResolutionRequest#fromRelease}, {@link ResolutionRequest#fromSource}, {@link
      * ResolutionRequest#fromGit}, or {@link ResolutionRequest#fromUrl}.
      * @return the resolved jar file; never null.
-     * @throws RuntimeException if {@code request} names a release: thrown by this method itself,
-     * naming the coordinate, when {@link Releases#downloadJar(String, String, String)} returns an
-     * empty {@code Optional} (no release matches the version, or the release has no matching jar
-     * asset); or propagated unchecked from {@code downloadJar} if the download itself fails.
+     * @throws ReleaseNotFoundException if {@code request} names a release: thrown by this method
+     * itself, naming the coordinate, when {@link Releases#downloadJar(String, String, String)}
+     * returns an empty {@code Optional} (no release matches the version, or the release has no
+     * matching jar asset).
      * @throws IOException if {@code request} names a source or git build and
      * {@link SourceBuilds#buildFromSource} fails to check out or build the requested ref.
      */

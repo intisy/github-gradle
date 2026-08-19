@@ -1,5 +1,6 @@
 package io.github.intisy.gradle.github.impl;
 
+import io.github.intisy.gradle.github.api.ReleaseNotFoundException;
 import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Releases;
@@ -8,6 +9,7 @@ import io.github.intisy.gradle.github.api.model.ResolutionRequest;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 
 /**
  * Dispatches a {@link ResolutionRequest} to {@link Releases}, {@link SourceBuilds}, or
@@ -35,6 +37,7 @@ public final class JarResolverImpl implements JarResolver {
      * @throws IOException if {@code request} names a source or git build and the underlying
      * {@link SourceBuilds#buildFromSource} call fails, or names a url download and the underlying
      * {@link Downloads#download} call fails.
+     * @throws ReleaseNotFoundException if {@code request} names a release and no matching jar is found.
      */
     @Override
     public File resolve(ResolutionRequest request) throws IOException {
@@ -50,8 +53,11 @@ public final class JarResolverImpl implements JarResolver {
                 final String owner = request.getOwner();
                 final String repo = request.getRepo();
                 final String version = request.getVersion();
+                final String coordinate = owner + "/" + repo + ":" + version;
                 return releases.downloadJar(owner, repo, version)
-                        .orElseThrow(() -> new RuntimeException("No release jar found for " + owner + ":" + repo + ":" + version));
+                        .orElseThrow(() -> new ReleaseNotFoundException(
+                                "No release jar found for " + owner + ":" + repo + ":" + version,
+                                coordinate, Collections.singletonList(version)));
         }
     }
 }
