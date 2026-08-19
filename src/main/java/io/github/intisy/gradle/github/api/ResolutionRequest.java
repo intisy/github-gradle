@@ -6,8 +6,13 @@ package io.github.intisy.gradle.github.api;
  * {@link #fromSource(String, String, String, String)} and pass it to {@link JarResolver#resolve}.
  */
 public final class ResolutionRequest {
-    enum Strategy {
+    /**
+     * Which capability a {@link ResolutionRequest} is satisfied by.
+     */
+    public enum Strategy {
+        /** Satisfied by {@link Releases#downloadJar(String, String, String)}. */
         RELEASE,
+        /** Satisfied by {@link SourceBuilds#buildFromSource}. */
         SOURCE
     }
 
@@ -76,19 +81,31 @@ public final class ResolutionRequest {
         return repo;
     }
 
-    Strategy getStrategy() {
+    /**
+     * @return which capability this request is satisfied by.
+     */
+    public Strategy getStrategy() {
         return strategy;
     }
 
-    String getVersion() {
+    /**
+     * @return the release tag to resolve, or null if this request names a source build.
+     */
+    public String getVersion() {
         return version;
     }
 
-    String getBranch() {
+    /**
+     * @return the branch to clone or pull, or null if this request names a release.
+     */
+    public String getBranch() {
         return branch;
     }
 
-    String getCommitSha() {
+    /**
+     * @return the commit to build, or null if this request names a release or has no specific commit.
+     */
+    public String getCommitSha() {
         return commitSha;
     }
 }
