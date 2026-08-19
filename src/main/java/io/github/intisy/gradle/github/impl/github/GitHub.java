@@ -372,13 +372,16 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     /**
-     * Constructs the appropriate Git repository URL based on authentication type.
+     * Constructs the appropriate github.com Git repository URL based on authentication type.
      *
      * @param repoOwner the repository owner
      * @param repoName the repository name
-     * @return the Git repository URL (SSH or HTTPS)
+     * @return the Git repository URL (SSH or HTTPS), always on github.com
+     * @implNote public so a caller resolving a GitHub clone URL for a host-agnostic consumer
+     * (such as {@link GitHubSourceBuilds}) can reuse this instance's SSH-vs-HTTPS decision
+     * instead of duplicating it.
      */
-    private String getRepositoryURL(String repoOwner, String repoName) {
+    public String getRepositoryURL(String repoOwner, String repoName) {
         if (getSshKey() != null) {
             String url = String.format("git@github.com:%s/%s.git", repoOwner, repoName);
             logger.debug("Detected SSH key, using SSH URL for Git operations: " + url);
@@ -398,11 +401,23 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @throws GitAPIException if the clone operation fails
      */
     public void cloneRepository(File path, String repoOwner, String repoName) throws GitAPIException {
-        String repositoryURL = getRepositoryURL(repoOwner, repoName);
-        logger.log("Cloning repository... (" + repositoryURL + ") into " + path.getAbsolutePath());
+        cloneRepositoryFromUrl(path, getRepositoryURL(repoOwner, repoName), repoOwner);
+    }
+
+    /**
+     * Clones {@code cloneUrl} to the specified path, bypassing {@link #getRepositoryURL} so any
+     * git host works, not just github.com.
+     *
+     * @param path the directory to clone the repository into
+     * @param cloneUrl the exact URL to clone from
+     * @param authUsername the username presented for HTTPS token auth
+     * @throws GitAPIException if the clone operation fails
+     */
+    private void cloneRepositoryFromUrl(File path, String cloneUrl, String authUsername) throws GitAPIException {
+        logger.log("Cloning repository... (" + cloneUrl + ") into " + path.getAbsolutePath());
         try (Git ignored = Git.cloneRepository()
-                .setURI(repositoryURL)
-                .setCredentialsProvider(getCredentialsProvider(repoOwner))
+                .setURI(cloneUrl)
+                .setCredentialsProvider(getCredentialsProvider(authUsername))
                 .setTransportConfigCallback(getTransportConfigCallback())
                 .setDirectory(path)
                 .call()) {
@@ -568,6 +583,40 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         } else {
             logger.debug("Repository does not exist, cloning...");
             cloneRepository(path, repoOwner, repoName);
+        }
+    }
+
+    /**
+     * Clones or pulls {@code cloneUrl} into {@code target}, using the given URL directly for a
+     * fresh clone instead of deriving one via {@link #getRepositoryURL}, so any git host works.
+     * An existing checkout is updated through its own {@code origin} remote, which already
+     * points at {@code cloneUrl} from a previous clone, so the URL is not needed again there.
+     *
+     * @param target the repository directory
+     * @param cloneUrl the exact URL to clone from on a fresh checkout
+     * @param authUsername the username presented for HTTPS token auth on a fresh clone, and for
+     * fetch/pull when this instance's {@code resourcesExtension.repoUrl} does not resolve one
+     * @param branch the branch to clone or pull, or null for the current/default branch
+     * @throws IOException if the clone, fetch, or checkout operation fails
+     */
+    public void cloneOrPullFromUrl(File target, String cloneUrl, String authUsername, String branch) throws IOException {
+        try {
+            logger.debug("Executing cloneOrPull for " + cloneUrl + " at " + target.getAbsolutePath());
+            if (doesRepoExist(target)) {
+                logger.debug("Repository exists, checking if it's up-to-date.");
+                if (!isRepoUpToDate(target)) {
+                    logger.debug("Repository not up-to-date, pulling...");
+                    pullRepository(target, branch);
+                } else {
+                    logger.log("Repository is up to date.");
+                    ensureCorrectBranch(target, branch);
+                }
+            } else {
+                logger.debug("Repository does not exist, cloning...");
+                cloneRepositoryFromUrl(target, cloneUrl, authUsername);
+            }
+        } catch (GitAPIException e) {
+            throw new IOException("Failed to clone or pull " + cloneUrl + ": " + e.getMessage(), e);
         }
     }
 

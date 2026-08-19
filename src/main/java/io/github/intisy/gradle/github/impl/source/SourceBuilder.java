@@ -2,7 +2,6 @@ package io.github.intisy.gradle.github.impl.source;
 
 import io.github.intisy.gradle.github.api.config.GitHubConfig;
 import io.github.intisy.gradle.github.api.log.GitHubLogger;
-import io.github.intisy.gradle.github.api.capability.SourceBuilds;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.github.GitHub;
 import org.eclipse.jgit.api.Git;
@@ -17,15 +16,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Builds a GitHub repository from source and caches the resulting jar by commit, so a repeated
- * request for the same commit never re-runs the build.
+ * Clones an arbitrary git URL and builds it, caching the resulting jar by commit, so a repeated
+ * request for the same commit never re-runs the build. Host-agnostic: the caller supplies the
+ * clone URL explicitly, so this class never assumes github.com or any other specific host.
  *
  * @implNote {@link GitHub} carries a single {@link ResourceSettings}, hence a single repository
- * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource} call, configured for
- * the exact {@code owner}/{@code repo} requested, rather than accepting one pre-built {@link
- * GitHub} that could only ever be correctly configured for one repository.
+ * identity, so a fresh {@link GitHub} is built per {@link #buildFromSource} call, scoped to the
+ * exact {@code cloneUrl} requested, rather than accepting one pre-built {@link GitHub} that could
+ * only ever be correctly configured for one repository.
  */
-public class SourceBuilder implements SourceBuilds {
+public class SourceBuilder {
     private final GitHubConfig config;
     private final GitHubLogger logger;
     private final File cacheDir;
@@ -45,20 +45,23 @@ public class SourceBuilder implements SourceBuilds {
     }
 
     /**
-     * @param owner     the repository owner.
-     * @param repo      the repository name.
+     * @param cloneUrl  the exact URL to clone from; any git host, not just github.com.
+     * @param owner     an identity for the repository, used only for the checkout/cache directory
+     *                  and jar naming, never for URL construction.
+     * @param repo      an identity for the repository, used only for the checkout/cache directory
+     *                  and jar naming, never for URL construction.
      * @param branch    the branch to clone or pull, or null for the current/default branch.
      * @param commitSha the commit to check out, or null to use the branch's latest commit.
      * @return the cached jar for the resolved commit, built only when not already cached.
+     * @throws IOException if the clone/pull, checkout, or build itself fails.
      */
-    @Override
-    public File buildFromSource(String owner, String repo, String branch, String commitSha) throws IOException {
+    public File buildFromSource(String cloneUrl, String owner, String repo, String branch, String commitSha) throws IOException {
         if (!cacheDir.exists() && !cacheDir.mkdirs()) {
             throw new IOException("Failed to create cache directory: " + cacheDir.getAbsolutePath());
         }
         File checkoutDir = new File(cacheDir, owner + "-" + repo);
-        GitHub gitHub = newGitHub(owner, repo);
-        gitHub.cloneOrPull(checkoutDir, owner, repo, branch);
+        GitHub gitHub = newGitHub(cloneUrl);
+        gitHub.cloneOrPullFromUrl(checkoutDir, cloneUrl, owner, branch);
         String sha = checkOutAndResolve(checkoutDir, commitSha);
 
         File cachedJar = new File(cacheDir, owner + "-" + repo + "-" + sha + ".jar");
@@ -74,9 +77,9 @@ public class SourceBuilder implements SourceBuilds {
         return cachedJar;
     }
 
-    private GitHub newGitHub(String owner, String repo) {
+    private GitHub newGitHub(String cloneUrl) {
         ResourceSettings resources = new ResourceSettings();
-        resources.setRepoUrl("https://github.com/" + owner + "/" + repo);
+        resources.setRepoUrl(cloneUrl);
         return new GitHub(logger, resources, config);
     }
 

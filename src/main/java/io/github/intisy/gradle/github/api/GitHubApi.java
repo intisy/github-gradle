@@ -14,6 +14,7 @@ import io.github.intisy.gradle.github.api.config.ResourceSettings;
 import io.github.intisy.gradle.github.impl.JarResolverImpl;
 import io.github.intisy.gradle.github.impl.RepositoriesImpl;
 import io.github.intisy.gradle.github.impl.github.GitHub;
+import io.github.intisy.gradle.github.impl.github.GitHubSourceBuilds;
 import io.github.intisy.gradle.github.impl.source.BuildInvoker;
 import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 import io.github.intisy.gradle.github.utils.FileUtils;
@@ -32,15 +33,16 @@ import java.io.File;
 public final class GitHubApi {
     private final GitHub gitHub;
     private final Repositories repositories;
-    private final SourceBuilder sourceBuilder;
+    private final SourceBuilds sourceBuilds;
     private final JarResolver resolver;
 
     private GitHubApi(GitHub gitHub, GitHubConfig config, GitHubLogger logger) {
         this.gitHub = gitHub;
         this.repositories = new RepositoriesImpl(gitHub, config, logger);
         File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
-        this.sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
-        this.resolver = new JarResolverImpl(gitHub, sourceBuilder);
+        SourceBuilder sourceBuilder = new SourceBuilder(config, logger, cacheDir, new BuildInvoker.Gradlew(logger));
+        this.sourceBuilds = new GitHubSourceBuilds(gitHub, sourceBuilder);
+        this.resolver = new JarResolverImpl(gitHub, sourceBuilds);
     }
 
     /**
@@ -109,7 +111,7 @@ public final class GitHubApi {
      * entries are keyed by owner, repo, and resolved commit.
      */
     public SourceBuilds sourceBuilds() {
-        return sourceBuilder;
+        return sourceBuilds;
     }
 
     /**

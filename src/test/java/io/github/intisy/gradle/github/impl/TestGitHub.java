@@ -21,6 +21,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -51,6 +52,24 @@ public class TestGitHub {
     public void testGetRemoteOwnerAndRepoNonGitDirectoryThrows(@TempDir File projectDir) {
         GitHub gh = makeGitHub();
         assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
+    }
+
+    @Test
+    public void testGetRepositoryURLUsesHttpsWithoutAnSshKey() {
+        GitHub gh = makeGitHub();
+        assertEquals("https://github.com/acme/widget", gh.getRepositoryURL("acme", "widget"));
+    }
+
+    @Test
+    public void testGetRepositoryURLPrefersSshWhenAnSshKeyIsConfigured(@TempDir File tempDir) throws IOException {
+        File sshKeyFile = new File(tempDir, "id_test");
+        Files.write(sshKeyFile.toPath(), "-----BEGIN OPENSSH PRIVATE KEY-----\nstub\n-----END OPENSSH PRIVATE KEY-----"
+                .getBytes(StandardCharsets.UTF_8));
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setSshKey(sshKeyFile);
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertEquals("git@github.com:acme/widget.git", gh.getRepositoryURL("acme", "widget"));
     }
 
     @Disabled

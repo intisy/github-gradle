@@ -72,7 +72,7 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        File jar = builder.buildFromSource("acme", "widget", null, null);
+        File jar = builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
 
         assertEquals(1, invoker.invocations);
         assertEquals(new File(cacheDir, "acme-widget-" + headSha + ".jar"), jar);
@@ -91,8 +91,8 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        builder.buildFromSource("acme", "widget", null, null);
-        File secondJar = builder.buildFromSource("acme", "widget", null, null);
+        builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
+        File secondJar = builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
 
         assertTrue(secondJar.isFile());
         assertEquals(1, invoker.invocations);
@@ -110,8 +110,8 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar", "gadget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        File widgetJar = builder.buildFromSource("acme", "widget", null, null);
-        File gadgetJar = builder.buildFromSource("acme", "gadget", null, null);
+        File widgetJar = builder.buildFromSource(originA.toURI().toString(), "acme", "widget", null, null);
+        File gadgetJar = builder.buildFromSource(originB.toURI().toString(), "acme", "gadget", null, null);
 
         assertEquals(2, invoker.invocations);
         assertTrue(widgetJar.isFile());
@@ -130,8 +130,8 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        File firstJar = builder.buildFromSource("acme", "widget", null, null);
-        File secondJar = builder.buildFromSource("acme", "widget", null, null);
+        File firstJar = builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
+        File secondJar = builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
 
         assertEquals(1, invoker.invocations);
         assertEquals(firstJar, secondJar);
@@ -149,7 +149,7 @@ public class TestSourceBuilder {
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
         IOException exception = assertThrows(IOException.class,
-                () -> builder.buildFromSource("acme", "widget", null, null));
+                () -> builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null));
 
         assertTrue(exception.getMessage().contains("widget-1.0.jar"));
         assertTrue(exception.getMessage().contains("widget-2.0.jar"));
@@ -167,7 +167,7 @@ public class TestSourceBuilder {
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
         IOException exception = assertThrows(IOException.class,
-                () -> builder.buildFromSource("acme", "widget", null, null));
+                () -> builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null));
 
         File expectedLibsDir = new File(new File(checkoutDir, "build"), "libs");
         assertTrue(exception.getMessage().contains(expectedLibsDir.getAbsolutePath()));
@@ -188,9 +188,24 @@ public class TestSourceBuilder {
         FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
         SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
 
-        builder.buildFromSource("acme", "widget", null, firstSha);
+        builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, firstSha);
 
         assertEquals("initial content", readFile(new File(checkoutDir, "file.txt")));
         assertTrue(new File(cacheDir, "acme-widget-" + firstSha + ".jar").isFile());
+    }
+
+    @Test
+    public void freshCallClonesFromTheGivenUrlWithoutAssumingGithub(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = createOriginRepo(new File(tempDir, "origin"));
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+
+        FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        File jar = builder.buildFromSource(origin.toURI().toString(), "acme", "widget", null, null);
+
+        assertTrue(jar.isFile());
+        assertEquals("initial content", readFile(new File(new File(cacheDir, "acme-widget"), "file.txt")));
     }
 }
