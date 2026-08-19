@@ -72,4 +72,34 @@ public class TestCloneUrlIdentity {
         assertFalse(identity[0].contains("secret-token"));
         assertFalse(identity[0].contains("user"));
     }
+
+    /**
+     * R1's regression test, reopened via the same {@link UrlRedaction} exception-path omission
+     * that reopened Important 4: a token containing a newline (the ordinary shape of {@code
+     * file("token.txt").text} in Groovy) used to survive verbatim into the derived owner, e.g.
+     * {@code "user-ghp_SECRET\n@git.company.com-8443-<hash>"}.
+     */
+    @Test
+    public void newlineInUserinfoNeverAppearsInTheDerivedIdentity() {
+        String[] identity = CloneUrlIdentity.derive("https://user:ghp_SECRET\n@git.company.com:8443/lib.git");
+
+        assertEquals("lib", identity[1]);
+        assertFalse(identity[0].contains("ghp_SECRET"));
+        assertFalse(identity[0].contains("\n"));
+        assertFalse(identity[0].contains(":"));
+    }
+
+    @Test
+    public void spaceInUserinfoNeverAppearsInTheDerivedIdentity() {
+        String[] identity = CloneUrlIdentity.derive("https://user:tok en@git.company.com/lib.git");
+
+        assertFalse(identity[0].contains("tok en"));
+    }
+
+    @Test
+    public void braceInUserinfoNeverAppearsInTheDerivedIdentity() {
+        String[] identity = CloneUrlIdentity.derive("https://user:to{k}@git.company.com/lib.git");
+
+        assertFalse(identity[0].contains("to{k}"));
+    }
 }
