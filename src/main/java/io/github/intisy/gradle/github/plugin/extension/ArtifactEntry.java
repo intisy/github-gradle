@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.extension;
+package io.github.intisy.gradle.github.plugin.extension;
 
 import java.io.File;
 

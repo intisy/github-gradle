@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.extension;
+package io.github.intisy.gradle.github.plugin.extension;
 
 import org.gradle.api.Action;
 import groovy.lang.Closure;

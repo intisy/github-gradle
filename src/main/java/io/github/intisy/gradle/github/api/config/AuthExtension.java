@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.extension;
+package io.github.intisy.gradle.github.api.config;
 
 import java.io.File;
 import java.nio.file.Path;

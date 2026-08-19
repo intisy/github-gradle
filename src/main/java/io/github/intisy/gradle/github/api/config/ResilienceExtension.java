@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.extension;
+package io.github.intisy.gradle.github.api.config;
 
 /**
  * Extension for configuring how the plugin behaves when GitHub cannot be reached as expected.

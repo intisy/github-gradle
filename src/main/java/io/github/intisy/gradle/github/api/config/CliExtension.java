@@ -1,4 +1,4 @@
-package io.github.intisy.gradle.github.extension;
+package io.github.intisy.gradle.github.api.config;
 
 /**
  * Extension for configuring the local GitHub CLI ({@code gh}) transport.
