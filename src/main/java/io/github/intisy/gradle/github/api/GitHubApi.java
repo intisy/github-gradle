@@ -1,7 +1,12 @@
 package io.github.intisy.gradle.github.api;
 
 import io.github.intisy.gradle.github.extension.ResourcesExtension;
+import io.github.intisy.gradle.github.impl.BuildInvoker;
 import io.github.intisy.gradle.github.impl.GitHub;
+import io.github.intisy.gradle.github.impl.SourceBuilder;
+import io.github.intisy.gradle.github.utils.FileUtils;
+
+import java.io.File;
 
 /**
  * The single entry point for consuming the GitHub client outside a Gradle build.
@@ -9,13 +14,16 @@ import io.github.intisy.gradle.github.impl.GitHub;
  * <p>Construct one with {@link #create(GitHubConfig, ResourcesExtension, GitHubLogger)} (or the
  * two-argument overload, which logs to {@code System.err}), then reach each capability through
  * its accessor: {@link #credentials()}, {@link #repositories()}, {@link #releases()},
- * {@link #publishing()}.
+ * {@link #publishing()}, {@link #sourceBuilds()}.
  */
 public final class GitHubApi {
     private final GitHub gitHub;
+    private final SourceBuilder sourceBuilder;
 
-    private GitHubApi(GitHub gitHub) {
+    private GitHubApi(GitHub gitHub, GitHubLogger logger) {
         this.gitHub = gitHub;
+        File cacheDir = FileUtils.getGradleHome().resolve("github-source").toFile();
+        this.sourceBuilder = new SourceBuilder(gitHub, logger, cacheDir, new BuildInvoker.Gradlew(logger));
     }
 
     /**
@@ -24,7 +32,7 @@ public final class GitHubApi {
      * @param logger    receives diagnostic output.
      */
     public static GitHubApi create(GitHubConfig config, ResourcesExtension resources, GitHubLogger logger) {
-        return new GitHubApi(new GitHub(logger, resources, config));
+        return new GitHubApi(new GitHub(logger, resources, config), logger);
     }
 
     /**
@@ -49,5 +57,9 @@ public final class GitHubApi {
 
     public Publishing publishing() {
         return gitHub;
+    }
+
+    public SourceBuilds sourceBuilds() {
+        return sourceBuilder;
     }
 }
