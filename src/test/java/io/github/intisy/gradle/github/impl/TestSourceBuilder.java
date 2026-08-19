@@ -208,4 +208,25 @@ public class TestSourceBuilder {
         assertTrue(jar.isFile());
         assertEquals("initial content", readFile(new File(new File(cacheDir, "acme-widget"), "file.txt")));
     }
+
+    @Test
+    public void twoArgOverloadDerivesTheRepoNameFromTheCloneUrlsLastPathSegment(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = createOriginRepo(new File(tempDir, "origin"));
+        String firstSha = headSha(origin);
+        addCommit(origin, "second.txt", "second content");
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+
+        FakeBuildInvoker invoker = new FakeBuildInvoker(origin.getName() + "-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        File jar = builder.buildFromSource(origin.toURI().toString(), firstSha);
+
+        assertTrue(jar.isFile());
+        assertEquals(1, invoker.invocations);
+
+        File[] checkoutDirs = cacheDir.listFiles(File::isDirectory);
+        assertEquals(1, checkoutDirs.length, "exactly one checkout directory should have been created");
+        assertEquals("initial content", readFile(new File(checkoutDirs[0], "file.txt")));
+    }
 }

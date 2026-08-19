@@ -28,18 +28,27 @@ public final class JarResolverImpl implements JarResolver {
     /**
      * @param request the coordinate to resolve.
      * @return the resolved jar file; never null.
-     * @throws IOException if {@code request} names a source build and the underlying
+     * @throws IOException if {@code request} names a source or git build and the underlying
      * {@link SourceBuilds#buildFromSource} call fails.
+     * @throws UnsupportedOperationException if {@code request} names a {@link
+     * ResolutionRequest.Strategy#URL} download; not yet wired to a {@code Downloads} capability.
      */
     @Override
     public File resolve(ResolutionRequest request) throws IOException {
-        if (request.getStrategy() == ResolutionRequest.Strategy.SOURCE) {
-            return sourceBuilds.buildFromSource(request.getOwner(), request.getRepo(), request.getBranch(), request.getCommitSha());
+        switch (request.getStrategy()) {
+            case SOURCE:
+                return sourceBuilds.buildFromSource(request.getOwner(), request.getRepo(), request.getBranch(), request.getCommitSha());
+            case GIT:
+                return sourceBuilds.buildFromSource(request.getCloneUrl(), request.getRef());
+            case URL:
+                throw new UnsupportedOperationException("URL strategy resolution is not wired yet.");
+            case RELEASE:
+            default:
+                final String owner = request.getOwner();
+                final String repo = request.getRepo();
+                final String version = request.getVersion();
+                return releases.downloadJar(owner, repo, version)
+                        .orElseThrow(() -> new RuntimeException("No release jar found for " + owner + ":" + repo + ":" + version));
         }
-        final String owner = request.getOwner();
-        final String repo = request.getRepo();
-        final String version = request.getVersion();
-        return releases.downloadJar(owner, repo, version)
-                .orElseThrow(() -> new RuntimeException("No release jar found for " + owner + ":" + repo + ":" + version));
     }
 }

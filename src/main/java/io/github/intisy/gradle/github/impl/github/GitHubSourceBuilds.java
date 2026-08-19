@@ -30,4 +30,9 @@ public final class GitHubSourceBuilds implements SourceBuilds {
         String cloneUrl = gitHub.getRepositoryURL(owner, repo);
         return sourceBuilder.buildFromSource(cloneUrl, owner, repo, branch, commitSha);
     }
+
+    @Override
+    public File buildFromSource(String cloneUrl, String ref) throws IOException {
+        return sourceBuilder.buildFromSource(cloneUrl, ref);
+    }
 }

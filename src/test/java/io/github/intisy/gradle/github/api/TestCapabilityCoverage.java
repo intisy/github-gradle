@@ -1,6 +1,7 @@
 package io.github.intisy.gradle.github.api;
 
 import io.github.intisy.gradle.github.api.capability.Credentials;
+import io.github.intisy.gradle.github.api.capability.Downloads;
 import io.github.intisy.gradle.github.api.capability.JarResolver;
 import io.github.intisy.gradle.github.api.capability.Publishing;
 import io.github.intisy.gradle.github.api.capability.Releases;
@@ -36,16 +37,16 @@ public class TestCapabilityCoverage {
     }
 
     /**
-     * Walks every public-facing {@code api} type, not just the five capability interfaces:
+     * Walks every public-facing {@code api} type, not just the six capability interfaces:
      * {@link JarResolver}, {@link ResolutionRequest} and {@link GitHubConfig} carry no
      * implementation-detail types on their own signatures either, and belong in the same coverage
-     * as {@link Credentials}, {@link Repositories}, {@link Releases}, {@link Publishing} and
-     * {@link SourceBuilds}.
+     * as {@link Credentials}, {@link Repositories}, {@link Releases}, {@link Publishing},
+     * {@link SourceBuilds}, and {@link Downloads}.
      */
     @Test
     public void noApiMethodMentionsAnImplementationDetailType() {
         for (Class<?> apiType : Arrays.asList(Credentials.class, Repositories.class, Releases.class, Publishing.class,
-                SourceBuilds.class, JarResolver.class, ResolutionRequest.class, GitHubConfig.class)) {
+                SourceBuilds.class, Downloads.class, JarResolver.class, ResolutionRequest.class, GitHubConfig.class)) {
             for (Method method : apiType.getDeclaredMethods()) {
                 assertNoForbiddenType(apiType, method, method.getGenericReturnType());
                 for (Type parameterType : method.getGenericParameterTypes()) {

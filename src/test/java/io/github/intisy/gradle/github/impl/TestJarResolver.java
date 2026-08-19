@@ -82,6 +82,50 @@ public class TestJarResolver {
         assertThrows(IllegalArgumentException.class, () -> ResolutionRequest.fromSource("owner", "repo", null, "sha"));
     }
 
+    @Test
+    public void gitRequestDelegatesToTheTwoArgBuildFromSourceWithExactArguments() throws IOException {
+        File expected = new File("git.jar");
+        RecordingSourceBuilds sourceBuilds = new RecordingSourceBuilds(expected);
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), sourceBuilds);
+
+        File resolved = resolver.resolve(ResolutionRequest.fromGit("https://gitlab.com/me/lib.git", "v1.0"));
+
+        assertSame(expected, resolved);
+        assertEquals("https://gitlab.com/me/lib.git", sourceBuilds.capturedCloneUrl);
+        assertEquals("v1.0", sourceBuilds.capturedRef);
+        assertNull(sourceBuilds.capturedOwner, "the git strategy must never reach the owner/repo overload");
+    }
+
+    @Test
+    public void urlRequestIsNotYetWired() {
+        JarResolver resolver = new JarResolverImpl(new UnusedReleases(), new UnusedSourceBuilds());
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(ResolutionRequest.fromUrl("https://example.com/foo.jar", null)));
+    }
+
+    @Test
+    public void fromGitRejectsNullCloneUrl() {
+        assertThrows(IllegalArgumentException.class, () -> ResolutionRequest.fromGit(null, "main"));
+    }
+
+    @Test
+    public void fromGitAllowsNullRef() {
+        ResolutionRequest request = ResolutionRequest.fromGit("https://gitlab.com/me/lib.git", null);
+        assertNull(request.getRef());
+    }
+
+    @Test
+    public void fromUrlRejectsNullJarUrl() {
+        assertThrows(IllegalArgumentException.class, () -> ResolutionRequest.fromUrl(null, null));
+    }
+
+    @Test
+    public void fromUrlWithNullHeadersReturnsAnEmptyMapRatherThanNull() {
+        ResolutionRequest request = ResolutionRequest.fromUrl("https://example.com/foo.jar", null);
+        assertTrue(request.getHeaders().isEmpty());
+    }
+
     private static final class RecordingReleases implements Releases {
         private final File jarToReturn;
         private String capturedOwner;
@@ -184,6 +228,8 @@ public class TestJarResolver {
         private String capturedRepo;
         private String capturedBranch;
         private String capturedCommitSha;
+        private String capturedCloneUrl;
+        private String capturedRef;
 
         RecordingSourceBuilds(File jarToReturn) {
             this.jarToReturn = jarToReturn;
@@ -197,11 +243,23 @@ public class TestJarResolver {
             this.capturedCommitSha = commitSha;
             return jarToReturn;
         }
+
+        @Override
+        public File buildFromSource(String cloneUrl, String ref) {
+            this.capturedCloneUrl = cloneUrl;
+            this.capturedRef = ref;
+            return jarToReturn;
+        }
     }
 
     private static final class UnusedSourceBuilds implements SourceBuilds {
         @Override
         public File buildFromSource(String owner, String repo, String branch, String commitSha) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public File buildFromSource(String cloneUrl, String ref) {
             throw new UnsupportedOperationException();
         }
     }

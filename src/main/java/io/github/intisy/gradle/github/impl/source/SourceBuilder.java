@@ -45,6 +45,36 @@ public class SourceBuilder {
     }
 
     /**
+     * @param cloneUrl the exact URL to clone from; any git host, not just github.com.
+     * @param ref the branch, tag, or commit to build, or null for the remote's default branch.
+     * @return the cached jar for the resolved ref, built only when not already cached.
+     * @throws IOException if the clone, checkout, or build itself fails.
+     * @implNote {@code ref} is passed through as {@code commitSha} rather than {@code branch},
+     * because {@code git checkout <ref>} (unlike a clone's branch selection) already accepts a
+     * branch, tag, or commit interchangeably, so nothing here needs to disambiguate which one it is.
+     */
+    public File buildFromSource(String cloneUrl, String ref) throws IOException {
+        String[] identity = deriveIdentity(cloneUrl);
+        return buildFromSource(cloneUrl, identity[0], identity[1], null, ref);
+    }
+
+    /**
+     * Derives an owner/repo-shaped identity from an arbitrary clone URL, for the checkout/cache
+     * directory and jar naming only; never used for the actual clone.
+     */
+    private static String[] deriveIdentity(String cloneUrl) {
+        String withoutSuffix = cloneUrl.endsWith(".git") ? cloneUrl.substring(0, cloneUrl.length() - 4) : cloneUrl;
+        String withoutTrailingSlash = withoutSuffix.endsWith("/") ? withoutSuffix.substring(0, withoutSuffix.length() - 1) : withoutSuffix;
+        String normalized = withoutTrailingSlash.contains("://")
+                ? withoutTrailingSlash
+                : withoutTrailingSlash.replaceFirst(":", "/");
+        String[] segments = normalized.split("/");
+        String repo = segments[segments.length - 1];
+        String owner = segments.length > 1 ? segments[segments.length - 2] : "unknown";
+        return new String[] { owner, repo };
+    }
+
+    /**
      * @param cloneUrl  the exact URL to clone from; any git host, not just github.com.
      * @param owner     an identity for the repository, used only for the checkout/cache directory
      *                  and jar naming, never for URL construction.
