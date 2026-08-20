@@ -1673,7 +1673,15 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         try (Response response = makeGitHubApiPostRequest(apiUrl, gson.toJson(body))) {
             if (!response.isSuccessful()) {
                 String context = "create release " + owner + "/" + repo + " tag " + tagName;
-                throw apiError(response, context);
+                RuntimeException failure = apiError(response, context);
+                if (response.code() == 422) {
+                    JsonObject raced = fetchReleaseByTagOrNull(owner, repo, tagName);
+                    if (raced != null) {
+                        logger.log("Release '" + tagName + "' was created concurrently; uploading assets to it.");
+                        return raced;
+                    }
+                }
+                throw failure;
             }
             if (response.body() == null) {
                 throw new RuntimeException("GitHub API returned empty body when creating release " + tagName + ".");
@@ -1683,6 +1691,20 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
             return release;
         } catch (IOException e) {
             throw new RuntimeException("IOException creating release: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * @param owner   the repository owner.
+     * @param repo    the repository name.
+     * @param tagName the release tag to look up.
+     * @return the release for {@code tagName}, or null if there is none or the lookup itself fails.
+     */
+    private JsonObject fetchReleaseByTagOrNull(String owner, String repo, String tagName) {
+        try {
+            return fetchReleaseByTag(owner, repo, tagName);
+        } catch (RuntimeException ignored) {
+            return null;
         }
     }
 
