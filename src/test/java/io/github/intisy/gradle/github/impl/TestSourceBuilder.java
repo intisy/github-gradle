@@ -349,5 +349,40 @@ public class TestSourceBuilder {
         assertEquals("branch v1 content", readFile(new File(new File(cacheDir, "ambiguous-owner-widget"), "file.txt")),
                 "a branch must win over a tag of the same name, matching porcelain 'git checkout <name>'");
     }
+    /**
+     * F3's regression: {@code cloneRepositoryFromUrl} used to never call {@code setBranch} on the
+     * clone command, so a first-ever clone of a non-default {@code branch} with no {@code
+     * commitSha} silently produced a jar from the remote's default branch instead, with no error.
+     * This exercises the {@code buildFromSource(cloneUrl, owner, repo, branch, commitSha)}
+     * overload directly (the shape {@code GitHubSourceBuilds} uses), never going through {@link
+     * SourceBuilder#buildFromGit}, since that method always passes {@code branch = null} and only
+     * ever sets {@code commitSha}.
+     */
+    @Test
+    public void firstEverCloneOfANonDefaultBranchWithANullShaBuildsFromThatBranch(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = createOriginRepo(new File(tempDir, "origin"));
+        String defaultBranch;
+        try (Git git = Git.open(origin)) {
+            defaultBranch = git.getRepository().getBranch();
+            git.branchCreate().setName("feature").call();
+            git.checkout().setName("feature").call();
+        }
+        addCommit(origin, "feature.txt", "on feature");
+        try (Git git = Git.open(origin)) {
+            git.checkout().setName(defaultBranch).call();
+        }
 
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+        FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        builder.buildFromSource(origin.toURI().toString(), "first-ever-owner", "widget", "feature", null);
+
+        File checkoutDir = new File(cacheDir, "first-ever-owner-widget");
+        assertTrue(new File(checkoutDir, "feature.txt").isFile(),
+                "a first-ever clone with branch = 'feature' and no commitSha must build from 'feature', "
+                        + "not silently from the default branch");
+    }
 }
+

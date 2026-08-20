@@ -26,6 +26,7 @@ import io.github.intisy.gradle.github.utils.UrlRedaction;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.PullResult;
@@ -467,8 +468,8 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     /**
-     * Clones {@code cloneUrl} to the specified path, bypassing {@link #getRepositoryURL} so any
-     * git host works, not just github.com.
+     * Same as {@link #cloneRepositoryFromUrl(File, String, String, String)} with {@code branch}
+     * null: clones whatever the remote's own default branch is.
      *
      * @param path the directory to clone the repository into
      * @param cloneUrl the exact URL to clone from
@@ -476,13 +477,35 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @throws GitAPIException if the clone operation fails
      */
     private void cloneRepositoryFromUrl(File path, String cloneUrl, String authUsername) throws GitAPIException {
+        cloneRepositoryFromUrl(path, cloneUrl, authUsername, null);
+    }
+
+    /**
+     * Clones {@code cloneUrl} to the specified path, bypassing {@link #getRepositoryURL} so any
+     * git host works, not just github.com.
+     *
+     * @param path the directory to clone the repository into
+     * @param cloneUrl the exact URL to clone from
+     * @param authUsername the username presented for HTTPS token auth
+     * @param branch the branch to check out once cloned, or null for the remote's default branch
+     * @throws GitAPIException if the clone operation fails
+     * @implNote A caller that resolves {@code branch} only for a repeat call against an
+     * already-cloned checkout (leaving this overload to default it to null) silently ignores the
+     * requested branch on a first-ever clone, since {@link CloneCommand} has no other way to learn
+     * which branch to check out. Passing {@code branch} through to {@link
+     * CloneCommand#setBranch(String)} here is what makes a first-ever clone honour it too.
+     */
+    private void cloneRepositoryFromUrl(File path, String cloneUrl, String authUsername, String branch) throws GitAPIException {
         logger.log("Cloning repository... (" + UrlRedaction.redact(cloneUrl) + ") into " + path.getAbsolutePath());
-        try (Git ignored = Git.cloneRepository()
+        CloneCommand cloneCommand = Git.cloneRepository()
                 .setURI(cloneUrl)
                 .setCredentialsProvider(getCredentialsProvider(authUsername, cloneUrl))
                 .setTransportConfigCallback(getTransportConfigCallback(cloneUrl))
-                .setDirectory(path)
-                .call()) {
+                .setDirectory(path);
+        if (branch != null) {
+            cloneCommand.setBranch(branch);
+        }
+        try (Git ignored = cloneCommand.call()) {
             logger.log("Repository cloned successfully.");
         } catch (GitAPIException e) {
             logger.error("Failed to clone repository: " + e.getMessage(), e);
@@ -677,7 +700,7 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 }
             } else {
                 logger.debug("Repository does not exist, cloning...");
-                cloneRepositoryFromUrl(target, cloneUrl, authUsername);
+                cloneRepositoryFromUrl(target, cloneUrl, authUsername, branch);
             }
         } catch (GitAPIException e) {
             throw new IOException("Failed to clone or pull " + UrlRedaction.redact(cloneUrl) + ": " + e.getMessage(), e);
