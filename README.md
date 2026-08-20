@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.8.3.1"
+    id "io.github.intisy.github-gradle" version "1.0.0"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.8.3.1"
+        classpath "io.github.intisy.github-gradle:1.0.0"
     }
 }
 
@@ -76,6 +76,37 @@ dependencies {
 }
 ```
 
+### Sources: git repositories and direct jars
+
+Beyond a GitHub release, a dependency can also be resolved by cloning and building an arbitrary
+git repository, or by downloading a jar directly over HTTP(S). Both are declared in a nested
+`sources { }` block inside `github { }`, and both `git { }` and `jar { }` are repeatable:
+
+```groovy
+github {
+    sources {
+        git {
+            url = "https://gitlab.com/me/lib.git"
+            ref = "main"                 // branch, tag or commit; optional, default the remote's default branch
+            into = "implementation"      // native configuration; optional, default "implementation"
+        }
+        jar {
+            url = "https://nexus.internal/libs/foo-1.0.jar"
+            header "Authorization", "Bearer ${myToken}"
+            sha256 = "80a981f3202da20cc46a0bf22e6e0ff40803e857ba6f4571496805c079162ffc" // optional; verified after download
+            into = "implementation"
+        }
+    }
+}
+```
+
+`git { }` clones any git host, not just github.com, checks out `ref`, builds it with its own
+Gradle wrapper, and caches the result by resolved commit. `jar { }` downloads a jar with optional
+request headers (for a private Nexus/Artifactory/S3-backed host) and an optional expected
+`sha256`; a mismatch fails the build instead of silently using the wrong jar. A jar reachable
+through more than one of the `github*` coordinates, `sources { git { } }`, or `sources { jar { } }`
+is only ever added to the native configuration once.
+
 ### Publishing a release
 
 Configure the publishGithub extension and run `gradle publishGithub` to build the project and upload its JAR(s) as a GitHub release. Every field is optional:
@@ -109,6 +140,54 @@ github {
     }
 }
 ```
+
+## Using the library without Gradle
+
+Cloning repositories, resolving releases and downloading assets are also published as a small,
+Gradle-free library, separate from the plugin jar:
+
+```groovy
+dependencies {
+    implementation "io.github.intisy:github-gradle-api:1.3.8"
+}
+```
+
+The entry point is `GitHubApi.create(...)`. It needs a `GitHubConfig` (the access token and
+auth/cli/resilience settings); `GitHubConfig.builder()` assembles one without any Gradle DSL,
+every builder method is optional, and calling `build()` with none produces a config for fully
+anonymous, unauthenticated access:
+
+```java
+import io.github.intisy.gradle.github.api.*;
+import io.github.intisy.gradle.github.api.config.*;
+
+import java.io.File;
+import java.util.Collections;
+
+GitHubConfig config = GitHubConfig.builder()
+        .token(System.getenv("GITHUB_TOKEN"))
+        .build();
+
+GitHubApi api = GitHubApi.create(config, new ResourceSettings());
+
+// A GitHub release
+File releaseJar = api.releases().downloadJar("intisy", "simple-logger", "1.12.7")
+        .orElseThrow(() -> new IllegalStateException("jar not found"));
+
+// An arbitrary git repository, cloned and built
+File gitJar = api.sourceBuilds().buildFromGit("https://gitlab.com/me/lib.git", "main");
+
+// A direct jar URL, with an optional header and sha256 check
+File urlJar = api.downloads().download("https://nexus.internal/libs/foo-1.0.jar",
+        Collections.singletonMap("Authorization", "Bearer " + System.getenv("NEXUS_TOKEN")),
+        "80a981f3202da20cc46a0bf22e6e0ff40803e857ba6f4571496805c079162ffc");
+```
+
+`api.repositories()`, `api.publishing()`, `api.sourceBuilds()`, `api.downloads()` and
+`api.resolver()` reach the same capabilities the plugin's own tasks use. `GitHubApi.create` also
+accepts a `GitHubLogger` argument if you want diagnostics sent somewhere other than `System.err`,
+and `GitHubApi.create()` with no arguments defaults to an anonymous config for quick,
+unauthenticated use.
 
 ## License
 
