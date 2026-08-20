@@ -1591,18 +1591,23 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * Reads the git remote "origin" URL from the project directory and parses it
      * into {@code [owner, repo]}.  Supports both HTTPS and SSH remote URLs.
      *
-     * @param projectDir the root directory of the Git repository
+     * @implNote the search walks up from {@code projectDir}, because a Gradle subproject directory
+     * holds no {@code .git} of its own: only the build root does.
+     * @param projectDir a directory inside the Git repository
      * @return a two-element array {@code {owner, repo}}
      * @throws RuntimeException if no "origin" remote is configured or the URL cannot be parsed
      */
     public String[] getRemoteOwnerAndRepo(File projectDir) {
         logger.debug("Resolving GitHub owner/repo from git remote in: " + projectDir.getAbsolutePath());
-        FileRepositoryBuilder builder = new FileRepositoryBuilder();
-        try (org.eclipse.jgit.lib.Repository repository = builder
-                .setGitDir(new File(projectDir, ".git"))
+        FileRepositoryBuilder builder = new FileRepositoryBuilder()
                 .readEnvironment()
-                .findGitDir()
-                .build()) {
+                .findGitDir(projectDir);
+        if (builder.getGitDir() == null) {
+            throw new RuntimeException(
+                    "No git repository found at or above " + projectDir.getAbsolutePath() + ". "
+                    + "Add a remote with: git remote add origin https://github.com/OWNER/REPO");
+        }
+        try (org.eclipse.jgit.lib.Repository repository = builder.build()) {
             String remoteUrl = repository.getConfig().getString("remote", "origin", "url");
             if (remoteUrl == null || remoteUrl.trim().isEmpty()) {
                 throw new RuntimeException(
