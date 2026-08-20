@@ -1,6 +1,7 @@
 name: Sync Development to Main
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - development
