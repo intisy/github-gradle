@@ -313,4 +313,41 @@ public class TestSourceBuilder {
         assertEquals("develop content", readFile(new File(new File(cacheDir, "branch-owner-widget"), "file.txt")),
                 "ref = a non-default branch must resolve via its remote-tracking ref");
     }
+
+    /**
+     * When a repository carries both a tag and a non-default branch of the same name, porcelain
+     * {@code git checkout <name>} resolves the branch, not the tag. {@link
+     * org.eclipse.jgit.lib.Repository#resolve} alone does not have this precedence (it checks
+     * {@code refs/tags/<name>} before {@code refs/heads/<name>}), so {@code checkOutRef} must try
+     * the branch (local, then remote-tracking) first and only fall back to generic resolution.
+     */
+    @Test
+    public void branchWinsOverATagWithTheSameName(@TempDir File tempDir) throws IOException, GitAPIException {
+        File origin = new File(tempDir, "origin");
+        PersonIdent author = new PersonIdent("Test", "test@example.com");
+        try (Git git = Git.init().setDirectory(origin).setInitialBranch("main").call()) {
+            Files.write(new File(origin, "file.txt").toPath(), "main content".getBytes(StandardCharsets.UTF_8));
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("main commit").setAuthor(author).setCommitter(author).call();
+            git.tag().setName("v1").setMessage("v1").setTagger(author).call();
+
+            git.branchCreate().setName("v1").call();
+            git.checkout().setName("refs/heads/v1").call();
+            Files.write(new File(origin, "file.txt").toPath(), "branch v1 content".getBytes(StandardCharsets.UTF_8));
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("branch v1 commit").setAuthor(author).setCommitter(author).call();
+            git.checkout().setName("refs/heads/main").call();
+        }
+
+        File cacheDir = new File(tempDir, "cache");
+        assertTrue(cacheDir.mkdirs());
+        FakeBuildInvoker invoker = new FakeBuildInvoker("widget-1.0.jar");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        builder.buildFromSource(origin.toURI().toString(), "ambiguous-owner", "widget", null, "v1");
+
+        assertEquals("branch v1 content", readFile(new File(new File(cacheDir, "ambiguous-owner-widget"), "file.txt")),
+                "a branch must win over a tag of the same name, matching porcelain 'git checkout <name>'");
+    }
+
 }

@@ -10,6 +10,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
 
 import java.io.File;
 import java.io.IOException;
@@ -115,28 +116,48 @@ public class SourceBuilder {
     }
 
     /**
-     * @implNote {@code checkout().setName(ref)} alone only resolves a local branch, a tag, or a
-     * commit. Unlike the real {@code git} CLI, JGit does not fall back to a remote-tracking branch
-     * when {@code ref} names neither: a fresh clone only ever creates the local branch for whatever
-     * branch it checked out by default, so any other branch name exists solely as {@code
-     * refs/remotes/origin/<ref>} until a local tracking branch is created for it explicitly.
+     * @implNote Tries a local branch, then a remote-tracking branch, before falling back to
+     * generic ref resolution (a tag or a commit sha), matching porcelain {@code git checkout
+     * <name>}'s own precedence: a branch wins over a tag of the same name. Both {@link
+     * Repository#resolve} and {@link org.eclipse.jgit.api.CheckoutCommand}'s own short-name
+     * resolution follow the same {@code rev-parse}-style order, checking {@code refs/tags/<name>}
+     * before {@code refs/heads/<name>}, so every branch checkout here passes the fully-qualified
+     * {@code refs/heads/<name>}, never the bare short name, to {@code setName}: passing the short
+     * name hands the ambiguity straight back to {@code CheckoutCommand} and lands on the tag
+     * instead. This is true even for {@code CheckoutCommand.setCreateBranch(true)}: measured
+     * directly, it creates {@code refs/heads/<ref>} at the correct commit as a side effect, but
+     * then still re-resolves the bare {@code ref} for the actual HEAD-attach and working-tree
+     * update, landing on the tag's commit with a detached HEAD. So the remote-tracking branch is
+     * created with the plain {@link org.eclipse.jgit.api.CreateBranchCommand} (which only ever
+     * touches {@code refs/heads/}, no ambiguity possible) and checked out as a separate, explicit,
+     * fully-qualified step. A fresh clone creates a local branch only for the one it checks out by
+     * default, so any other branch exists solely as {@code refs/remotes/origin/<ref>} until this
+     * runs; the direct {@code refs/heads/<ref>} check above still covers a second call against an
+     * already-checked-out branch.
      */
     private void checkOutRef(Git git, String ref) throws GitAPIException, IOException {
-        if (git.getRepository().resolve(ref) != null) {
+        Repository repository = git.getRepository();
+        Ref localBranch = repository.findRef("refs/heads/" + ref);
+        if (localBranch != null) {
+            git.checkout().setName(localBranch.getName()).call();
+            return;
+        }
+        Ref remoteBranch = repository.findRef("refs/remotes/origin/" + ref);
+        if (remoteBranch != null) {
+            git.branchCreate()
+                    .setName(ref)
+                    .setStartPoint(remoteBranch.getName())
+                    .setUpstreamMode(SetupUpstreamMode.TRACK)
+                    .call();
+            git.checkout().setName("refs/heads/" + ref).call();
+            return;
+        }
+        if (repository.resolve(ref) != null) {
             git.checkout().setName(ref).call();
             return;
         }
-        Ref remoteBranch = git.getRepository().findRef("refs/remotes/origin/" + ref);
-        if (remoteBranch == null) {
-            throw new IOException("Ref " + ref + " cannot be resolved as a local branch, a tag, a commit, "
-                    + "or a remote branch on origin.");
-        }
-        git.checkout()
-                .setCreateBranch(true)
-                .setName(ref)
-                .setStartPoint(remoteBranch.getName())
-                .setUpstreamMode(SetupUpstreamMode.TRACK)
-                .call();
+        throw new IOException("Ref " + ref + " cannot be resolved as a local branch, a remote branch "
+                + "on origin, a tag, or a commit.");
     }
 
     private File locateBuiltJar(File checkoutDir, String repo) throws IOException {
