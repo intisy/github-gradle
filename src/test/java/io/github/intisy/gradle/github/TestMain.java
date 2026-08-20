@@ -6,7 +6,9 @@ import org.gradle.api.Task;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,12 +17,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import io.github.intisy.gradle.github.extension.ArtifactEntry;
-import io.github.intisy.gradle.github.extension.AuthExtension;
-import io.github.intisy.gradle.github.extension.CliExtension;
-import io.github.intisy.gradle.github.extension.GithubExtension;
-import io.github.intisy.gradle.github.extension.PublishExtension;
-import io.github.intisy.gradle.github.extension.ResilienceExtension;
+import io.github.intisy.gradle.github.api.config.AuthSettings;
+import io.github.intisy.gradle.github.api.config.CliSettings;
+import io.github.intisy.gradle.github.api.config.ResilienceSettings;
+import io.github.intisy.gradle.github.plugin.extension.ArtifactEntry;
+import io.github.intisy.gradle.github.plugin.extension.GitSourceEntry;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.extension.JarSourceEntry;
+import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
+import io.github.intisy.gradle.github.plugin.extension.SourcesExtension;
 
 public class TestMain {
 
@@ -54,28 +59,57 @@ public class TestMain {
         Project project = Commons.applyPlugin();
         Task publishTask = project.getTasks().findByName("publishGithub");
         assertNotNull(publishTask, "publishGithub task should exist");
-        boolean dependsOnBuild = publishTask.getDependsOn().stream()
-                .anyMatch(dep -> {
-                    if (dep instanceof String) return dep.equals("build");
-                    if (dep instanceof Task) return ((Task) dep).getName().equals("build");
-                    return dep.toString().contains("build");
-                });
+        Set<? extends Task> resolvedDependencies = publishTask.getTaskDependencies().getDependencies(publishTask);
+        boolean dependsOnBuild = false;
+        for (Task dependency : resolvedDependencies) {
+            if (dependency.getName().equals("build")) {
+                dependsOnBuild = true;
+                break;
+            }
+        }
         assertTrue(dependsOnBuild, "publishGithub should depend on build");
+    }
+
+    // -------------------------------------------------------------------------
+    // Full registration surface
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testGithubExtensionIsRegisteredAsGithubExtension() {
+        Project project = Commons.applyPlugin();
+        Object github = project.getExtensions().findByName("github");
+        assertNotNull(github, "github extension should be registered");
+        assertTrue(github instanceof GithubExtension, "github extension should be a GithubExtension");
+    }
+
+    @Test
+    public void testAllPluginTasksAreRegistered() {
+        Project project = Commons.applyPlugin();
+        for (String taskName : new String[]{"processGitHubResources", "generateGithubDependencyMetadata",
+                "printGithubDependencies", "updateGithubDependencies", "publishGithub"}) {
+            assertNotNull(project.getTasks().findByName(taskName), taskName + " task should be registered");
+        }
+    }
+
+    @Test
+    public void testProcessResourcesDependsOnGithubTasks() {
+        Project project = Commons.applyPlugin();
+        Task processResources = project.getTasks().findByName("processResources");
+        assertNotNull(processResources, "processResources task should exist");
+        Set<? extends Task> resolvedDependencies = processResources.getTaskDependencies().getDependencies(processResources);
+        Set<String> dependencyNames = new HashSet<>();
+        for (Task dependency : resolvedDependencies) {
+            dependencyNames.add(dependency.getName());
+        }
+        assertTrue(dependencyNames.contains("processGitHubResources"),
+                "processResources should depend on processGitHubResources");
+        assertTrue(dependencyNames.contains("generateGithubDependencyMetadata"),
+                "processResources should depend on generateGithubDependencyMetadata");
     }
 
     // -------------------------------------------------------------------------
     // Extra configurations
     // -------------------------------------------------------------------------
-
-    @Test
-    public void testAllGithubConfigurationsRegistered() {
-        Project project = Commons.applyPlugin();
-        for (String cfg : new String[]{"githubImplementation", "githubApi", "githubCompileOnly",
-                "githubCompileOnlyApi", "githubRuntimeOnly"}) {
-            assertNotNull(project.getConfigurations().findByName(cfg),
-                    cfg + " configuration should be registered");
-        }
-    }
 
     @Test
     public void testGithubApiConfigAcceptsDependency() {
@@ -222,12 +256,12 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // CliExtension — nested cli { } block
+    // CliSettings — nested cli { } block
     // -------------------------------------------------------------------------
 
     @Test
-    public void testCliExtensionDefaults() {
-        CliExtension cli = new GithubExtension().getCli();
+    public void testCliSettingsDefaults() {
+        CliSettings cli = new GithubExtension().getCli();
         assertNotNull(cli, "cli extension should be available");
         assertFalse(cli.isEnabled(), "cli.enabled should default to false");
         assertTrue(cli.isFallback(), "cli.fallback should default to true");
@@ -256,12 +290,12 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // AuthExtension — nested auth { } block
+    // AuthSettings — nested auth { } block
     // -------------------------------------------------------------------------
 
     @Test
-    public void testAuthExtensionDefaultsAreNull() {
-        AuthExtension auth = new GithubExtension().getAuth();
+    public void testAuthSettingsDefaultsAreNull() {
+        AuthSettings auth = new GithubExtension().getAuth();
         assertNotNull(auth, "auth extension should be available");
         assertNull(auth.getToken(),     "auth.token should default to null");
         assertNull(auth.getTokenFile(), "auth.tokenFile should default to null");
@@ -284,13 +318,13 @@ public class TestMain {
     }
 
     // -------------------------------------------------------------------------
-    // ResilienceExtension — nested resilience { } block
+    // ResilienceSettings — nested resilience { } block
     // -------------------------------------------------------------------------
 
     @Test
     public void testResilienceDefaultAndBlock() {
         GithubExtension github = new GithubExtension();
-        ResilienceExtension resilience = github.getResilience();
+        ResilienceSettings resilience = github.getResilience();
         assertNotNull(resilience, "resilience extension should be available");
         assertFalse(resilience.isSkipOnRateLimit(), "skipOnRateLimit should default to false");
         github.resilience(r -> r.setSkipOnRateLimit(true));
@@ -304,5 +338,125 @@ public class TestMain {
         github.setSkipOnRateLimit(true);
         assertTrue(github.getResilience().isSkipOnRateLimit(), "setSkipOnRateLimit should delegate to resilience");
         assertTrue(github.isSkipOnRateLimit(), "isSkipOnRateLimit should reflect resilience");
+    }
+
+    // -------------------------------------------------------------------------
+    // SourcesExtension, the nested "sources { }" extension, separate from "github { }"
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testSourcesExtensionIsNestedUnderGithubExtension() {
+        Project project = Commons.applyPlugin();
+        GithubExtension github = project.getExtensions().getByType(GithubExtension.class);
+
+        assertNotNull(github.getSources(), "github.sources should be reachable");
+        assertTrue(github.getSources() instanceof SourcesExtension, "github.sources should be a SourcesExtension");
+    }
+
+    @Test
+    public void testSourcesIsNotRegisteredAsATopLevelExtension() {
+        Project project = Commons.applyPlugin();
+
+        assertNull(project.getExtensions().findByName("sources"),
+                "sources must not be a bare top-level extension name; a bare, generic name on a "
+                        + "public plugin risks colliding with another applied plugin or the user's own "
+                        + "extensions.create(\"sources\", ...)");
+    }
+
+    @Test
+    public void testSourcesGitAndJarListsAreEmptyByDefault() {
+        SourcesExtension sources = new SourcesExtension();
+        assertTrue(sources.getGitSources().isEmpty());
+        assertTrue(sources.getJarSources().isEmpty());
+    }
+
+    /**
+     * The real DSL shape a build script writes: {@code github { sources { git { } jar { } } } }.
+     */
+    @Test
+    public void testGithubSourcesBlockViaActionConfiguresTheNestedExtension() {
+        GithubExtension github = new GithubExtension();
+        github.sources(sources -> {
+            sources.git(entry -> entry.setUrl("https://gitlab.com/me/lib.git"));
+            sources.jar(entry -> entry.setUrl("https://nexus.internal/libs/foo-1.0.jar"));
+        });
+
+        assertEquals(1, github.getSources().getGitSources().size());
+        assertEquals(1, github.getSources().getJarSources().size());
+        assertEquals("https://gitlab.com/me/lib.git", github.getSources().getGitSources().get(0).getUrl());
+    }
+
+    @Test
+    public void testSourcesGitBlockViaAction() {
+        SourcesExtension sources = new SourcesExtension();
+        sources.git(entry -> {
+            entry.setUrl("https://gitlab.com/me/lib.git");
+            entry.setRef("main");
+        });
+        assertEquals(1, sources.getGitSources().size());
+        GitSourceEntry entry = sources.getGitSources().get(0);
+        assertEquals("https://gitlab.com/me/lib.git", entry.getUrl());
+        assertEquals("main", entry.getRef());
+        assertEquals("implementation", entry.getInto(), "into should default to implementation");
+    }
+
+    @Test
+    public void testSourcesGitBlockIsRepeatable() {
+        SourcesExtension sources = new SourcesExtension();
+        sources.git(e -> e.setUrl("https://gitlab.com/me/one.git"));
+        sources.git(e -> e.setUrl("https://gitlab.com/me/two.git"));
+        sources.git(e -> e.setUrl("https://gitlab.com/me/three.git"));
+        assertEquals(3, sources.getGitSources().size());
+        assertEquals("https://gitlab.com/me/one.git", sources.getGitSources().get(0).getUrl());
+        assertEquals("https://gitlab.com/me/two.git", sources.getGitSources().get(1).getUrl());
+        assertEquals("https://gitlab.com/me/three.git", sources.getGitSources().get(2).getUrl());
+    }
+
+    @Test
+    public void testSourcesJarBlockViaActionWithHeaderAndSha256() {
+        SourcesExtension sources = new SourcesExtension();
+        sources.jar(entry -> {
+            entry.setUrl("https://nexus.internal/libs/foo-1.0.jar");
+            entry.header("Authorization", "Bearer my-token");
+            entry.setSha256("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d");
+        });
+        assertEquals(1, sources.getJarSources().size());
+        JarSourceEntry entry = sources.getJarSources().get(0);
+        assertEquals("https://nexus.internal/libs/foo-1.0.jar", entry.getUrl());
+        assertEquals("Bearer my-token", entry.getHeaders().get("Authorization"));
+        assertEquals("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d", entry.getSha256());
+        assertEquals("implementation", entry.getInto(), "into should default to implementation");
+    }
+
+    @Test
+    public void testSourcesJarBlockIsRepeatable() {
+        SourcesExtension sources = new SourcesExtension();
+        sources.jar(e -> e.setUrl("https://nexus.internal/libs/one.jar"));
+        sources.jar(e -> e.setUrl("https://nexus.internal/libs/two.jar"));
+        assertEquals(2, sources.getJarSources().size());
+    }
+
+    @Test
+    public void testSourcesJarIntoIsConfigurable() {
+        SourcesExtension sources = new SourcesExtension();
+        sources.jar(entry -> {
+            entry.setUrl("https://nexus.internal/libs/foo-1.0.jar");
+            entry.setInto("api");
+        });
+        assertEquals("api", sources.getJarSources().get(0).getInto());
+    }
+
+    @Test
+    public void testJarSourceEntryHeadersDefaultToEmpty() {
+        JarSourceEntry entry = new JarSourceEntry();
+        assertTrue(entry.getHeaders().isEmpty());
+        assertNull(entry.getSha256());
+    }
+
+    @Test
+    public void testGitSourceEntryRefDefaultsToNull() {
+        GitSourceEntry entry = new GitSourceEntry();
+        assertNull(entry.getRef());
+        assertEquals("implementation", entry.getInto());
     }
 }

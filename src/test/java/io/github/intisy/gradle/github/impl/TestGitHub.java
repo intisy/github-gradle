@@ -2,26 +2,154 @@ package io.github.intisy.gradle.github.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import io.github.intisy.gradle.github.extension.GithubExtension;
-import io.github.intisy.gradle.github.Logger;
-import io.github.intisy.gradle.github.extension.ResourcesExtension;
-import io.github.intisy.gradle.github.utils.GradleUtils;
+import io.github.intisy.gradle.github.api.log.GitHubLogger;
+import io.github.intisy.gradle.github.api.model.DeclaredDependency;
+import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
+import io.github.intisy.gradle.github.plugin.Logger;
+import io.github.intisy.gradle.github.api.config.ResourceSettings;
+import io.github.intisy.gradle.github.impl.github.GitHub;
+import io.github.intisy.gradle.github.utils.FileUtils;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.transport.URIish;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestGitHub {
     @Test
-    public void testGithub() throws IOException {
-//        org.kohsuke.github.GitHub github = org.kohsuke.github.GitHub.connectAnonymously();
-//        GitHub.getAsset("SimpleLogger", "Blizzity", "1.12.7", github);
+    public void testGetRemoteOwnerAndRepoParsesHttpsRemote(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("https://example.com/SomeOwner/some-repo.git"))
+                    .call();
+        }
+        GitHub gh = makeGitHub();
+        String[] result = gh.getRemoteOwnerAndRepo(projectDir);
+        assertEquals("SomeOwner", result[0]);
+        assertEquals("some-repo", result[1]);
+    }
+
+    @Test
+    public void testGetRemoteOwnerAndRepoNonGitDirectoryThrows(@TempDir File projectDir) {
+        GitHub gh = makeGitHub();
+        assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
+    }
+
+    /**
+     * GitHub Actions' {@code actions/checkout} writes {@code
+     * https://x-access-token:<TOKEN>@github.com/o/r.git} into {@code remote.origin.url} by
+     * default, and this method runs on every publish via {@code PublishTasks}' call to {@code
+     * remoteOf}, so the debug log naming the remote URL must never carry the token through.
+     */
+    @Test
+    public void testGetRemoteOwnerAndRepoRedactsACredentialInTheDebugLog(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("https://x-access-token:ghp_SECRET_TOKEN@github.com/o/r.git"))
+                    .call();
+        }
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        String[] result = gh.getRemoteOwnerAndRepo(projectDir);
+
+        assertEquals("o", result[0]);
+        assertEquals("r", result[1]);
+        assertTrue(logger.debugMessages.stream().anyMatch(message -> message.contains("Remote origin URL")),
+                "expected the remote URL to actually be logged, or this test would pass vacuously");
+        for (String message : logger.debugMessages) {
+            assertFalse(message.contains("ghp_SECRET_TOKEN"),
+                    "debug log must never contain the credential, but found it in: " + message);
+        }
+    }
+
+    /**
+     * The "cannot parse" exception thrown when a remote has no owner segment must also never leak
+     * a credential. A scp-like remote with no owner segment after the colon triggers it; a
+     * query-string-shaped fragment stands in for a credential, since scp syntax carries no
+     * userinfo slot to leak a real one through.
+     */
+    @Test
+    public void testGetRemoteOwnerAndRepoRedactsTheExceptionMessage(@TempDir File projectDir) throws GitAPIException, URISyntaxException {
+        try (Git git = Git.init().setDirectory(projectDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("git@host:reponame?token=SECRET_QUERY_VALUE"))
+                    .call();
+        }
+        GitHub gh = makeGitHub();
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> gh.getRemoteOwnerAndRepo(projectDir));
+
+        assertFalse(thrown.getMessage().contains("SECRET_QUERY_VALUE"),
+                "exception message must not contain the query-string secret, but was: " + thrown.getMessage());
+    }
+
+    @Test
+    public void testGetRepositoryURLUsesHttpsWithoutAnSshKey() {
+        GitHub gh = makeGitHub();
+        assertEquals("https://github.com/acme/widget", gh.getRepositoryURL("acme", "widget"));
+    }
+
+    @Test
+    public void testGetRepositoryURLPrefersSshWhenAnSshKeyIsConfigured(@TempDir File tempDir) throws IOException {
+        File sshKeyFile = new File(tempDir, "id_test");
+        Files.write(sshKeyFile.toPath(), "-----BEGIN OPENSSH PRIVATE KEY-----\nstub\n-----END OPENSSH PRIVATE KEY-----"
+                .getBytes(StandardCharsets.UTF_8));
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setSshKey(sshKeyFile);
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertEquals("git@github.com:acme/widget.git", gh.getRepositoryURL("acme", "widget"));
+    }
+
+    /**
+     * The configured GitHub token must never be offered to a git host other than github.com.
+     * {@link GitHub#getCredentialsProvider} is scoped by the clone URL it is asked about, not by
+     * any global state, so a single instance correctly withholds credentials for one host while
+     * still authenticating against another.
+     */
+    @Test
+    public void credentialsProviderIsWithheldForANonGitHubHost() {
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setToken("ghp_test-token");
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertNull(gh.getCredentialsProvider("acme", "https://gitlab.com/acme/widget.git"),
+                "the configured GitHub token must not be offered to gitlab.com");
+        assertNotNull(gh.getCredentialsProvider("acme", "https://github.com/acme/widget"),
+                "the configured GitHub token must still be offered to github.com");
+    }
+
+    @Test
+    public void credentialsProviderIsWithheldWhenTheCloneUrlIsAnUnrelatedSshHost() {
+        GithubExtension ext = new GithubExtension();
+        ext.getAuth().setToken("ghp_test-token");
+        GitHub gh = new GitHub(new Logger(ext), new ResourceSettings(), ext);
+
+        assertNull(gh.getCredentialsProvider("acme", "git@bitbucket.org:acme/widget.git"));
+        assertNotNull(gh.getCredentialsProvider("acme", "git@github.com:acme/widget.git"));
     }
 
     @Disabled
@@ -31,20 +159,48 @@ public class TestGitHub {
         githubExtension.setAccessToken(new File(System.getProperty("user.home") + "/.ssh/id_rsa"));
         githubExtension.setDebug(true);
 
-        ResourcesExtension resourcesExtension = new ResourcesExtension();
+        ResourceSettings resourcesExtension = new ResourceSettings();
         resourcesExtension.setRepoUrl("https://github.com/Blizzity/libraries");
         resourcesExtension.setBranch("main");
 
         Logger logger = new Logger(githubExtension);
         GitHub gitHub = new GitHub(logger, resourcesExtension, githubExtension);
 
-        File path = GradleUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
+        File path = FileUtils.getGradleHome().resolve("resources").resolve(gitHub.getResourceRepoOwner() + "-" + gitHub.getResourceRepoName()).toFile();
         gitHub.cloneOrPullRepository(path, resourcesExtension.getBranch());
+    }
+
+    /**
+     * On a root-level URL (no distinct owner segment), {@code getResourceRepoOwner} must not
+     * mistake the repo segment itself for an owner (that would derive a non-null but nonsensical
+     * owner, literally {@code "lib.git"}, which would pass {@link TestResourceSync}'s fail-fast
+     * unnoticed). It falls back to the URL's own host as a stand-in owner instead.
+     */
+    @Test
+    public void testGetResourceRepoOwnerFallsBackToTheHostForARootLevelUrl() {
+        ResourceSettings res = new ResourceSettings();
+        res.setRepoUrl("https://git.company.com/lib.git");
+        GitHub gh = new GitHub(new Logger(new GithubExtension()), res, new GithubExtension());
+
+        assertEquals("git.company.com", gh.getResourceRepoOwner());
+        assertEquals("lib", gh.getResourceRepoName());
+    }
+
+    @Test
+    public void testGetResourceRepoOwnerForARootLevelUrlNeverLeaksACredential() {
+        ResourceSettings res = new ResourceSettings();
+        res.setRepoUrl("https://user:secret-token@git.company.com:8443/lib.git");
+        GitHub gh = new GitHub(new Logger(new GithubExtension()), res, new GithubExtension());
+
+        String owner = gh.getResourceRepoOwner();
+
+        assertEquals("git.company.com:8443", owner);
+        assertEquals("lib", gh.getResourceRepoName());
     }
 
     private GitHub makeGitHub() {
         GithubExtension ext = new GithubExtension();
-        ResourcesExtension res = new ResourcesExtension();
+        ResourceSettings res = new ResourceSettings();
         Logger logger = new Logger(ext);
         return new GitHub(logger, res, ext);
     }
@@ -100,5 +256,81 @@ public class TestGitHub {
         assets.add(asset("readme.txt"));
         JsonObject result = gh.selectJarAsset(assets, "my-lib", "1.0");
         assertNull(result, "Should return null when no usable JAR found");
+    }
+
+    @Test
+    public void testDeclaredDependenciesCorruptMetadataReturnsEmptyListAndWarns(@TempDir File tempDir) throws IOException {
+        File jar = new File(tempDir, "corrupt.jar");
+        writeJarWithMetadataEntry(jar, "[{]");
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        List<DeclaredDependency> result = gh.declaredDependencies(jar);
+
+        assertEquals(0, result.size());
+        assertEquals(1, logger.warnings.size(), "corrupt metadata should log exactly one warning");
+        assertTrue(logger.warnings.get(0).contains("corrupt.jar"), "warning should name the jar");
+    }
+
+    @Test
+    public void testDeclaredDependenciesNoMetadataEntryDoesNotWarn(@TempDir File tempDir) throws IOException {
+        File jar = new File(tempDir, "plain.jar");
+        writeJarWithoutMetadataEntry(jar);
+        CapturingLogger logger = new CapturingLogger();
+        GitHub gh = makeGitHub(logger);
+
+        List<DeclaredDependency> result = gh.declaredDependencies(jar);
+
+        assertEquals(0, result.size());
+        assertEquals(0, logger.warnings.size(), "missing metadata is not corruption and must not warn");
+    }
+
+    private GitHub makeGitHub(GitHubLogger logger) {
+        GithubExtension ext = new GithubExtension();
+        ResourceSettings res = new ResourceSettings();
+        return new GitHub(logger, res, ext);
+    }
+
+    private void writeJarWithMetadataEntry(File jar, String content) throws IOException {
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(jar))) {
+            zos.putNextEntry(new ZipEntry("META-INF/github-dependencies.json"));
+            zos.write(content.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        }
+    }
+
+    private void writeJarWithoutMetadataEntry(File jar) throws IOException {
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(jar))) {
+            zos.putNextEntry(new ZipEntry("META-INF/MANIFEST.MF"));
+            zos.write("Manifest-Version: 1.0\n".getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        }
+    }
+
+    private static final class CapturingLogger implements GitHubLogger {
+        final List<String> warnings = new ArrayList<>();
+        final List<String> debugMessages = new ArrayList<>();
+
+        @Override
+        public void log(String message) {
+        }
+
+        @Override
+        public void error(String message) {
+        }
+
+        @Override
+        public void error(String message, Throwable throwable) {
+        }
+
+        @Override
+        public void debug(String message) {
+            debugMessages.add(message);
+        }
+
+        @Override
+        public void warn(String message) {
+            warnings.add(message);
+        }
     }
 }

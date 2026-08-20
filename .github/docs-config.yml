@@ -1,0 +1,2 @@
+kind: gradle-plugin
+description: GitHub Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore

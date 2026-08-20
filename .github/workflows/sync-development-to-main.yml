@@ -10,27 +10,7 @@ permissions:
 
 jobs:
   merge:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Set up Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Fetch and Checkout Main
-        run: |
-          git fetch origin
-          git checkout main
-
-      - name: Merge Development into Main
-        run: |
-          git merge --no-ff development -m "Automated merge from development to main"
-
-      - name: Push Changes
-        run: git push origin main
+    uses: intisy/workflows/.github/workflows/merge.yml@main
+    with:
+      source: development
+      target: main
