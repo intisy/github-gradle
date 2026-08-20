@@ -11,17 +11,22 @@ import java.net.URISyntaxException;
  * S3, or Artifactory download, and {@code https://oauth2:TOKEN@host/repo.git} is the ordinary
  * shape for a private git clone URL; both carry a credential in a place this method removes.
  * Locating that credential is done textually, not via {@link URI}: a credential that contains a
- * {@code /}, {@code ?}, {@code #}, or a character {@link URI} rejects outright (a raw newline, a
- * space, a brace, the ordinary shape of a token read via Groovy's {@code file("token.txt").text})
- * makes {@code URI} either throw or silently mis-parse the authority, truncating it at the
- * credential's own {@code /}/{@code ?}/{@code #} and leaving everything from {@code "://"} up to
- * that point, including the credential, sitting in what {@code URI} then reports as the path or
- * query instead of the authority. So {@link #redact} checks first, on the raw text, whether the
- * shape between {@code "://"} and the last {@code '@'} looks like {@code userinfo:secret@}, and if
- * so removes that whole span outright before ever asking {@link URI} to parse anything. Only a URL
- * with no such span falls through to structured {@link URI} parsing (needed to preserve a port
- * cleanly), and only a URL that {@link URI} still cannot parse falls through further to a
- * best-effort manual strip.
+ * {@code /} or {@code +} (the standard base64 alphabet an Azure DevOps PAT or similar token is
+ * drawn from), or a character {@link URI} rejects outright (a raw newline, a space, a brace, the
+ * ordinary shape of a token read via Groovy's {@code file("token.txt").text}), makes {@code URI}
+ * either throw or silently mis-parse the authority. So {@link #redact} checks first, on the raw
+ * text, whether the shape between {@code "://"} and the last {@code '@'} looks like {@code
+ * userinfo:secret@}, and if so removes that whole span outright before ever asking {@link URI} to
+ * parse anything.
+ * <p>That check is scoped to end at the first {@code ?} or {@code #} after {@code "://"} (never at
+ * a {@code /}, since a leaked credential's own {@code /} must still be searched past). Without that
+ * bound, a credential-free URL whose query or fragment happens to contain a colon and a later
+ * {@code @} (an ordinary shape: a {@code mailto:} link, a {@code notify=admin@example.com}
+ * parameter) would have its host and path destroyed by a match that was never really userinfo at
+ * all; RFC 3986 never allows a raw, unencoded {@code ?} or {@code #} inside userinfo, so bounding
+ * the search there loses no real coverage. Only a URL with no {@code userinfo:secret@} span falls
+ * through to structured {@link URI} parsing (needed to preserve a port cleanly), and only a URL
+ * that {@link URI} still cannot parse falls through further to a best-effort manual strip.
  */
 public final class UrlRedaction {
     private UrlRedaction() {
@@ -43,8 +48,9 @@ public final class UrlRedaction {
             return stripQuery(url);
         }
         int authorityStart = schemeEnd + 3;
-        int lastAt = url.lastIndexOf('@');
-        if (lastAt > authorityStart && url.substring(authorityStart, lastAt).indexOf(':') >= 0) {
+        int searchEnd = indexOfQueryOrFragment(url, authorityStart);
+        int lastAt = url.lastIndexOf('@', searchEnd - 1);
+        if (lastAt > authorityStart && lastAt < searchEnd && url.substring(authorityStart, lastAt).indexOf(':') >= 0) {
             String withoutUserinfo = url.substring(0, authorityStart) + url.substring(lastAt + 1);
             return stripQuery(withoutUserinfo);
         }
@@ -69,6 +75,25 @@ public final class UrlRedaction {
         } catch (URISyntaxException e) {
             return stripUserinfoAndQueryManually(url);
         }
+    }
+
+    /**
+     * @return the index of the first {@code ?} or {@code #} at or after {@code from}, or {@code
+     * url.length()} if neither appears. Deliberately not bounded at {@code /}: a leaked
+     * credential's own {@code /} (an Azure DevOps PAT's base64 alphabet) must still be searched
+     * past to find the real {@code @} that separates it from the host.
+     */
+    private static int indexOfQueryOrFragment(String url, int from) {
+        int question = url.indexOf('?', from);
+        int hash = url.indexOf('#', from);
+        int end = url.length();
+        if (question >= 0) {
+            end = Math.min(end, question);
+        }
+        if (hash >= 0) {
+            end = Math.min(end, hash);
+        }
+        return end;
     }
 
     private static String stripUserinfo(String authority) {

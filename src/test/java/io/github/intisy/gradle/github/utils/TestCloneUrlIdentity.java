@@ -116,6 +116,19 @@ public class TestCloneUrlIdentity {
     }
 
     /**
+     * F1's regression, at the identity level: no userinfo at all, but the query contains a colon
+     * and a later {@code @} (an ordinary {@code mailto:} shape). The owner/repo must still derive
+     * from the real host and path, not get corrupted by a false-positive credential match.
+     */
+    @Test
+    public void credentialFreeQueryWithAColonAndAnAtSignDoesNotCorruptTheIdentity() {
+        String[] identity = CloneUrlIdentity.derive("https://gitlab.com/acme/widget.git?redirect=mailto:a@b.com");
+
+        assertEquals("widget", identity[1]);
+        assertTrue(identity[0].startsWith("acme-"), "owner: " + identity[0]);
+    }
+
+    /**
      * The identity is what lands on disk, so every character in {@link
      * TestUrlRedaction#SPECIAL_USERINFO_CHARACTERS} that {@link UrlRedaction#redact} must strip
      * has to be proven gone from the derived owner too, not just from the redacted URL string.

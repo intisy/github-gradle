@@ -90,13 +90,20 @@ public class TestUrlRedaction {
     }
 
     /**
-     * A userinfo character that terminates {@link java.net.URI}'s authority early ({@code /},
-     * {@code ?}, {@code #}) makes {@code URI} parse the URL "successfully", but assigns everything
-     * from that character onward to the path or query instead of the authority, so a strip that
-     * only inspects the parsed authority never sees the rest of the credential and returns it
-     * verbatim. A base64-shaped token (the ordinary shape of an Azure DevOps PAT) routinely
-     * contains {@code /} and {@code +}; a tab is included alongside the already-covered newline,
-     * space, and brace as another character a hand-typed or file-read token can carry.
+     * A userinfo character that terminates {@link java.net.URI}'s authority early ({@code /})
+     * makes {@code URI} parse the URL "successfully", but assigns everything from that character
+     * onward to the path instead of the authority, so a strip that only inspects the parsed
+     * authority never sees the rest of the credential and returns it verbatim. A base64-shaped
+     * token (the ordinary shape of an Azure DevOps PAT) routinely contains {@code /} and
+     * {@code +}; a tab is included alongside the already-covered newline, space, and brace as
+     * another character a hand-typed or file-read token can carry.
+     *
+     * <p>{@code ?} and {@code #} are deliberately not in this matrix: {@link UrlRedaction#redact}
+     * bounds its credential search at the first {@code ?}/{@code #} after {@code "://"} so that a
+     * credential-free URL whose query or fragment happens to contain a colon and a later
+     * {@code @} is never mistaken for one (see {@link #credentialFreeQueryWithAColonAndAnAtSignIsUnaffected}
+     * and friends). RFC 3986 never allows a raw {@code ?} or {@code #} inside userinfo either, so
+     * this bound loses no real-world coverage.
      */
     @Test
     public void everyUnusualUserinfoCharacterIsStrippedNotJustTheOnesUriRejects() {
@@ -108,7 +115,7 @@ public class TestUrlRedaction {
         }
     }
 
-    static final String[] SPECIAL_USERINFO_CHARACTERS = {"/", "?", "#", "+", " ", "\n", "{", "\t"};
+    static final String[] SPECIAL_USERINFO_CHARACTERS = {"/", "+", " ", "\n", "{", "\t"};
 
     static String describe(String special) {
         if (special.equals("\n")) {
@@ -121,5 +128,48 @@ public class TestUrlRedaction {
             return "space";
         }
         return special;
+    }
+
+    /**
+     * F1's regression: no userinfo at all, but the query contains a colon (from {@code mailto:})
+     * followed later by an {@code @}. The unbounded "last @ in the whole string" search used to
+     * pick that {@code @} up as if it were a userinfo separator and destroy the host and path.
+     */
+    @Test
+    public void credentialFreeQueryWithAColonAndAnAtSignIsUnaffected() {
+        String redacted = UrlRedaction.redact("https://host.example/repo.git?redirect=mailto:a@b.com");
+        assertEquals("https://host.example/repo.git", redacted);
+    }
+
+    @Test
+    public void credentialFreeQueryWithANestedUrlAndAnAtSignIsUnaffected() {
+        String redacted = UrlRedaction.redact(
+                "https://host.example/repo.git?redirect=https://cdn.example.com/x&notify=admin@ops.example.com");
+        assertEquals("https://host.example/repo.git", redacted);
+    }
+
+    @Test
+    public void credentialFreeUrlWithAnAtSignInThePathIsUnaffected() {
+        assertEquals("https://host.example/users/foo@bar/settings",
+                UrlRedaction.redact("https://host.example/users/foo@bar/settings"));
+    }
+
+    @Test
+    public void credentialFreeUrlWithAColonAndAnAtSignInTheFragmentIsUnaffected() {
+        assertEquals("https://host.example/repo.git",
+                UrlRedaction.redact("https://host.example/repo.git#see-also:admin@example.com"));
+    }
+
+    /**
+     * A real credential AND an unrelated {@code @} later in the query, together: the credential
+     * must still be stripped, and the (unrelated) query is dropped entirely as always, so its own
+     * {@code @} is moot either way.
+     */
+    @Test
+    public void userinfoPresentAndAnAtSignLaterInTheQueryStripsOnlyTheCredential() {
+        String redacted = UrlRedaction.redact(
+                "https://user:secret-token@host.example/repo.git?notify=admin@ops.example.com");
+        assertEquals("https://host.example/repo.git", redacted);
+        assertFalse(redacted.contains("secret-token"));
     }
 }
