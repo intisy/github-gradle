@@ -1,40 +1,3 @@
-# Github Gradle
-
-Archives containing JAR files are available as [releases](https://github.com/intisy/github-gradle/releases).
-
-## What is github-gradle?
-
-GitHub Gradle implements a way to get dependencies from a GitHub asset, so you don't need services like jitpack anymore
-
-## Usage
-
-Using the plugins DSL:
-
-```groovy
-plugins {
-    id "io.github.intisy.github-gradle" version "1.3.8"
-}
-```
-
-Using legacy plugin application:
-
-```groovy
-buildscript {
-    repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-    }
-    dependencies {
-        classpath "io.github.intisy.github-gradle:1.3.8"
-    }
-}
-
-apply plugin: "io.github.intisy.github-gradle"
-```
-
-Once you have the plugin installed you can use it like so:
-
 ```groovy
 dependencies {
     // OWNER:REPOSITORY:TAG resolves the main JAR from that release
@@ -188,7 +151,3 @@ File urlJar = api.downloads().download("https://nexus.internal/libs/foo-1.0.jar"
 accepts a `GitHubLogger` argument if you want diagnostics sent somewhere other than `System.err`,
 and `GitHubApi.create()` with no arguments defaults to an anonymous config for quick,
 unauthenticated use.
-
-## License
-
-[![Apache License 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
