@@ -43,7 +43,9 @@ public interface BuildInvoker {
             if (isWindows()) {
                 command.add("cmd");
                 command.add("/c");
-                command.add("gradlew.bat");
+                // Explicitly relative, matching the ./gradlew below: cmd resolves a bare batch name
+                // against PATH, not the working directory, so the unprefixed name never ran.
+                command.add(".\\gradlew.bat");
             } else {
                 command.add("./gradlew");
             }
