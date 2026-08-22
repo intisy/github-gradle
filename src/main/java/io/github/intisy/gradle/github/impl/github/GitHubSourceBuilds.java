@@ -5,6 +5,7 @@ import io.github.intisy.gradle.github.impl.source.SourceBuilder;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Adapts the host-agnostic {@link SourceBuilder} to the GitHub-specific {@link SourceBuilds}
@@ -32,7 +33,7 @@ public final class GitHubSourceBuilds implements SourceBuilds {
     }
 
     @Override
-    public File buildFromGit(String cloneUrl, String ref) throws IOException {
-        return sourceBuilder.buildFromGit(cloneUrl, ref);
+    public List<File> buildFromGit(String cloneUrl, String ref, String gradleDir, List<String> modules) throws IOException {
+        return sourceBuilder.buildFromGit(cloneUrl, ref, gradleDir, modules);
     }
 }

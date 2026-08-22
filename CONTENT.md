@@ -50,8 +50,10 @@ github {
     sources {
         git {
             url = "https://gitlab.com/me/lib.git"
-            ref = "main"                 // branch, tag or commit; optional, default the remote's default branch
-            into = "implementation"      // native configuration; optional, default "implementation"
+            ref = "main"                  // branch, tag or commit; optional, default the remote's default branch
+            dir = "java"                  // gradle project directory; optional, default the checkout root
+            modules = "routing contracts" // modules whose jars to take; optional, default the root project's jar
+            into = "implementation"       // native configuration; optional, default "implementation"
         }
         jar {
             url = "https://nexus.internal/libs/foo-1.0.jar"
@@ -64,7 +66,11 @@ github {
 ```
 
 `git { }` clones any git host, not just github.com, checks out `ref`, builds it with its own
-Gradle wrapper, and caches the result by resolved commit. `jar { }` downloads a jar with optional
+Gradle wrapper, and caches the result by resolved commit. `dir` moves the build to a repository
+whose Gradle root is a subdirectory rather than the checkout root, and `modules` names the modules
+of a multi-module build whose jars to take, one cached jar each. One clone and one build serve
+every module. Together they let a library with several consumable modules be consumed straight from
+a branch, with no release to cut for each change. `jar { }` downloads a jar with optional
 request headers (for a private Nexus/Artifactory/S3-backed host) and an optional expected
 `sha256`; a mismatch fails the build instead of silently using the wrong jar. A jar reachable
 through more than one of the `github*` coordinates, `sources { git { } }`, or `sources { jar { } }`

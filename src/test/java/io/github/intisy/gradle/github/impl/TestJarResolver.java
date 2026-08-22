@@ -285,10 +285,10 @@ public class TestJarResolver {
         }
 
         @Override
-        public File buildFromGit(String cloneUrl, String ref) {
+        public List<File> buildFromGit(String cloneUrl, String ref, String gradleDir, List<String> modules) {
             this.capturedCloneUrl = cloneUrl;
             this.capturedRef = ref;
-            return jarToReturn;
+            return Collections.singletonList(jarToReturn);
         }
     }
 
@@ -299,7 +299,7 @@ public class TestJarResolver {
         }
 
         @Override
-        public File buildFromGit(String cloneUrl, String ref) {
+        public List<File> buildFromGit(String cloneUrl, String ref, String gradleDir, List<String> modules) {
             throw new UnsupportedOperationException();
         }
     }

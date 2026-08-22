@@ -26,12 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Extracts every fenced {@code ```java} block from {@code README.md} and compiles it against the
+ * Extracts every fenced {@code ```java} block from {@code CONTENT.md} and compiles it against the
  * published library jar ({@code github-gradle-api-*.jar}, built by the {@code libraryJar} task
  * this test's own {@code test} task depends on), so a snippet that no longer compiles fails the
  * build instead of shipping silently.
  *
- * @implNote A README snippet is written to read naturally inline, mixing {@code import}
+ * @implNote A documentation snippet is written to read naturally inline, mixing {@code import}
  * statements with executable statements the way a reader would paste them into a method body, not
  * as a standalone compilation unit. This test separates the {@code import} lines from the rest and
  * wraps the remainder in a synthetic class's method, so the snippet is compiled exactly as
@@ -45,10 +45,10 @@ public class TestReadmeJavaSnippetsCompile {
     @Test
     public void everyReadmeJavaSnippetCompilesAgainstTheLibraryJar(@TempDir File tempDir) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assumeTrue(compiler != null, "No system Java compiler available at test time; skipping the README compile gate.");
+        assumeTrue(compiler != null, "No system Java compiler available at test time; skipping the snippet compile gate.");
 
-        List<String> snippets = extractJavaSnippets(readReadme());
-        assertTrue(!snippets.isEmpty(), "Expected at least one ```java fenced block in README.md.");
+        List<String> snippets = extractJavaSnippets(readContent());
+        assertTrue(!snippets.isEmpty(), "Expected at least one ```java fenced block in CONTENT.md.");
 
         File libraryJar = findLibraryJar();
 
@@ -59,10 +59,10 @@ public class TestReadmeJavaSnippetsCompile {
         }
     }
 
-    private static String readReadme() throws IOException {
-        File readme = new File("README.md");
-        assertTrue(readme.isFile(), "README.md not found at " + readme.getAbsolutePath());
-        return new String(Files.readAllBytes(readme.toPath()), StandardCharsets.UTF_8);
+    private static String readContent() throws IOException {
+        File content = new File("CONTENT.md");
+        assertTrue(content.isFile(), "CONTENT.md not found at " + content.getAbsolutePath());
+        return new String(Files.readAllBytes(content.toPath()), StandardCharsets.UTF_8);
     }
 
     private static List<String> extractJavaSnippets(String readme) {
@@ -104,7 +104,7 @@ public class TestReadmeJavaSnippetsCompile {
         }
 
         if (!success) {
-            StringBuilder message = new StringBuilder("README.md's ```java snippet #" + className
+            StringBuilder message = new StringBuilder("CONTENT.md's ```java snippet #" + className
                     + " failed to compile against the library jar:\n");
             for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
                 message.append(diagnostic.toString()).append('\n');

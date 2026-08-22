@@ -56,6 +56,28 @@ public class TestGitHub {
     }
 
     /**
+     * A Gradle subproject directory holds no {@code .git} of its own, so publishing from one has to
+     * resolve the remote of the enclosing build root.
+     */
+    @Test
+    public void testGetRemoteOwnerAndRepoResolvesFromASubprojectDirectory(@TempDir File rootDir) throws GitAPIException, URISyntaxException, IOException {
+        try (Git git = Git.init().setDirectory(rootDir).call()) {
+            git.remoteAdd()
+                    .setName("origin")
+                    .setUri(new URIish("https://github.com/SomeOwner/some-repo.git"))
+                    .call();
+        }
+        File subproject = new File(rootDir, "jvm");
+        Files.createDirectories(subproject.toPath());
+        GitHub gh = makeGitHub();
+
+        String[] result = gh.getRemoteOwnerAndRepo(subproject);
+
+        assertEquals("SomeOwner", result[0]);
+        assertEquals("some-repo", result[1]);
+    }
+
+    /**
      * GitHub Actions' {@code actions/checkout} writes {@code
      * https://x-access-token:<TOKEN>@github.com/o/r.git} into {@code remote.origin.url} by
      * default, and this method runs on every publish via {@code PublishTasks}' call to {@code

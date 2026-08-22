@@ -307,10 +307,11 @@ public class TestSourcesResolution {
             public File buildFromSource(String owner, String repo, String branch, String commitSha) {
                 throw new UnsupportedOperationException();
             }
-            public File buildFromGit(String cloneUrl, String ref) {
+            public java.util.List<File> buildFromGit(String cloneUrl, String ref, String gradleDir,
+                    java.util.List<String> modules) {
                 assertEquals(expectedCloneUrl, cloneUrl);
                 assertEquals(expectedRef, ref);
-                return jar;
+                return java.util.Collections.singletonList(jar);
             }
         };
     }
@@ -320,7 +321,8 @@ public class TestSourcesResolution {
             public File buildFromSource(String owner, String repo, String branch, String commitSha) {
                 throw new UnsupportedOperationException();
             }
-            public File buildFromGit(String cloneUrl, String ref) {
+            public java.util.List<File> buildFromGit(String cloneUrl, String ref, String gradleDir,
+                    java.util.List<String> modules) {
                 throw new UnsupportedOperationException();
             }
         };

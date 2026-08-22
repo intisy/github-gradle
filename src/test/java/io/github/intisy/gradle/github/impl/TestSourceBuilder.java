@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static io.github.intisy.gradle.github.impl.GitTestFixtures.addCommit;
@@ -60,6 +61,88 @@ public class TestSourceBuilder {
                 Files.write(new File(libsDir, jarName).toPath(), "stub jar".getBytes(StandardCharsets.UTF_8));
             }
         }
+    }
+
+    private static final class FakeModuleBuildInvoker implements BuildInvoker {
+        private final List<String> modules;
+        private final List<File> buildRoots = new ArrayList<File>();
+
+        FakeModuleBuildInvoker(String... modules) {
+            this.modules = new ArrayList<String>();
+            for (String module : modules) {
+                this.modules.add(module);
+            }
+        }
+
+        @Override
+        public void invoke(File buildRoot) throws IOException {
+            buildRoots.add(buildRoot);
+            for (String module : modules) {
+                File libsDir = new File(new File(new File(buildRoot, module), "build"), "libs");
+                Files.createDirectories(libsDir.toPath());
+                Files.write(new File(libsDir, module + ".jar").toPath(),
+                        ("stub " + module).getBytes(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    /** An origin whose gradle root is a subdirectory, the shape every library in this ecosystem has. */
+    private static File originWithGradleSubdirectory(File dir) throws IOException, GitAPIException {
+        File origin = createOriginRepo(dir);
+        assertTrue(new File(origin, "java").mkdirs());
+        addCommit(origin, "java/settings.gradle", "rootProject.name = 'widget'");
+        return origin;
+    }
+
+    @Test
+    public void buildsEveryNamedModuleFromASubdirectoryGradleRootInOneInvocation(@TempDir File tempDir)
+            throws IOException, GitAPIException {
+        File origin = originWithGradleSubdirectory(new File(tempDir, "origin"));
+        File cacheDir = new File(tempDir, "cache");
+
+        FakeModuleBuildInvoker invoker = new FakeModuleBuildInvoker("routing", "contracts");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+
+        List<File> jars = builder.buildFromGit(origin.toURI().toString(), null, "java",
+                Arrays.asList("routing", "contracts"));
+
+        assertEquals(1, invoker.buildRoots.size(), "one build serves every module");
+        assertEquals("java", invoker.buildRoots.get(0).getName(), "the build runs in the gradle root");
+        assertEquals(2, jars.size());
+        assertTrue(jars.get(0).getName().endsWith("-routing.jar"), jars.get(0).getName());
+        assertTrue(jars.get(1).getName().endsWith("-contracts.jar"), jars.get(1).getName());
+        assertEquals("stub routing", readFile(jars.get(0)));
+        assertEquals("stub contracts", readFile(jars.get(1)));
+    }
+
+    @Test
+    public void aSecondCallForTheSameCommitReusesEveryCachedModuleJar(@TempDir File tempDir)
+            throws IOException, GitAPIException {
+        File origin = originWithGradleSubdirectory(new File(tempDir, "origin"));
+        File cacheDir = new File(tempDir, "cache");
+
+        FakeModuleBuildInvoker invoker = new FakeModuleBuildInvoker("routing", "contracts");
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir, invoker);
+        List<String> modules = Arrays.asList("routing", "contracts");
+
+        builder.buildFromGit(origin.toURI().toString(), null, "java", modules);
+        builder.buildFromGit(origin.toURI().toString(), null, "java", modules);
+
+        assertEquals(1, invoker.buildRoots.size(), "a cached commit rebuilds nothing");
+    }
+
+    @Test
+    public void aMissingGradleDirectoryFailsWithTheDirectoryItLookedFor(@TempDir File tempDir)
+            throws IOException, GitAPIException {
+        File origin = createOriginRepo(new File(tempDir, "origin"));
+        File cacheDir = new File(tempDir, "cache");
+
+        SourceBuilder builder = new SourceBuilder(new GithubExtension(), LOGGER, cacheDir,
+                new FakeModuleBuildInvoker("routing"));
+
+        IOException failure = assertThrows(IOException.class, () -> builder.buildFromGit(
+                origin.toURI().toString(), null, "no-such-dir", Arrays.asList("routing")));
+        assertTrue(failure.getMessage().contains("no-such-dir"), failure.getMessage());
     }
 
     @Test

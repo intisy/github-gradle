@@ -55,9 +55,10 @@ public interface Repositories {
     boolean isUpToDate(File path);
 
     /**
-     * @param projectDir the checkout whose {@code origin} remote is parsed.
-     * @return the owner and repository name parsed from {@code projectDir}'s {@code origin} remote URL.
-     * @throws RuntimeException if {@code projectDir} has no {@code origin} remote configured, or its
+     * @param projectDir a directory inside the checkout whose {@code origin} remote is parsed; the
+     * search walks up to the enclosing repository, so a Gradle subproject directory works.
+     * @return the owner and repository name parsed from the enclosing checkout's {@code origin} remote URL.
+     * @throws RuntimeException if no enclosing checkout has an {@code origin} remote configured, or its
      * URL cannot be parsed into an owner and repository name.
      */
     RemoteRepo remoteOf(File projectDir);
