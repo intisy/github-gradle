@@ -1,6 +1,7 @@
-name: Sync Development to Main
+name: Merge
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - development
@@ -14,3 +15,5 @@ jobs:
     with:
       source: development
       target: main
+      sync_back: true
+      generated_paths: README.md
