@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and publish; empty takes the ref the run was started from'
+        required: false
+        type: string
+        default: ''
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: intisy/workflows/.github/workflows/publish.yml@main
+    with:
+      tag: ${{ inputs.tag }}
+      java_version: '8'
+      jdk_distribution: liberica-full
+      gradle_args: --no-daemon
+      release_assets: 'build/libs/*'
+    secrets:
+      envPAT: ${{ secrets.PAT }}
+      envKEY: ${{ secrets.KEY }}
+      envSECRET: ${{ secrets.SECRET }}
