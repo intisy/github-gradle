@@ -39,8 +39,10 @@ public class SourcesResolution {
                     throw new IllegalStateException("A sources { git { } } entry is missing 'url'.");
                 }
                 try {
-                    File jar = sourceBuilds.buildFromGit(entry.getUrl(), entry.getRef());
-                    addJar(proj, entry.getInto(), jar, addedJars);
+                    for (File jar : sourceBuilds.buildFromGit(entry.getUrl(), entry.getRef(),
+                            entry.getDir(), entry.getModules())) {
+                        addJar(proj, entry.getInto(), jar, addedJars);
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException("Failed to build git source " + UrlRedaction.redact(entry.getUrl())
                             + ": " + e.getMessage(), e);
