@@ -29,7 +29,7 @@ public class DependencyResolution {
 	 * @param releases the client used to resolve each dependency to a jar.
 	 */
 	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases) {
-		apply(project, logger, githubExtension, releases, new HashSet<File>());
+		apply(project, logger, githubExtension, releases, new AddedJars());
 	}
 
 	/**
@@ -40,7 +40,7 @@ public class DependencyResolution {
 	 * @param logger receives diagnostic output.
 	 * @param githubExtension the extension supplying {@code resilience.skipOnRateLimit}.
 	 * @param releases the client used to resolve each dependency to a jar.
-	 * @param addedJars the dedup filter, keyed by resolved {@link File}; pass the same set given to
+	 * @param addedJars the dedup filter, keyed by native configuration and resolved jar; pass the same one given to
 	 * {@link SourcesResolution#apply} so a jar reachable from both a {@code github*} coordinate and
 	 * a {@code sources { }} entry is added to a native configuration only once.
 	 * @implNote {@link Releases#resolveWithDependencies} deduplicates cycles only within a single
@@ -49,14 +49,14 @@ public class DependencyResolution {
 	 * ({@link Releases#resolveWithDependencies}), the {@code :all} branch
 	 * ({@link Releases#downloadAllModuleJars}), the explicit-classifier branch
 	 * ({@link Releases#downloadJar(String, String, String, String)}), and {@link SourcesResolution}
-	 * all consult it, keyed by the resolved {@link File}. The guarantee is only as strong as the
+	 * all consult it, keyed by the native configuration and the resolved file. The guarantee is only as strong as the
 	 * cache-naming scheme behind that {@link File}: both the release cache and the source-build
 	 * cache key a jar by unescaped {@code "-"}-joined string concatenation (owner, repo, version or
 	 * commit), so two logically distinct artifacts could in principle collide on the same path and
 	 * be treated as one jar. The url-download cache sidesteps this by keying on a hash of the URL
 	 * instead.
 	 */
-	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases, Set<File> addedJars) {
+	public static void apply(Project project, Logger logger, GithubExtension githubExtension, Releases releases, AddedJars addedJars) {
 		project.afterEvaluate(proj -> {
 			for (String cfgName : GithubConfigurations.GITHUB_CONFIGS) {
 				String nativeCfg = GithubConfigurations.GITHUB_TO_GRADLE.get(cfgName);
@@ -71,20 +71,20 @@ public class DependencyResolution {
 						List<File> jars = new ArrayList<File>();
 						if (classifier.isEmpty()) {
 							for (File jar : releases.resolveWithDependencies(dependency.getGroup(), dependency.getName(), dependency.getVersion())) {
-								if (addedJars.add(jar)) {
+								if (addedJars.add(nativeCfg, jar)) {
 									jars.add(jar);
 								}
 							}
 						} else if (classifier.equals("all")) {
 							for (File jar : releases.downloadAllModuleJars(dependency.getGroup(), dependency.getName(), dependency.getVersion())) {
-								if (addedJars.add(jar)) {
+								if (addedJars.add(nativeCfg, jar)) {
 									jars.add(jar);
 								}
 							}
 						} else {
 							Optional<File> jar = releases.downloadJar(dependency.getGroup(), dependency.getName(), dependency.getVersion(), classifier);
 							if (jar.isPresent()) {
-								if (addedJars.add(jar.get())) {
+								if (addedJars.add(nativeCfg, jar.get())) {
 									jars.add(jar.get());
 								}
 							} else {
