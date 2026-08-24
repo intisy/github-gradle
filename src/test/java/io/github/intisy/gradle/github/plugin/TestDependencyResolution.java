@@ -244,6 +244,59 @@ public class TestDependencyResolution {
     }
 
     /**
+     * An annotation processor resolves like any other jar but must land on {@code
+     * annotationProcessor}, the one native configuration a consumer cannot substitute with {@code
+     * compileOnly}: a processor merely on the compile classpath is not run by javac.
+     */
+    @Test
+    public void annotationProcessorDependencyLandsOnTheNativeAnnotationProcessorConfiguration() throws IOException {
+        Project project = ProjectBuilder.builder().withName("annotation-processor-test").build();
+        project.getPluginManager().apply("java");
+        GithubConfigurations.apply(project);
+        project.getDependencies().add("githubAnnotationProcessor", "some-owner:some-repo:1.0.0:processor");
+
+        File processorJar = File.createTempFile("github-annotation-processor", ".jar");
+        processorJar.deleteOnExit();
+
+        GithubExtension githubExtension = new GithubExtension();
+        Logger logger = new Logger(githubExtension, project);
+
+        DependencyResolution.apply(project, logger, githubExtension, new Releases() {
+            public String latestVersion(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Release releaseByTag(String owner, String repo, String tag) {
+                throw new UnsupportedOperationException();
+            }
+            public Release latestRelease(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
+                return Optional.of(processorJar);
+            }
+            public List<File> downloadAllModuleJars(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<File> resolveWithDependencies(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<DeclaredDependency> declaredDependencies(File jar) {
+                throw new UnsupportedOperationException();
+            }
+        });
+
+        ((ProjectInternal) project).evaluate();
+
+        assertEquals(1, project.getConfigurations().getByName("annotationProcessor").getDependencies().size(),
+                "a githubAnnotationProcessor dependency must be added to the native annotationProcessor configuration");
+        assertEquals(0, project.getConfigurations().getByName("compileOnly").getDependencies().size(),
+                "and must not leak onto the compile classpath");
+    }
+
+    /**
      * The two tests above stub {@link Releases} directly, which proves {@link DependencyResolution}
      * absorbed the {@code Optional} contract correctly but never exercises the real {@link GitHub}
      * adapter. These two drive the real adapter (via its overridable, public, non-final

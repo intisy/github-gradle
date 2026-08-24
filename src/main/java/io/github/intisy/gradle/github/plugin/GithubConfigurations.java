@@ -26,7 +26,8 @@ public class GithubConfigurations {
 		"githubApi",
 		"githubCompileOnly",
 		"githubCompileOnlyApi",
-		"githubRuntimeOnly"
+		"githubRuntimeOnly",
+		"githubAnnotationProcessor"
 	));
 
 	/**
@@ -41,6 +42,7 @@ public class GithubConfigurations {
 		m.put("githubCompileOnly",     "compileOnly");
 		m.put("githubCompileOnlyApi",  "compileOnlyApi");
 		m.put("githubRuntimeOnly",     "runtimeOnly");
+		m.put("githubAnnotationProcessor", "annotationProcessor");
 		GITHUB_TO_GRADLE = Collections.unmodifiableMap(m);
 	}
 
