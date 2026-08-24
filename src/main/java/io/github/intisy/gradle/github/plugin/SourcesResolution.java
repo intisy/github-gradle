@@ -12,7 +12,6 @@ import org.gradle.api.Project;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
 
 /**
  * Resolves every {@code sources { git { } / jar { } } } entry into a local jar and adds it to its
@@ -27,7 +26,7 @@ public class SourcesResolution {
      * @param sourceBuilds resolves each {@code git} entry to a jar.
      * @param downloads resolves each {@code jar} entry to a jar.
      * @param addedJars the dedup filter shared with
-     * {@link DependencyResolution#apply(Project, Logger, GithubExtension, Releases, Set)}, so a jar
+     * {@link DependencyResolution#apply(Project, Logger, GithubExtension, Releases, AddedJars)}, so a jar
      * reachable from both a {@code github*} coordinate and a {@code sources} entry is added to a
      * native configuration only once.
      */
