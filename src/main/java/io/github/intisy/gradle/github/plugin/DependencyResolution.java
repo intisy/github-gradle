@@ -9,10 +9,8 @@ import org.gradle.api.artifacts.Dependency;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Resolves each GitHub dependency configuration's declared dependencies into local JAR files.
@@ -20,7 +18,7 @@ import java.util.Set;
 public class DependencyResolution {
 
 	/**
-	 * Same as {@link #apply(Project, Logger, GithubExtension, Releases, Set)}, with a fresh,
+	 * Same as {@link #apply(Project, Logger, GithubExtension, Releases, AddedJars)}, with a fresh,
 	 * private dedup set: nothing outside the GitHub branches shares it.
 	 *
 	 * @param project the project whose GitHub dependency configurations are resolved.
