@@ -27,11 +27,17 @@ public class GithubConfigurations {
 		"githubCompileOnly",
 		"githubCompileOnlyApi",
 		"githubRuntimeOnly",
-		"githubAnnotationProcessor"
+		"githubAnnotationProcessor",
+		"githubTestImplementation",
+		"githubTestCompileOnly",
+		"githubTestRuntimeOnly",
+		"githubTestAnnotationProcessor"
 	));
 
 	/**
-	 * Maps each GitHub configuration to the native Gradle configuration it feeds.
+	 * Maps each GitHub configuration to the native Gradle configuration it feeds. The test-source
+	 * entries mirror the main-source ones, because a published jar is as often a test-only
+	 * dependency (a shared fixture) as a compile one.
 	 * {@code api} and {@code compileOnlyApi} require the {@code java-library} plugin.
 	 */
 	static final Map<String, String> GITHUB_TO_GRADLE;
@@ -43,6 +49,10 @@ public class GithubConfigurations {
 		m.put("githubCompileOnlyApi",  "compileOnlyApi");
 		m.put("githubRuntimeOnly",     "runtimeOnly");
 		m.put("githubAnnotationProcessor", "annotationProcessor");
+		m.put("githubTestImplementation", "testImplementation");
+		m.put("githubTestCompileOnly", "testCompileOnly");
+		m.put("githubTestRuntimeOnly", "testRuntimeOnly");
+		m.put("githubTestAnnotationProcessor", "testAnnotationProcessor");
 		GITHUB_TO_GRADLE = Collections.unmodifiableMap(m);
 	}
 
