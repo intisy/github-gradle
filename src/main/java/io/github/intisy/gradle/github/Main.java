@@ -5,6 +5,7 @@ import io.github.intisy.gradle.github.plugin.extension.GithubExtension;
 import io.github.intisy.gradle.github.plugin.extension.PublishExtension;
 import io.github.intisy.gradle.github.plugin.extension.SourcesExtension;
 import io.github.intisy.gradle.github.api.config.ResourceSettings;
+import io.github.intisy.gradle.github.plugin.AddedJars;
 import io.github.intisy.gradle.github.plugin.DependencyMetadata;
 import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.DependencyTasks;
@@ -40,7 +41,7 @@ class Main implements Plugin<Project> {
 		GitHubApi api = GitHubApi.create(githubExtension, resourcesExtension, logger);
 
 		ResourceSync.apply(project, logger, resourcesExtension, api.repositories());
-		Set<File> addedJars = new HashSet<File>();
+		AddedJars addedJars = new AddedJars();
 		DependencyResolution.apply(project, logger, githubExtension, api.releases(), addedJars);
 		SourcesResolution.apply(project, logger, sourcesExtension, api.sourceBuilds(), api.downloads(), addedJars);
 		DependencyMetadata.apply(project, logger);

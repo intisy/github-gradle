@@ -188,11 +188,12 @@ public class TestDependencyResolution {
     /**
      * Declares the same underlying jar through all three resolution branches (no-classifier,
      * {@code :all}, and an explicit classifier) in one project evaluation, driving the real
-     * {@link DependencyResolution#apply} loop rather than a per-branch stub. Pins that
-     * {@code addedJars} dedups across all three, not just the no-classifier branch.
+     * {@link DependencyResolution#apply} loop rather than a per-branch stub. Pins that every branch
+     * consults {@code addedJars}, and that its key is the configuration-and-jar PAIR: three distinct
+     * configurations each asked for the jar, so each gets it once.
      */
     @Test
-    public void sameJarReachableThroughAllThreeBranchesIsAddedOnlyOnce() throws IOException {
+    public void sameJarAskedForByThreeConfigurationsReachesEachOfThemOnce() throws IOException {
         Project project = ProjectBuilder.builder().withName("dedup-across-branches-test").build();
         project.getPluginManager().apply("java-library");
         GithubConfigurations.apply(project);
@@ -238,9 +239,60 @@ public class TestDependencyResolution {
         int totalAdded = project.getConfigurations().getByName("implementation").getDependencies().size()
                 + project.getConfigurations().getByName("api").getDependencies().size()
                 + project.getConfigurations().getByName("compileOnly").getDependencies().size();
-        assertEquals(1, totalAdded,
-                "the same jar reached via the no-classifier, ':all', and explicit-classifier branches "
-                        + "must be added to a native configuration exactly once across the whole loop");
+        assertEquals(3, totalAdded,
+                "each configuration that asked for the jar must receive it, through whichever branch "
+                        + "resolved it");
+    }
+
+    /**
+     * The companion to the test above: within ONE configuration, a jar reached through more than one
+     * coordinate is still added once.
+     */
+    @Test
+    public void sameJarAskedForTwiceByOneConfigurationIsAddedOnce() throws IOException {
+        Project project = ProjectBuilder.builder().withName("dedup-within-configuration-test").build();
+        project.getPluginManager().apply("java-library");
+        GithubConfigurations.apply(project);
+        project.getDependencies().add("githubImplementation", "some-owner:some-repo:1.0.0:one");
+        project.getDependencies().add("githubImplementation", "some-owner:some-repo:1.0.0:two");
+
+        File sharedJar = File.createTempFile("shared-one-configuration", ".jar");
+        sharedJar.deleteOnExit();
+
+        GithubExtension githubExtension = new GithubExtension();
+        Logger logger = new Logger(githubExtension, project);
+
+        DependencyResolution.apply(project, logger, githubExtension, new Releases() {
+            public String latestVersion(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Release releaseByTag(String owner, String repo, String tag) {
+                throw new UnsupportedOperationException();
+            }
+            public Release latestRelease(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
+                return Optional.of(sharedJar);
+            }
+            public List<File> downloadAllModuleJars(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<File> resolveWithDependencies(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<DeclaredDependency> declaredDependencies(File jar) {
+                throw new UnsupportedOperationException();
+            }
+        });
+
+        ((ProjectInternal) project).evaluate();
+
+        assertEquals(1, project.getConfigurations().getByName("implementation").getDependencies().size(),
+                "one configuration must receive the jar once, however many coordinates resolved to it");
     }
 
     /**

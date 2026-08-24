@@ -1,0 +1,30 @@
+package io.github.intisy.gradle.github.plugin;
+
+import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * Remembers which resolved jars have already been added to which native Gradle configuration, so a
+ * jar reachable through several coordinates, branches or {@code sources { }} entries is added to any
+ * one configuration exactly once.
+ *
+ * @implNote The key is the PAIR, not the jar alone. One jar legitimately belongs on two
+ * configurations at once: an annotation library is needed on {@code compileOnly} for the source that
+ * references it and on {@code annotationProcessor} for the processor that reads it, and keying by
+ * jar alone silently dropped the second, leaving the processor to fail with a
+ * {@code NoClassDefFoundError} at compile time.
+ */
+public final class AddedJars {
+
+	private final Set<String> added = new HashSet<String>();
+
+	/**
+	 * @param nativeConfiguration the Gradle configuration the jar is destined for.
+	 * @param jar the resolved jar.
+	 * @return {@code true} if this pair had not been seen, meaning the caller should add it.
+	 */
+	public boolean add(String nativeConfiguration, File jar) {
+		return added.add(nativeConfiguration + "::" + jar.getAbsolutePath());
+	}
+}

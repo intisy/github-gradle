@@ -32,7 +32,7 @@ public class SourcesResolution {
      * native configuration only once.
      */
     public static void apply(Project project, Logger logger, SourcesExtension sourcesExtension,
-            SourceBuilds sourceBuilds, Downloads downloads, Set<File> addedJars) {
+            SourceBuilds sourceBuilds, Downloads downloads, AddedJars addedJars) {
         project.afterEvaluate(proj -> {
             for (GitSourceEntry entry : sourcesExtension.getGitSources()) {
                 if (entry.getUrl() == null) {
@@ -63,8 +63,8 @@ public class SourcesResolution {
         });
     }
 
-    private static void addJar(Project proj, String nativeCfg, File jar, Set<File> addedJars) {
-        if (addedJars.add(jar)) {
+    private static void addJar(Project proj, String nativeCfg, File jar, AddedJars addedJars) {
+        if (addedJars.add(nativeCfg, jar)) {
             proj.getDependencies().add(nativeCfg, proj.files(jar));
         }
     }

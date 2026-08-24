@@ -58,7 +58,7 @@ public class TestSourcesResolution {
         fakeJar.deleteOnExit();
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                stubSourceBuilds(fakeJar, "https://gitlab.com/me/lib.git", "main"), unusedDownloads(), new HashSet<File>());
+                stubSourceBuilds(fakeJar, "https://gitlab.com/me/lib.git", "main"), unusedDownloads(), new AddedJars());
 
         ((ProjectInternal) project).evaluate();
 
@@ -94,7 +94,7 @@ public class TestSourcesResolution {
         };
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                unusedSourceBuilds(), downloads, new HashSet<File>());
+                unusedSourceBuilds(), downloads, new AddedJars());
 
         ((ProjectInternal) project).evaluate();
 
@@ -130,7 +130,7 @@ public class TestSourcesResolution {
         };
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                unusedSourceBuilds(), downloads, new HashSet<File>());
+                unusedSourceBuilds(), downloads, new AddedJars());
 
         ((ProjectInternal) project).evaluate();
 
@@ -163,7 +163,7 @@ public class TestSourcesResolution {
         };
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                unusedSourceBuilds(), downloads, new HashSet<File>());
+                unusedSourceBuilds(), downloads, new AddedJars());
 
         ((ProjectInternal) project).evaluate();
 
@@ -190,7 +190,7 @@ public class TestSourcesResolution {
 
         GithubExtension githubExtension = new GithubExtension();
         Logger logger = new Logger(githubExtension, project);
-        Set<File> addedJars = new HashSet<File>();
+        AddedJars addedJars = new AddedJars();
 
         DependencyResolution.apply(project, logger, githubExtension, new io.github.intisy.gradle.github.api.capability.Releases() {
             public String latestVersion(String owner, String repo) { throw new UnsupportedOperationException(); }
@@ -236,7 +236,7 @@ public class TestSourcesResolution {
         Downloads mismatchDownloads = new UrlDownloads(clientReturningCannedJar(jarBytes),
                 new Logger(new GithubExtension(), mismatchProject), new File(cacheDir, "mismatch"));
         SourcesResolution.apply(mismatchProject, new Logger(new GithubExtension(), mismatchProject), mismatchSources,
-                unusedSourceBuilds(), mismatchDownloads, new HashSet<File>());
+                unusedSourceBuilds(), mismatchDownloads, new AddedJars());
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> ((ProjectInternal) mismatchProject).evaluate());
         assertTrue(collectMessages(thrown).contains("sha256 mismatch"),
@@ -252,7 +252,7 @@ public class TestSourcesResolution {
         Downloads matchDownloads = new UrlDownloads(clientReturningCannedJar(jarBytes),
                 new Logger(new GithubExtension(), matchProject), new File(cacheDir, "match"));
         SourcesResolution.apply(matchProject, new Logger(new GithubExtension(), matchProject), matchSources,
-                unusedSourceBuilds(), matchDownloads, new HashSet<File>());
+                unusedSourceBuilds(), matchDownloads, new AddedJars());
 
         ((ProjectInternal) matchProject).evaluate();
         assertEquals(1, matchProject.getConfigurations().getByName("implementation").getDependencies().size(),
@@ -268,7 +268,7 @@ public class TestSourcesResolution {
         sources.git(entry -> entry.setRef("main"));
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                unusedSourceBuilds(), unusedDownloads(), new HashSet<File>());
+                unusedSourceBuilds(), unusedDownloads(), new AddedJars());
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> ((ProjectInternal) project).evaluate());
         assertTrue(collectMessages(thrown).contains("url"));
@@ -283,7 +283,7 @@ public class TestSourcesResolution {
         sources.jar(entry -> entry.setSha256("abc"));
 
         SourcesResolution.apply(project, new Logger(new GithubExtension(), project), sources,
-                unusedSourceBuilds(), unusedDownloads(), new HashSet<File>());
+                unusedSourceBuilds(), unusedDownloads(), new AddedJars());
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> ((ProjectInternal) project).evaluate());
         assertTrue(collectMessages(thrown).contains("url"));
