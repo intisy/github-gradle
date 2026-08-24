@@ -245,6 +245,58 @@ public class TestDependencyResolution {
     }
 
     /**
+     * A shared test fixture is a published jar that must reach only the test classpath: on
+     * {@code implementation} it would leak into consumers of the module's own jar.
+     */
+    @Test
+    public void testImplementationDependencyLandsOnTheNativeTestConfigurationOnly() throws IOException {
+        Project project = ProjectBuilder.builder().withName("test-implementation-test").build();
+        project.getPluginManager().apply("java");
+        GithubConfigurations.apply(project);
+        project.getDependencies().add("githubTestImplementation", "some-owner:some-repo:1.0.0:test-fixtures");
+
+        File fixturesJar = File.createTempFile("github-test-fixtures", ".jar");
+        fixturesJar.deleteOnExit();
+
+        GithubExtension githubExtension = new GithubExtension();
+        Logger logger = new Logger(githubExtension, project);
+
+        DependencyResolution.apply(project, logger, githubExtension, new Releases() {
+            public String latestVersion(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Release releaseByTag(String owner, String repo, String tag) {
+                throw new UnsupportedOperationException();
+            }
+            public Release latestRelease(String owner, String repo) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public Optional<File> downloadJar(String owner, String repo, String version, String classifier) {
+                return Optional.of(fixturesJar);
+            }
+            public List<File> downloadAllModuleJars(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<File> resolveWithDependencies(String owner, String repo, String version) {
+                throw new UnsupportedOperationException();
+            }
+            public List<DeclaredDependency> declaredDependencies(File jar) {
+                throw new UnsupportedOperationException();
+            }
+        });
+
+        ((ProjectInternal) project).evaluate();
+
+        assertEquals(1, project.getConfigurations().getByName("testImplementation").getDependencies().size(),
+                "a githubTestImplementation dependency must reach the native testImplementation configuration");
+        assertEquals(0, project.getConfigurations().getByName("implementation").getDependencies().size(),
+                "and must not reach the main implementation configuration");
+    }
+
+    /**
      * The companion to the test above: within ONE configuration, a jar reached through more than one
      * coordinate is still added once.
      */
