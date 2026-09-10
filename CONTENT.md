@@ -25,6 +25,12 @@ github {
 }
 ```
 
+When the `auth` block states nothing, the token is taken from `GITHUB_TOKEN`, then `GH_TOKEN`, then
+from whatever `gh` is signed in with (`gh auth token`). So a developer who has run `gh auth login`
+needs no token in any file, and a CI job that already exports `GITHUB_TOKEN` needs no configuration
+either. Anything stated in `auth` still wins, and finding nothing at all is a supported state: the
+plugin simply works unauthenticated.
+
 ### Dependency configurations
 
 Every standard Gradle configuration has a github counterpart, all using the OWNER:REPOSITORY:TAG[:CLASSIFIER] coordinate:
@@ -76,6 +82,37 @@ request headers (for a private Nexus/Artifactory/S3-backed host) and an optional
 through more than one of the `github*` coordinates, `sources { git { } }`, or `sources { jar { } }`
 is only ever added to the native configuration once.
 
+### Resolving from GitHub Packages
+
+A release asset is a bare jar: it carries no pom and no Gradle module metadata, so transitive
+dependencies have to be restated by hand and variants such as test fixtures cannot be expressed at
+all. A package can carry both. Declare the repositories a build resolves packages from in a nested
+`packages { }` block inside `github { }`, and the dependencies themselves stay ordinary Gradle
+dependencies:
+
+```groovy
+github {
+    packages {
+        from "my-org/libs"
+        from("my-org/core") { group = "com.example" }
+    }
+}
+
+dependencies {
+    implementation "com.example:common:1.0.0"
+    testImplementation testFixtures("com.example:common:1.0.0")
+}
+```
+
+`from` is repeatable and takes `owner/repo`, which becomes
+`https://maven.pkg.github.com/owner/repo`. The optional `group` narrows a repository to one
+dependency group, so resolving anything else never queries it and never collects a 404 from it.
+
+Credentials come from the same `auth` block, environment variables and `gh` login as everything
+else, and a token is always required: GitHub Packages refuses an anonymous read even of a public
+package. That is also why publishing to a package is not a replacement for attaching a release
+asset, which on a public repository resolves with no credentials at all. Publish to both.
+
 ### Publishing a release
 
 Configure the publishGithub extension and run `gradle publishGithub` to build the project and upload its JAR(s) as a GitHub release. Every field is optional:
@@ -90,6 +127,24 @@ publishGithub {
     jar         = file("build/libs/my-app.jar") // auto-selected from build/libs if omitted
 }
 ```
+
+To publish the project's Maven publications to GitHub Packages in the same run, enable the nested
+`packages { }` block. One `publishGithub` then reaches both destinations, so neither can drift
+behind the other:
+
+```groovy
+publishGithub {
+    packages {
+        enabled = true
+    }
+}
+```
+
+The project must apply `maven-publish`; what is published is whatever publications it declares, or
+one created from the `java` component if it declares none. `owner` and `repo` fall back to the ones
+`publishGithub` already resolves, so a build normally states nothing but `enabled`. Uploading an
+asset whose name the release already carries replaces it, so republishing one version, as a rolling
+snapshot does on every push, works rather than failing on the second run.
 
 ### Managing installed dependencies
 
