@@ -119,6 +119,123 @@ public class TestPackagesPublishing {
         evaluate(project);
     }
 
+    /**
+     * Five of the nine spisor repositories are multi-module, and a root that publishes nothing of
+     * its own is the normal shape for one. Registering only on the project the block was written in
+     * would leave every such repository publishing no package at all.
+     */
+    @Test
+    public void aSubprojectPublicationReachesTheDestination() {
+        Project root = newProject();
+        Project module = ProjectBuilder.builder().withName("common").withParent(root).build();
+        module.getPluginManager().apply("java");
+        module.getPluginManager().apply("maven-publish");
+
+        applyWith(root, true);
+        evaluate(root);
+        evaluate(module);
+
+        MavenArtifactRepository repository = packagesRepository(module);
+        assertNotNull(repository, "the subproject should carry the destination");
+        assertEquals("https://maven.pkg.github.com/my-org/my-repo", repository.getUrl().toString());
+    }
+
+    @Test
+    public void theRootsPublishGithubPublishesEverySubproject() {
+        Project root = newProject();
+        Project first = ProjectBuilder.builder().withName("common").withParent(root).build();
+        Project second = ProjectBuilder.builder().withName("objectstore").withParent(root).build();
+        for (Project module : new Project[]{first, second}) {
+            module.getPluginManager().apply("java");
+            module.getPluginManager().apply("maven-publish");
+        }
+
+        applyWith(root, true);
+        evaluate(root);
+        evaluate(first);
+        evaluate(second);
+
+        List<String> dependencies = dependencyNames(root, root.getTasks().getByName("publishGithub"));
+        assertEquals(2, countPackagesPublishes(dependencies),
+                "publishGithub should publish both modules' packages, got " + dependencies);
+    }
+
+    /**
+     * api-host and storage-host both publish from the root and from subprojects, so the two cases
+     * are not alternatives.
+     */
+    @Test
+    public void aRootThatAlsoPublishesCoversItselfAndItsSubprojects() {
+        Project root = newProject();
+        root.getPluginManager().apply("java");
+        root.getPluginManager().apply("maven-publish");
+        Project module = ProjectBuilder.builder().withName("kit").withParent(root).build();
+        module.getPluginManager().apply("java");
+        module.getPluginManager().apply("maven-publish");
+
+        applyWith(root, true);
+        evaluate(root);
+        evaluate(module);
+
+        assertNotNull(packagesRepository(root), "the root publishes too");
+        assertNotNull(packagesRepository(module), "and so does the subproject");
+    }
+
+    @Test
+    public void aSubprojectWithoutMavenPublishIsSkippedRatherThanFailing() {
+        Project root = newProject();
+        root.getPluginManager().apply("java");
+        root.getPluginManager().apply("maven-publish");
+        Project consumer = ProjectBuilder.builder().withName("app").withParent(root).build();
+        consumer.getPluginManager().apply("java");
+
+        applyWith(root, true);
+        evaluate(root);
+        evaluate(consumer);
+
+        assertNotNull(packagesRepository(root));
+        assertEquals(null, packagesRepository(consumer), "a project with nothing to publish is not a destination");
+    }
+
+    /**
+     * A root with subprojects cannot be judged while it is being evaluated, since they are evaluated
+     * after it is, so the case where nothing in the build publishes anything is caught when
+     * publishGithub runs. Without it the task succeeds having sent no package anywhere.
+     */
+    @Test
+    public void aBuildWhereNothingPublishesIsRefusedWhenPublishGithubRuns() {
+        Project root = newProject();
+        root.getPluginManager().apply("java");
+        Project module = ProjectBuilder.builder().withName("app").withParent(root).build();
+        module.getPluginManager().apply("java");
+
+        applyWith(root, true);
+        evaluate(root);
+        evaluate(module);
+
+        Task publishGithub = root.getTasks().getByName("publishGithub");
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> runActions(publishGithub));
+
+        assertTrue(rootCauseMessage(failure).contains("GitHub Packages"),
+                "the failure should say nothing would reach the registry, got " + rootCauseMessage(failure));
+    }
+
+    private void runActions(Task task) {
+        for (org.gradle.api.Action<? super Task> action : task.getActions()) {
+            action.execute(task);
+        }
+    }
+
+    private int countPackagesPublishes(List<String> dependencies) {
+        int found = 0;
+        for (String dependency : dependencies) {
+            if (dependency.contains(PackagesPublishing.PUBLISH_TASK_NAME)) {
+                found++;
+            }
+        }
+        return found;
+    }
+
     private Project publishingProject(boolean enabled) {
         Project project = newProject();
         project.getPluginManager().apply("java");
@@ -161,13 +278,14 @@ public class TestPackagesPublishing {
         return null;
     }
 
+    /**
+     * @implNote Resolved dependencies only. Reading {@code getDependsOn()} as well counts every
+     * dependency twice, once as the declared provider and once as the task it resolves to.
+     */
     private List<String> dependencyNames(Project project, Task task) {
         List<String> names = new ArrayList<String>();
         for (Object dependency : task.getTaskDependencies().getDependencies(task)) {
             names.add(((Task) dependency).getName());
-        }
-        for (Object declared : task.getDependsOn()) {
-            names.add(String.valueOf(declared));
         }
         return names;
     }

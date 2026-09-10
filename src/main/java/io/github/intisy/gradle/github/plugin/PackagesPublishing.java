@@ -10,7 +10,8 @@ import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 
 /**
- * Sends the project's Maven publications to GitHub Packages as part of {@code publishGithub}.
+ * Sends the project's Maven publications, and its subprojects', to GitHub Packages as part of
+ * {@code publishGithub}.
  */
 public final class PackagesPublishing {
 
@@ -24,68 +25,114 @@ public final class PackagesPublishing {
     }
 
     /**
-     * Registers the GitHub Packages repository and makes {@code publishGithub} publish to it, when
+     * Registers the GitHub Packages repository on every project of this build that publishes
+     * something, and makes {@code publishGithub} publish to each, when
      * {@code publishGithub.packages.enabled} is set.
      *
-     * @param project the project whose publications are published.
+     * @param project the project the block was written in, whose {@code publishGithub} does the work.
      * @param logger receives diagnostic output.
      * @param publishExtension the extension supplying the destination and the owner/repo fallback.
      * @param repositories the client used to read the git remote when the owner/repo is not stated.
      * @param credentials supplies the token the repository authenticates with.
-     * @implNote The repository is registered through {@code withPlugin("maven-publish")} rather
-     * than by applying that plugin here. Whether the destination is enabled is only known after
-     * the build script has run, and applying a plugin from inside {@code afterEvaluate} is the one
-     * point at which {@code maven-publish} can no longer add its own publish tasks. Every project
-     * that has something to publish already applies it, so requiring it costs nothing and an
-     * absent one is reported rather than worked around.
+     * @implNote Subprojects are covered because a root that publishes nothing of its own is the
+     * normal shape of a multi-module repository, and the release-asset half already spans them
+     * through {@code artifact { modules = true }}. The destination is registered through
+     * {@code withPlugin("maven-publish")} rather than by applying that plugin: whether the
+     * destination is enabled is only known after the build script has run, and applying
+     * {@code maven-publish} from inside {@code afterEvaluate} is the one point at which it can no
+     * longer add its own publish tasks.
      */
     public static void apply(Project project, Logger logger, PublishExtension publishExtension,
                              Repositories repositories, Credentials credentials) {
-        project.getPluginManager().withPlugin("maven-publish", applied ->
-                project.afterEvaluate(evaluated -> register(evaluated, logger, publishExtension, repositories, credentials)));
-        project.afterEvaluate(evaluated -> {
-            if (publishExtension.getPackages().isEnabled() && !evaluated.getPlugins().hasPlugin("maven-publish")) {
-                throw new IllegalStateException("publishGithub.packages is enabled but this project does not apply "
-                        + "maven-publish, so it has no publication to send. Add id 'maven-publish' to its plugins block.");
-            }
-        });
+        Registered registered = new Registered();
+        registerWhenPublishing(project, project, logger, publishExtension, repositories, credentials, registered);
+        project.subprojects(subproject ->
+                registerWhenPublishing(project, subproject, logger, publishExtension, repositories, credentials, registered));
+        project.afterEvaluate(evaluated -> guard(evaluated, publishExtension, registered));
     }
 
-    private static void register(Project project, Logger logger, PublishExtension publishExtension,
-                                 Repositories repositories, Credentials credentials) {
-        PackagesPublishExtension packages = publishExtension.getPackages();
-        if (!packages.isEnabled()) {
-            return;
-        }
+    /**
+     * Registers {@code target} as a destination once it turns out to apply {@code maven-publish}.
+     *
+     * @param owningProject the project whose {@code publishGithub} publishes it.
+     * @param target the project whose publications are published.
+     * @param logger receives diagnostic output.
+     * @param publishExtension the extension supplying the destination and the owner/repo fallback.
+     * @param repositories the client used to read the git remote.
+     * @param credentials supplies the token.
+     * @param registered counts the destinations, for the guard below.
+     */
+    private static void registerWhenPublishing(Project owningProject, Project target, Logger logger,
+                                               PublishExtension publishExtension, Repositories repositories,
+                                               Credentials credentials, Registered registered) {
+        target.getPluginManager().withPlugin("maven-publish", applied -> target.afterEvaluate(evaluated -> {
+            if (!publishExtension.getPackages().isEnabled()) {
+                return;
+            }
+            register(owningProject, evaluated, logger, publishExtension, repositories, credentials);
+            registered.count++;
+        }));
+    }
 
-        RemoteRepo target = target(project, publishExtension, repositories);
-        String url = "https://maven.pkg.github.com/" + target.getOwner() + "/" + target.getRepo();
-        PublishingExtension publishing = project.getExtensions().getByType(PublishingExtension.class);
+    private static void register(Project owningProject, Project target, Logger logger,
+                                 PublishExtension publishExtension, Repositories repositories,
+                                 Credentials credentials) {
+        RemoteRepo destination = destination(owningProject, publishExtension, repositories);
+        String url = "https://maven.pkg.github.com/" + destination.getOwner() + "/" + destination.getRepo();
+        PublishingExtension publishing = target.getExtensions().getByType(PublishingExtension.class);
 
         publishing.getRepositories().maven(repository -> {
             repository.setName(REPOSITORY_NAME);
-            repository.setUrl(project.uri(url));
+            repository.setUrl(target.uri(url));
             repository.credentials(passwordCredentials -> {
-                passwordCredentials.setUsername(username(target));
+                passwordCredentials.setUsername(username(destination));
                 passwordCredentials.setPassword(credentials.apiKey());
             });
         });
-        logger.debug("GitHub Packages destination: " + url);
+        logger.debug("GitHub Packages destination for " + target.getPath() + ": " + url);
 
-        if (publishing.getPublications().isEmpty() && project.getPlugins().hasPlugin("java")) {
+        if (publishing.getPublications().isEmpty() && target.getPlugins().hasPlugin("java")) {
             publishing.getPublications().create(REPOSITORY_NAME, MavenPublication.class, publication ->
-                    publication.from(project.getComponents().getByName("java")));
-            logger.debug("No publication was declared, so one was created from the java component.");
+                    publication.from(target.getComponents().getByName("java")));
+            logger.debug(target.getPath() + " declared no publication, so one was created from the java component.");
         }
 
-        project.getTasks().named(PUBLISH_TASK_NAME).configure(publish -> publish.doFirst(task -> {
+        target.getTasks().named(PUBLISH_TASK_NAME).configure(publish -> publish.doFirst(task -> {
             if (credentials.apiKey() == null) {
                 throw new IllegalStateException("Publishing to GitHub Packages needs a token with write:packages. "
                         + "Set github { auth { token = \"...\" } }, or GITHUB_TOKEN, or sign in with "
                         + "gh auth login (and gh auth refresh -s write:packages).");
             }
         }));
-        project.getTasks().named("publishGithub").configure(publishGithub -> publishGithub.dependsOn(PUBLISH_TASK_NAME));
+        owningProject.getTasks().named("publishGithub").configure(publishGithub ->
+                publishGithub.dependsOn(target.getTasks().named(PUBLISH_TASK_NAME)));
+    }
+
+    /**
+     * Reports a build that would publish no package at all.
+     *
+     * @param project the project the block was written in.
+     * @param publishExtension the extension stating whether the destination is enabled.
+     * @param registered the destination count.
+     * @implNote The single-project case fails at once, because it is the common misconfiguration and
+     * the answer is already known. A project with subprojects cannot be judged that early, since
+     * they are evaluated after it is, so that case is checked when {@code publishGithub} runs, by
+     * which time the count is final.
+     */
+    private static void guard(Project project, PublishExtension publishExtension, Registered registered) {
+        if (!publishExtension.getPackages().isEnabled()) {
+            return;
+        }
+        if (project.getSubprojects().isEmpty() && !project.getPlugins().hasPlugin("maven-publish")) {
+            throw new IllegalStateException("publishGithub.packages is enabled but this project does not apply "
+                    + "maven-publish, so it has no publication to send. Add id 'maven-publish' to its plugins block.");
+        }
+        project.getTasks().named("publishGithub").configure(publishGithub -> publishGithub.doFirst(task -> {
+            if (registered.count == 0) {
+                throw new IllegalStateException("publishGithub.packages is enabled but no project in this build "
+                        + "applies maven-publish, so nothing would reach GitHub Packages.");
+            }
+        }));
     }
 
     /**
@@ -94,7 +141,7 @@ public final class PackagesPublishing {
      * @param repositories the client used to read the git remote.
      * @return the repository the packages are published under.
      */
-    private static RemoteRepo target(Project project, PublishExtension publishExtension, Repositories repositories) {
+    private static RemoteRepo destination(Project project, PublishExtension publishExtension, Repositories repositories) {
         PackagesPublishExtension packages = publishExtension.getPackages();
         if (packages.getOwner() != null && packages.getRepo() != null) {
             return new RemoteRepo(packages.getOwner(), packages.getRepo());
@@ -106,13 +153,18 @@ public final class PackagesPublishing {
     }
 
     /**
-     * @param target the repository being published to.
+     * @param destination the repository being published to.
      * @return the username sent with the token.
      * @implNote GitHub Packages authenticates on the token alone and ignores this value, but Gradle
      * still requires one, and a recognisable one keeps a 401 readable.
      */
-    private static String username(RemoteRepo target) {
+    private static String username(RemoteRepo destination) {
         String actor = System.getenv("GITHUB_ACTOR");
-        return actor != null && !actor.trim().isEmpty() ? actor.trim() : target.getOwner();
+        return actor != null && !actor.trim().isEmpty() ? actor.trim() : destination.getOwner();
+    }
+
+    /** How many destinations were registered, which only the last subproject's evaluation settles. */
+    private static final class Registered {
+        private int count;
     }
 }
