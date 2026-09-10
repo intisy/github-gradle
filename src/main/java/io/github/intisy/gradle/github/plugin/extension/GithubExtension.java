@@ -64,6 +64,7 @@ public class GithubExtension implements GitHubConfig {
     private final AuthSettings auth = new AuthSettings();
     private final ResilienceSettings resilience = new ResilienceSettings();
     private final SourcesExtension sources = new SourcesExtension();
+    private final PackagesExtension packages = new PackagesExtension();
 
     private String accessToken;
     private boolean debug;
@@ -335,5 +336,34 @@ public class GithubExtension implements GitHubConfig {
         closure.setResolveStrategy(Closure.DELEGATE_FIRST);
         closure.setDelegate(sources);
         closure.call(sources);
+    }
+
+    /**
+     * @return The nested packages extension.
+     */
+    public PackagesExtension getPackages() {
+        return packages;
+    }
+
+    /**
+     * Configures the nested packages extension using a Gradle action.
+     *
+     * @param action The configuration action.
+     */
+    public void packages(Action<? super PackagesExtension> action) {
+        action.execute(packages);
+    }
+
+    /**
+     * Configures the nested packages extension using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code packages { from "owner/repo" } }
+     *
+     * @param closure The configuration closure.
+     */
+    public void packages(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(packages);
+        closure.call(packages);
     }
 }

@@ -48,6 +48,7 @@ public class PublishExtension {
     private String releaseName;
     private File jar;
     private final List<ArtifactEntry> artifacts = new ArrayList<ArtifactEntry>();
+    private final PackagesPublishExtension packages = new PackagesPublishExtension();
 
     /**
      * Override the GitHub repository owner.
@@ -212,5 +213,34 @@ public class PublishExtension {
         closure.setResolveStrategy(Closure.DELEGATE_FIRST);
         closure.setDelegate(this);
         closure.call(this);
+    }
+
+    /**
+     * @return the nested GitHub Packages destination.
+     */
+    public PackagesPublishExtension getPackages() {
+        return packages;
+    }
+
+    /**
+     * Configures the GitHub Packages destination using a Gradle action.
+     *
+     * @param action action that configures a {@link PackagesPublishExtension}.
+     */
+    public void packages(Action<? super PackagesPublishExtension> action) {
+        action.execute(packages);
+    }
+
+    /**
+     * Configures the GitHub Packages destination using a Groovy closure.
+     * Supports Gradle Groovy DSL usage: {@code packages { enabled = true } }
+     *
+     * @param closure closure that configures a {@link PackagesPublishExtension}.
+     */
+    public void packages(Closure<?> closure) {
+        if (closure == null) return;
+        closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+        closure.setDelegate(packages);
+        closure.call(packages);
     }
 }

@@ -56,17 +56,10 @@ public class PublishTasks {
 					        + "Set version in your build.gradle, or set publishGithub { version = \"1.0.0\" }.");
 				}
 
-				String owner;
-				String repo;
-				if (publishExtension.getOwner() != null && publishExtension.getRepo() != null) {
-					owner = publishExtension.getOwner();
-					repo  = publishExtension.getRepo();
-				} else {
-					RemoteRepo ownerRepo = repositories.remoteOf(project.getProjectDir());
-					owner = publishExtension.getOwner() != null ? publishExtension.getOwner() : ownerRepo.getOwner();
-					repo  = publishExtension.getRepo()  != null ? publishExtension.getRepo()  : ownerRepo.getRepo();
-				}
-								String tag = publishExtension.getTag() != null
+				RemoteRepo target = PublishTarget.resolve(project, publishExtension, repositories);
+				String owner = target.getOwner();
+				String repo = target.getRepo();
+				String tag = publishExtension.getTag() != null
 					        ? publishExtension.getTag()
 					        : version;
 				String releaseName = publishExtension.getReleaseName();

@@ -84,7 +84,7 @@ tasks.withType(Javadoc) {
         author = true
         version = true
         links("https://docs.oracle.com/en/java/javase/11/docs/api/")
-        tags("implNote:a:Implementation Note:", "implSpec:a:Implementation Requirements:")
+        tags("apiNote:a:API Note:", "implNote:a:Implementation Note:", "implSpec:a:Implementation Requirements:")
         addBooleanOption('Xwerror', true)
     }
 }

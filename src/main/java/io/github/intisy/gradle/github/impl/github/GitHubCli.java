@@ -31,6 +31,7 @@ public class GitHubCli {
 
     private final GitHubLogger logger;
     private Boolean available;
+    private boolean warnedUnavailable;
 
     /**
      * @param logger the logger for diagnostics.
@@ -40,18 +41,64 @@ public class GitHubCli {
     }
 
     /**
-     * Checks whether the {@code gh} CLI is installed and runnable. The result is probed once and cached.
+     * Checks whether the {@code gh} CLI can serve as the API transport, warning once when it cannot.
      *
      * @return true if {@code gh --version} succeeds.
      */
     public boolean isAvailable() {
+        boolean present = isPresent();
+        if (!present && !warnedUnavailable) {
+            warnedUnavailable = true;
+            logger.warn("github.cli.enabled is true but the 'gh' CLI was not found on PATH.");
+        }
+        return present;
+    }
+
+    /**
+     * Checks whether the {@code gh} CLI is installed and runnable. The result is probed once and cached.
+     *
+     * @return true if {@code gh --version} succeeds.
+     * @implNote Silent where {@link #isAvailable()} warns, because an absent CLI is only worth a
+     * warning when {@code cli.enabled} asked for it as the transport. Borrowing its token is a
+     * last-resort fallback nobody configured, so finding no CLI there is unremarkable.
+     */
+    public boolean isPresent() {
         if (available == null) {
             available = probe();
-            if (!available) {
-                logger.warn("github.cli.enabled is true but the 'gh' CLI was not found on PATH.");
-            }
         }
         return available;
+    }
+
+    /**
+     * Reads the token the local CLI is signed in with, by running {@code gh auth token}.
+     *
+     * @return the token, or null if {@code gh} is absent, is signed out, or the call fails.
+     */
+    public String authToken() {
+        if (!isPresent()) {
+            return null;
+        }
+        try {
+            Process process = new ProcessBuilder("gh", "auth", "token").start();
+            StreamReader errorReader = new StreamReader(process.getErrorStream());
+            errorReader.start();
+            byte[] output = readFully(process.getInputStream());
+            int exitCode = process.waitFor();
+            errorReader.join();
+            if (exitCode != 0) {
+                logger.debug("gh auth token exited " + exitCode + ": "
+                        + new String(errorReader.bytes(), StandardCharsets.UTF_8).trim());
+                return null;
+            }
+            String token = new String(output, StandardCharsets.UTF_8).trim();
+            return token.isEmpty() ? null : token;
+        } catch (IOException e) {
+            logger.debug("Could not run gh auth token: " + e.getMessage());
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
     /**
