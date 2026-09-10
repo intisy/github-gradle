@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.11.1"
+    id "io.github.intisy.github-gradle" version "1.11.2"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.11.1"
+        classpath "io.github.intisy.github-gradle:1.11.2"
     }
 }
 
@@ -144,6 +144,8 @@ dependencies {
 `from` is repeatable and takes `owner/repo`, which becomes
 `https://maven.pkg.github.com/owner/repo`. The optional `group` narrows a repository to one
 dependency group, so resolving anything else never queries it and never collects a 404 from it.
+A multi-module build declares its sources once, at the root: every subproject can resolve from
+them, since the modules are what actually have dependencies.
 
 Credentials come from the same `auth` block, environment variables and `gh` login as everything
 else, and a token is always required: GitHub Packages refuses an anonymous read even of a public
