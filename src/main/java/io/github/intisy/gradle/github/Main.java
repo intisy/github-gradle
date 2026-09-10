@@ -11,6 +11,7 @@ import io.github.intisy.gradle.github.plugin.DependencyResolution;
 import io.github.intisy.gradle.github.plugin.DependencyTasks;
 import io.github.intisy.gradle.github.plugin.GithubConfigurations;
 import io.github.intisy.gradle.github.plugin.Logger;
+import io.github.intisy.gradle.github.plugin.PackagesResolution;
 import io.github.intisy.gradle.github.plugin.PublishTasks;
 import io.github.intisy.gradle.github.plugin.ResourceSync;
 import io.github.intisy.gradle.github.plugin.SourcesResolution;
@@ -47,5 +48,6 @@ class Main implements Plugin<Project> {
 		DependencyMetadata.apply(project, logger);
 		DependencyTasks.apply(project, logger, githubExtension, api.releases());
 		PublishTasks.apply(project, logger, publishExtension, api.repositories(), api.publishing());
+		PackagesResolution.apply(project, logger, githubExtension.getPackages(), api.credentials());
 	}
 }
