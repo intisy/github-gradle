@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.11.0"
+    id "io.github.intisy.github-gradle" version "1.11.1"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.11.0"
+        classpath "io.github.intisy.github-gradle:1.11.1"
     }
 }
 
@@ -177,11 +177,14 @@ publishGithub {
 }
 ```
 
-The project must apply `maven-publish`; what is published is whatever publications it declares, or
-one created from the `java` component if it declares none. `owner` and `repo` fall back to the ones
-`publishGithub` already resolves, so a build normally states nothing but `enabled`. Uploading an
-asset whose name the release already carries replaces it, so republishing one version, as a rolling
-snapshot does on every push, works rather than failing on the second run.
+Every project of the build that applies `maven-publish` becomes a destination, the root and its
+subprojects alike, and what is published is whatever publications each declares, or one created
+from its `java` component if it declares none. So a multi-module repository whose root publishes
+nothing of its own needs the block only once, at the root, exactly as
+`artifact { modules = true }` covers the same modules on the release side. `owner` and `repo` fall
+back to the ones `publishGithub` already resolves, so a build normally states nothing but
+`enabled`. Uploading an asset whose name the release already carries replaces it, so republishing
+one version, as a rolling snapshot does on every push, works rather than failing on the second run.
 
 ### Managing installed dependencies
 
