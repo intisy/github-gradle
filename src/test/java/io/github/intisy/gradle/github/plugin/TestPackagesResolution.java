@@ -114,6 +114,40 @@ public class TestPackagesResolution {
         assertThrows(IllegalArgumentException.class, () -> extension.from("my-org/libs/extra"));
     }
 
+    /**
+     * A multi-module consumer declares its sources once, at the root, and the modules are what
+     * actually resolve dependencies. Registering only on the project the block was written in
+     * leaves every module unable to see the registry.
+     */
+    @Test
+    public void everySubprojectCanResolveFromTheDeclaredRegistry() {
+        Project root = ProjectBuilder.builder().build();
+        Project first = ProjectBuilder.builder().withName("kernel").withParent(root).build();
+        Project second = ProjectBuilder.builder().withName("spi").withParent(root).build();
+
+        PackagesResolution.apply(root, new CapturingLogger(), packagesFrom("my-org/libs"), new FixedToken("a-token"));
+        evaluate(root);
+        evaluate(first);
+        evaluate(second);
+
+        assertEquals(1, mavenRepositories(first).size(), "kernel should see the registry");
+        assertEquals(1, mavenRepositories(second).size(), "spi should see the registry");
+    }
+
+    @Test
+    public void aSubprojectRegistryCarriesTheUrlAndTheToken() {
+        Project root = ProjectBuilder.builder().build();
+        Project module = ProjectBuilder.builder().withName("kernel").withParent(root).build();
+
+        PackagesResolution.apply(root, new CapturingLogger(), packagesFrom("my-org/libs"), new FixedToken("a-token"));
+        evaluate(root);
+        evaluate(module);
+
+        MavenArtifactRepository repository = mavenRepositories(module).get(0);
+        assertEquals("https://maven.pkg.github.com/my-org/libs", repository.getUrl().toString());
+        assertEquals("a-token", repository.getCredentials(PasswordCredentials.class).getPassword());
+    }
+
     private PackagesExtension packagesFrom(String repository) {
         PackagesExtension extension = new PackagesExtension();
         extension.from(repository);
