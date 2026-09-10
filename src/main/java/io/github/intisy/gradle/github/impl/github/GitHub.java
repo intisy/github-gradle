@@ -15,6 +15,7 @@ import io.github.intisy.gradle.github.api.log.GitHubLogger;
 import io.github.intisy.gradle.github.api.capability.Publishing;
 import io.github.intisy.gradle.github.api.RateLimitException;
 import io.github.intisy.gradle.github.api.model.Release;
+import io.github.intisy.gradle.github.api.model.ReleaseAsset;
 import io.github.intisy.gradle.github.api.model.RemoteRepo;
 import io.github.intisy.gradle.github.api.capability.Repositories;
 import io.github.intisy.gradle.github.api.capability.Releases;
@@ -1630,6 +1631,56 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
     }
 
     /**
+     * Makes an authenticated DELETE request to the GitHub API.
+     *
+     * @param url the API URL
+     * @return the HTTP response (caller must close)
+     * @throws IOException if the request fails
+     */
+    private Response makeGitHubApiDeleteRequest(String url) throws IOException {
+        if (useCli()) {
+            try {
+                return cli.request(url, "DELETE", null);
+            } catch (IOException e) {
+                rethrowUnlessCliFallback(e);
+            }
+        }
+
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(url)
+                .delete()
+                .addHeader("Accept", "application/vnd.github+json")
+                .addHeader("X-GitHub-Api-Version", "2022-11-28");
+
+        String apiKey = getApiKey();
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            requestBuilder.addHeader("Authorization", "Bearer " + apiKey);
+        }
+
+        return httpClient.newCall(requestBuilder.build()).execute();
+    }
+
+    /**
+     * Deletes an asset already attached to a release.
+     *
+     * @param asset the asset to delete, carrying its own API URL
+     * @throws IOException if the request fails or GitHub refuses the delete
+     * @implNote A 404 counts as done rather than as a failure: the asset list was read when the
+     * release was looked up, so an asset deleted by someone else in between is exactly the state
+     * this call was trying to reach.
+     */
+    private void deleteReleaseAsset(ReleaseAsset asset) throws IOException {
+        logger.debug("Deleting existing asset " + asset.getName() + " at " + asset.getApiUrl());
+        try (Response response = makeGitHubApiDeleteRequest(asset.getApiUrl())) {
+            if (!response.isSuccessful() && response.code() != 404) {
+                throw new IOException(buildHttpErrorMessage(response.code(), response.message(),
+                        "delete existing asset " + asset.getName()));
+            }
+        }
+        logger.debug("Deleted existing asset " + asset.getName());
+    }
+
+    /**
      * Reads the git remote "origin" URL from the project directory and parses it
      * into {@code [owner, repo]}.  Supports both HTTPS and SSH remote URLs.
      *
@@ -1871,8 +1922,27 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
                 release.get("tag_name").getAsString(),
                 name,
                 release.get("html_url").getAsString(),
-                release.get("upload_url").getAsString()
+                release.get("upload_url").getAsString(),
+                toReleaseAssets(release.getAsJsonArray("assets"))
         );
+    }
+
+    /**
+     * @param assets the {@code assets} array from a release payload, or null when it carries none
+     * @return one {@link ReleaseAsset} per entry that states both a name and a URL
+     */
+    private List<ReleaseAsset> toReleaseAssets(JsonArray assets) {
+        List<ReleaseAsset> result = new ArrayList<ReleaseAsset>();
+        if (assets == null) {
+            return result;
+        }
+        for (int index = 0; index < assets.size(); index++) {
+            JsonObject asset = assets.get(index).getAsJsonObject();
+            if (asset.has("name") && asset.has("url")) {
+                result.add(new ReleaseAsset(asset.get("name").getAsString(), asset.get("url").getAsString()));
+            }
+        }
+        return result;
     }
 
     @Override
@@ -1924,6 +1994,10 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
 
     @Override
     public void uploadAsset(Release release, File file, String assetName) throws IOException {
+        ReleaseAsset existing = release.assetNamed(assetName);
+        if (existing != null) {
+            deleteReleaseAsset(existing);
+        }
         uploadReleaseAsset(release.getUploadUrl(), file, assetName);
     }
 }
