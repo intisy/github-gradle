@@ -12,7 +12,7 @@ Using the plugins DSL:
 
 ```groovy
 plugins {
-    id "io.github.intisy.github-gradle" version "1.11.2"
+    id "io.github.intisy.github-gradle" version "1.11.3"
 }
 ```
 
@@ -26,7 +26,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "io.github.intisy.github-gradle:1.11.2"
+        classpath "io.github.intisy.github-gradle:1.11.3"
     }
 }
 
@@ -166,6 +166,21 @@ publishGithub {
     jar         = file("build/libs/my-app.jar") // auto-selected from build/libs if omitted
 }
 ```
+
+A multi-module repository uploads one asset per module with `modules = true`, which needs no list
+of them:
+
+```groovy
+publishGithub {
+    artifacts {
+        artifact { modules = true }
+    }
+}
+```
+
+Every project of the build that produces a jar becomes an asset, the root included when it produces
+one of its own. A module uploads as `<repo>-<module>.jar` and the root as `<repo>.jar`, so a plain
+`OWNER:REPO:TAG` coordinate resolves the root's jar and the `:all` classifier pulls the modules.
 
 To publish the project's Maven publications to GitHub Packages in the same run, enable the nested
 `packages { }` block. One `publishGithub` then reaches both destinations, so neither can drift
