@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -71,14 +72,19 @@ import java.util.zip.ZipFile;
  */
 @SuppressWarnings("unused")
 public class GitHub implements Credentials, Repositories, Releases, Publishing {
+    /** Checked in order, after everything a build script states. */
+    private static final List<String> TOKEN_ENVIRONMENT_VARIABLES = Arrays.asList("GITHUB_TOKEN", "GH_TOKEN");
+
     private final GitHubLogger logger;
     private final ResourceSettings resourcesExtension;
     private final GitHubConfig githubExtension;
     private String resolvedApiKey;
+    private boolean apiKeyResolved;
     private String resolvedSshKey;
     private final OkHttpClient httpClient;
     private final Gson gson;
     private final GitHubCli cli;
+    private final Function<String, String> environment;
 
     /**
      * Constructs a new GitHub helper instance.
@@ -88,13 +94,30 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @param githubExtension the github extension containing access token configuration
      */
     public GitHub(GitHubLogger logger, ResourceSettings resourcesExtension, GitHubConfig githubExtension) {
+        this(logger, resourcesExtension, githubExtension, System::getenv, new GitHubCli(logger), new OkHttpClient());
+    }
+
+    /**
+     * @param logger the logger instance for debug and error messages
+     * @param resourcesExtension the resources extension containing repository configuration
+     * @param githubExtension the github extension containing access token configuration
+     * @param environment reads an environment variable by name
+     * @param cli the {@code gh} CLI transport
+     * @param httpClient the client every HTTP call goes through
+     * @implNote Exists so the token precedence in {@link #resolveToken()} and the requests the
+     * publish path makes can both be tested. Reading {@code System.getenv}, spawning {@code gh},
+     * and building an HTTP client in here are each what would make one of them untestable.
+     */
+    GitHub(GitHubLogger logger, ResourceSettings resourcesExtension, GitHubConfig githubExtension,
+           Function<String, String> environment, GitHubCli cli, OkHttpClient httpClient) {
         this.logger = logger;
         this.resourcesExtension = resourcesExtension;
         this.githubExtension = githubExtension;
         this.resolvedApiKey = null;
-        this.httpClient = new OkHttpClient();
+        this.httpClient = httpClient;
         this.gson = new Gson();
-        this.cli = new GitHubCli(logger);
+        this.cli = cli;
+        this.environment = environment;
         logger.debug("GitHub helper initialized.");
     }
 
@@ -170,17 +193,24 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
      * @return the resolved token, or null if none is configured
      */
     public String getApiKey() {
-        if (this.resolvedApiKey == null) {
+        if (!this.apiKeyResolved) {
             this.resolvedApiKey = resolveToken();
+            this.apiKeyResolved = true;
         }
         return this.resolvedApiKey;
     }
 
     /**
      * Resolves the token with precedence {@code auth.token} &rarr; {@code auth.tokenFile} &rarr; the
-     * deprecated {@code accessToken} (only when it is not an SSH key).
+     * deprecated {@code accessToken} (only when it is not an SSH key) &rarr; {@code GITHUB_TOKEN}
+     * &rarr; {@code GH_TOKEN} &rarr; {@code gh auth token}.
      *
      * @return the resolved token, or null if none is configured
+     * @implNote The last three are fallbacks rather than configuration, so they sit after
+     * everything a build script states and nothing explicit changes meaning. Reaching the CLI at
+     * all costs a process spawn, which is why it is last and why {@link #getApiKey()} caches a null
+     * result: unauthenticated is a supported state, and re-answering it once per request would
+     * spawn {@code gh} once per request.
      */
     @SuppressWarnings("deprecation") // reads the deprecated accessToken as a fallback on purpose
     private String resolveToken() {
@@ -197,6 +227,18 @@ public class GitHub implements Credentials, Repositories, Releases, Publishing {
         if (legacy != null && !isSshKey(legacy)) {
             logger.debug("Using the deprecated accessToken as the token.");
             return legacy;
+        }
+        for (String variable : TOKEN_ENVIRONMENT_VARIABLES) {
+            String value = environment.apply(variable);
+            if (value != null && !value.trim().isEmpty()) {
+                logger.debug("Using the token from " + variable + ".");
+                return value.trim();
+            }
+        }
+        String cliToken = cli.authToken();
+        if (cliToken != null) {
+            logger.debug("Using the token the gh CLI is signed in with.");
+            return cliToken;
         }
         return null;
     }
