@@ -130,6 +130,21 @@ publishGithub {
 }
 ```
 
+A multi-module repository uploads one asset per module with `modules = true`, which needs no list
+of them:
+
+```groovy
+publishGithub {
+    artifacts {
+        artifact { modules = true }
+    }
+}
+```
+
+Every project of the build that produces a jar becomes an asset, the root included when it produces
+one of its own. A module uploads as `<repo>-<module>.jar` and the root as `<repo>.jar`, so a plain
+`OWNER:REPO:TAG` coordinate resolves the root's jar and the `:all` classifier pulls the modules.
+
 To publish the project's Maven publications to GitHub Packages in the same run, enable the nested
 `packages { }` block. One `publishGithub` then reaches both destinations, so neither can drift
 behind the other:

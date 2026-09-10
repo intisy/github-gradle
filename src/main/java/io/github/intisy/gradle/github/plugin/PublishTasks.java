@@ -108,7 +108,7 @@ public class PublishTasks {
 	 * @param classifier the artifact classifier (blank means default)
 	 * @return e.g. {@code "my-repo.jar"} or {@code "my-repo-api.jar"}
 	 */
-	private static String buildAssetName(String repo, String classifier) {
+	static String buildAssetName(String repo, String classifier) {
 		if (classifier == null || classifier.isEmpty()) {
 			return repo + ".jar";
 		}
@@ -116,18 +116,33 @@ public class PublishTasks {
 	}
 
 	/**
-	 * Builds the artifact list for multi-module publishing: one entry per subproject, using its {@code jar}
-	 * task output and a classifier equal to the subproject name with the {@code <repo>-} prefix stripped
-	 * (so {@code dough-common} in repo {@code dough} uploads as {@code dough-common.jar}, not
-	 * {@code dough-dough-common.jar}).
+	 * Builds the artifact list for multi-module publishing: one entry per project that produces a jar,
+	 * using its {@code jar} task output and a classifier equal to the project name with the
+	 * {@code <repo>-} prefix stripped (so {@code dough-common} in repo {@code dough} uploads as
+	 * {@code dough-common.jar}, not {@code dough-dough-common.jar}).
 	 *
 	 * @param project the (root) project whose subprojects are published
 	 * @param repo    the repository name (used to strip the module prefix)
 	 * @param logger  the logger
-	 * @return one {@link ArtifactEntry} per subproject that produces a jar
+	 * @return one {@link ArtifactEntry} per project that produces a jar, the root included
+	 * @implNote The root counts as a module when it produces a jar of its own, which is what a
+	 * repository that publishes an artifact AND ships extension modules alongside it looks like. It
+	 * used to be skipped, so such a repository's own jar reached the packages registry and never the
+	 * release, leaving the two destinations disagreeing about what the repository publishes. The root
+	 * takes the empty classifier, so it uploads as {@code <repo>.jar}: the name a plain
+	 * {@code OWNER:REPO:TAG} coordinate resolves, and one the {@code :all} classifier ignores, since
+	 * that matches only names carrying a {@code <repo>-} prefix.
 	 */
-	private static List<ArtifactEntry> buildModuleArtifacts(Project project, String repo, Logger logger) {
+	static List<ArtifactEntry> buildModuleArtifacts(Project project, String repo, Logger logger) {
 		List<ArtifactEntry> entries = new ArrayList<ArtifactEntry>();
+		Task rootJarTask = project.getTasks().findByName("jar");
+		if (rootJarTask instanceof Jar) {
+			ArtifactEntry rootEntry = new ArtifactEntry();
+			rootEntry.setJar(((Jar) rootJarTask).getArchiveFile().get().getAsFile());
+			rootEntry.setClassifier("");
+			entries.add(rootEntry);
+			logger.debug("Module artifact: the root -> " + buildAssetName(repo, ""));
+		}
 		for (Project sub : project.getSubprojects()) {
 			Task jarTask = sub.getTasks().findByName("jar");
 			if (!(jarTask instanceof Jar)) {
@@ -144,7 +159,7 @@ public class PublishTasks {
 			logger.debug("Module artifact: " + sub.getName() + " -> " + buildAssetName(repo, classifier));
 		}
 		if (entries.isEmpty()) {
-			throw new RuntimeException("An artifact { modules = true } entry was declared but no subprojects with a jar task were found.");
+			throw new RuntimeException("An artifact { modules = true } entry was declared but no project in this build has a jar task.");
 		}
 		return entries;
 	}
